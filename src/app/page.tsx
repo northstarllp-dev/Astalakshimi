@@ -118,7 +118,7 @@ export default function LandingPage() {
           </div>
 
           {/* Register card */}
-          <div className="relative px-4 pb-8 pt-6 -mt-1 bg-gradient-to-b from-[#1a0608]/95 via-background/80 to-background">
+          <div className="relative px-4 pb-12 pt-6 -mt-1 bg-[#1a0608]">
             <HeroRegisterCard />
           </div>
         </div>

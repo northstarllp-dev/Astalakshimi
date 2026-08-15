@@ -68,9 +68,7 @@ export default function SignupPage() {
                 <ArrowLeft className="h-4 w-4" />
               </button>
             )}
-            <Link href="/">
-              <Logo />
-            </Link>
+            <Logo />
           </div>
           {!submitted && <StepProgress step={step} total={TOTAL_STEPS} />}
         </div>

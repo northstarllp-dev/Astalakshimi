@@ -167,7 +167,7 @@ export function Step6Verify({
   }
 
   return (
-    <div className="space-y-8 pb-28 md:pb-8">
+    <div className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8 pb-8">
       <StepHeading
         title="Photos & verification"
         subtitle="Add clear photos, verify with a selfie or government ID, and optionally upload your horoscope. Photos stay hidden until our team approves them — usually within 12 hours."
@@ -414,7 +414,7 @@ export function Step6Verify({
         <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-4 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0 safe-bottom">
+      <div className="mt-auto sticky bottom-0 z-40 -mx-4 border-t border-border bg-background/95 p-4 pt-6 backdrop-blur md:static md:-mx-0 md:border-0 md:bg-transparent md:p-0 md:pt-0 safe-bottom">
         <Button className="w-full" size="lg" disabled={!canSubmit} onClick={onSubmit}>
           Submit for verification
         </Button>
