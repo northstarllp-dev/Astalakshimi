@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6efe2;
+  --foreground: #2a1810;
+  --primary: #8b1e3f;
+  --primary-foreground: #fff8ee;
+  --secondary: #c9a227;
+  --secondary-foreground: #2a1810;
+  --muted: #ede3d0;
+  --muted-foreground: #6d5648;
+  --accent: #0f5c4c;
+  --accent-foreground: #fff8ee;
+  --border: #e0d0b4;
+  --input: #e0d0b4;
+  --card: #fffbf4;
+  --card-foreground: #2a1810;
+  --ring: #8b1e3f;
+  --destructive: #b42318;
+  --success: #067647;
+  --temple: #3d120c;
+  --peacock: #0f5c4c;
+  --gold: #c9a227;
+  --sandal: #f6efe2;
+  --radius: 0.875rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-temple: var(--temple);
+  --color-peacock: var(--peacock);
+  --color-gold: var(--gold);
+  --color-sandal: var(--sandal);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-xl: calc(var(--radius) * 1.35);
+
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-cormorant), ui-serif, Georgia, serif;
+  --font-tamil: var(--font-tiro), ui-serif, Georgia, serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans), sans-serif;
+    min-height: 100dvh;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .field-select {
+    display: flex;
+    height: 3rem;
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid var(--input);
+    background: var(--card);
+    padding: 0 1rem;
+    font-size: 0.9375rem;
+    box-shadow: 0 1px 2px rgb(42 24 16 / 0.04);
+  }
+
+  .field-select:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ring);
+  }
+
+  .kolam-surface {
+    background-color: var(--background);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23c9a227' stroke-width='0.7' opacity='0.18'%3E%3Ccircle cx='36' cy='36' r='3'/%3E%3Cpath d='M36 18c6 6 6 12 0 18s-6 12 0 18'/%3E%3Cpath d='M36 18c-6 6-6 12 0 18s6 12 0 18'/%3E%3Cpath d='M18 36c6-6 12-6 18 0s12 6 18 0'/%3E%3Cpath d='M18 36c6 6 12 6 18 0s12-6 18 0'/%3E%3Ccircle cx='18' cy='18' r='1.4' fill='%238b1e3f' stroke='none' opacity='0.35'/%3E%3Ccircle cx='54' cy='18' r='1.4' fill='%238b1e3f' stroke='none' opacity='0.35'/%3E%3Ccircle cx='18' cy='54' r='1.4' fill='%238b1e3f' stroke='none' opacity='0.35'/%3E%3Ccircle cx='54' cy='54' r='1.4' fill='%238b1e3f' stroke='none' opacity='0.35'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  .gold-rule {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #c9a227 20%, #f3e3a0 50%, #c9a227 80%, transparent);
+  }
+
+  .temple-frame {
+    box-shadow:
+      0 0 0 1px #c9a227,
+      0 0 0 4px #fffbf4,
+      0 0 0 5px #c9a22755;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fade-up 0.35s ease-out both;
+}
