@@ -110,8 +110,12 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-        <div className="border-t border-border/70 px-4 py-2 md:hidden">
-          <label className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm">
+      </header>
+
+      <main className="mx-auto max-w-5xl space-y-4 px-3 py-4 sm:px-4 md:space-y-6 md:py-8">
+        {/* Mobile Search - scrolls away */}
+        <div className="md:hidden">
+          <label className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm shadow-sm">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               type="search"
@@ -122,9 +126,7 @@ export default function DashboardPage() {
             />
           </label>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-5xl space-y-4 px-3 py-4 sm:px-4 md:space-y-6 md:py-8">
         {pending && (
           <section className="overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-[#fff8ef] shadow-sm">
             <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between sm:p-4">
@@ -179,7 +181,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="sticky top-[6.5rem] z-30 -mx-3 bg-background/90 px-3 py-2 backdrop-blur-md sm:-mx-4 sm:px-4 md:static md:top-auto md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
+        <section className="sticky top-14 z-30 -mx-3 bg-background/90 px-3 py-2 backdrop-blur-md sm:-mx-4 sm:px-4 md:static md:top-auto md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
           <div className="flex items-center gap-2">
             <button
               type="button"

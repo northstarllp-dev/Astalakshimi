@@ -53,8 +53,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
-      <header className="sticky top-0 z-50 border-b border-secondary/30 bg-[#fffbf4]/90 backdrop-blur-md safe-top">
+    <div className="flex min-h-dvh flex-col bg-background kolam-surface">
+      <header className="sticky top-0 z-50 bg-[#fffdf8]/96 backdrop-blur-xl safe-top">
         <div className="gold-rule" />
         <div className="mx-auto flex h-16 max-w-xl items-center justify-between px-4">
           <div className="flex items-center gap-3">
@@ -62,10 +62,10 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={prevStep}
-                className="tap-target inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+                className="tap-target inline-flex items-center justify-center rounded-full border border-secondary/20 bg-card text-muted-foreground hover:text-primary hover:border-primary/30 transition-all"
                 aria-label="Go back"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4" />
               </button>
             )}
             <Link href="/">
@@ -77,14 +77,15 @@ export default function SignupPage() {
         {!submitted && (
           <div className="h-1 bg-muted">
             <div
-              className="h-full bg-primary transition-all duration-300"
+              className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
               style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
             />
           </div>
         )}
+        <div className="h-px bg-gradient-to-r from-transparent via-secondary/20 to-transparent" />
       </header>
 
-      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 py-6 md:py-10">
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 py-8 md:py-12">
         <AnimatePresence mode="wait">
           <motion.div
             key={submitted ? "done" : step}
@@ -92,7 +93,7 @@ export default function SignupPage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -16 }}
             transition={{ duration: 0.22 }}
-            className="w-full"
+            className="flex w-full flex-1 flex-col"
           >
             {submitted ? (
               <VerificationSubmitted onContinue={() => router.push("/dashboard")} />
@@ -135,11 +136,12 @@ function Step1PhoneOTP({
   }, [otpSent, seconds])
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 md:space-y-8">
       <StepHeading title="Welcome to Astalakshimi" subtitle="Register free with your mobile number. South Indian families, verified photos, no password needed." />
 
       {!otpSent ? (
-        <div className="space-y-4">
+        <div className="flex flex-col flex-1 justify-between md:justify-start mt-8 md:mt-0">
+          <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="phone">Mobile number</Label>
             <div className="flex">
@@ -170,26 +172,30 @@ function Step1PhoneOTP({
             By continuing, you agree to our Terms of Service and Privacy Policy. Profiles are screened before they go live.
           </label>
 
-          <Button
-            className="w-full"
-            size="lg"
-            disabled={!/^[6-9]\d{9}$/.test(data.phone) || !terms}
-            onClick={() => {
-              setOtpSent(true)
-              setSeconds(30)
-            }}
-          >
-            Get OTP
-          </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Already a member?{" "}
-            <Link href="/login" className="font-semibold text-primary">
-              Login
-            </Link>
-          </p>
+          </div>
+
+          <div className="mt-auto space-y-4 pt-8 pb-4 md:mt-0 md:pb-0 md:pt-4">
+            <Button
+              className="w-full"
+              size="lg"
+              disabled={!/^[6-9]\d{9}$/.test(data.phone) || !terms}
+              onClick={() => {
+                setOtpSent(true)
+                setSeconds(30)
+              }}
+            >
+              Get OTP
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Already a member?{" "}
+              <Link href="/login" className="font-semibold text-primary">
+                Login
+              </Link>
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="flex flex-col flex-1 justify-between md:justify-start mt-8 md:mt-0">
           <div className="space-y-2 text-center">
             <Label htmlFor="otp">Enter the 6-digit OTP sent to +91 {data.phone}</Label>
             <Input
@@ -212,9 +218,11 @@ function Step1PhoneOTP({
               {seconds > 0 ? `Resend OTP in 00:${String(seconds).padStart(2, "0")}` : "Resend OTP"}
             </button>
           </div>
-          <Button className="w-full" size="lg" disabled={data.otp.length !== 6} onClick={nextStep}>
-            Verify & continue
-          </Button>
+          <div className="mt-auto pt-8 pb-4 md:mt-0 md:pb-0 md:pt-4">
+            <Button className="w-full" size="lg" disabled={data.otp.length !== 6} onClick={nextStep}>
+              Verify & Continue
+            </Button>
+          </div>
         </div>
       )}
     </div>
