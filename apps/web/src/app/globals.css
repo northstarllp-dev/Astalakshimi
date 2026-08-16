@@ -1,0 +1,276 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fdf8f0;
+  --foreground: #1a0e08;
+  --primary: #7c1535;
+  --primary-foreground: #fff8ee;
+  --secondary: #b8901f;
+  --secondary-foreground: #1a0e08;
+  --muted: #f0e8d8;
+  --muted-foreground: #705040;
+  --accent: #0d4f42;
+  --accent-foreground: #fff8ee;
+  --border: #ddd0b8;
+  --input: #e8dcc8;
+  --card: #fffdf8;
+  --card-foreground: #1a0e08;
+  --popover: #fffdf8;
+  --popover-foreground: #1a0e08;
+  --ring: #7c1535;
+  --destructive: #b42318;
+  --success: #067647;
+  --temple: #3d120c;
+  --peacock: #0d4f42;
+  --gold: #b8901f;
+  --gold-light: #e8c84a;
+  --sandal: #fdf8f0;
+  --radius: 0.875rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-temple: var(--temple);
+  --color-peacock: var(--peacock);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-sandal: var(--sandal);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-xl: calc(var(--radius) * 1.5);
+
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-cormorant), ui-serif, Georgia, serif;
+  --font-tamil: var(--font-tiro), ui-serif, Georgia, serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans), sans-serif;
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .field-select {
+    display: flex;
+    height: 3rem;
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1.5px solid var(--input);
+    background: var(--card);
+    padding: 0 1rem;
+    font-size: 0.9375rem;
+    color: var(--foreground);
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+
+  .field-select:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(124, 21, 53, 0.12);
+  }
+
+  /* Royal gold shimmer divider */
+  .gold-rule {
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      #b8901f 20%,
+      #e8c84a 50%,
+      #b8901f 80%,
+      transparent 100%
+    );
+    opacity: 0.7;
+  }
+
+  /* Subtle kolam pattern background */
+  .kolam-surface {
+    background-color: var(--background);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23b8901f' stroke-width='0.5' opacity='0.12'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3Cpath d='M30 15c5 5 5 10 0 15s-5 10 0 15'/%3E%3Cpath d='M30 15c-5 5-5 10 0 15s5 10 0 15'/%3E%3Cpath d='M15 30c5-5 10-5 15 0s10 5 15 0'/%3E%3Cpath d='M15 30c5 5 10 5 15 0s10-5 15 0'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* Royal card with gold border glow */
+  .royal-card {
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 1.25rem;
+    box-shadow:
+      0 1px 3px rgba(26, 14, 8, 0.06),
+      0 4px 16px rgba(26, 14, 8, 0.04);
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+
+  .royal-card:hover {
+    border-color: rgba(184, 144, 31, 0.4);
+    box-shadow:
+      0 2px 8px rgba(26, 14, 8, 0.08),
+      0 8px 24px rgba(26, 14, 8, 0.06),
+      0 0 0 1px rgba(184, 144, 31, 0.15);
+  }
+
+  /* Gold frame accent */
+  .temple-frame {
+    box-shadow:
+      0 0 0 1px rgba(184, 144, 31, 0.5),
+      0 0 0 3px var(--card),
+      0 0 0 4px rgba(184, 144, 31, 0.2),
+      0 8px 24px rgba(26, 14, 8, 0.08);
+  }
+
+  /* Glass effect */
+  .glass-card {
+    background: rgba(255, 253, 248, 0.22);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    box-shadow:
+      0 8px 32px rgba(26, 14, 8, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  /* Royal section label */
+  .royal-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--secondary);
+  }
+
+  /* Ornament line */
+  .ornament-line {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--secondary);
+  }
+
+  .ornament-line::before,
+  .ornament-line::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(184, 144, 31, 0.5));
+  }
+
+  .ornament-line::after {
+    background: linear-gradient(90deg, rgba(184, 144, 31, 0.5), transparent);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer-gold {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.animate-in {
+  animation: fade-up 0.35s ease-out both;
+}
+
+.gold-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--secondary) 0%,
+    var(--gold-light) 40%,
+    var(--secondary) 60%,
+    var(--secondary) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-gold 4s linear infinite;
+}
+
+/* Luxurious gold metallic gradient for logo branding */
+.logo-gold-gradient {
+  background: linear-gradient(
+    180deg,
+    #d4a843 0%,
+    #c49732 18%,
+    #a07818 35%,
+    #b8901f 50%,
+    #d4a843 65%,
+    #e8c84a 78%,
+    #c49732 90%,
+    #8a6a12 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
