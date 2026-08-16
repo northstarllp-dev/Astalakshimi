@@ -1,7 +1,10 @@
 {
   "name": "astalakshimi",
   "private": true,
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "pnpm --filter @astalakshimi/web dev",
     "build": "pnpm --filter @astalakshimi/web build",
