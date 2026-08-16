@@ -197,7 +197,7 @@ export default function SearchPage() {
             <p className="mt-3 text-center text-xs text-muted-foreground">
               Prefer quick browse?{" "}
               <Link href="/dashboard" className="font-semibold text-primary">
-                Home feed
+                Discover
               </Link>
             </p>
           </div>

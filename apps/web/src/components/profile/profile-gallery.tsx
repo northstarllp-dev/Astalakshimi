@@ -86,14 +86,14 @@ export function ProfileGallery({
   return (
     <>
       <div className="flex h-full flex-col">
-        <div className="group relative w-full flex-1 overflow-hidden bg-muted shadow-lg">
+        <div className="group relative h-full min-h-0 w-full overflow-hidden bg-muted">
           <Image
             src={hero}
             alt={`${name}, ${age}`}
             fill
             priority
             className="object-cover object-[center_12%] transition-transform duration-300 group-hover:scale-[1.02]"
-            sizes="(max-width: 1024px) 100vw, 42vw"
+            sizes="(max-width: 1024px) 90vw, 40vw"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/15" />
 
@@ -174,7 +174,7 @@ export function ProfileGallery({
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-3 text-white sm:p-4 md:p-5">
             <div className="flex items-end justify-between gap-2 sm:gap-3">
               <div className="min-w-0">
-                <h1 className="font-serif text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
+                <h1 className="font-serif text-xl font-bold tracking-tight sm:text-2xl">
                   {name}, {age}
                 </h1>
                 <p className="mt-0.5 flex items-center gap-1.5 text-xs text-white/85 sm:mt-1 sm:text-sm">

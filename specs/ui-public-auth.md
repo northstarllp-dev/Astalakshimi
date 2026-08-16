@@ -10,7 +10,7 @@ File: [`apps/web/src/app/(public)/page.tsx`](../apps/web/src/app/(public)/page.t
 | Hero (desktop) | Same photo with cinematic maroon wash; copy left, [`HeroRegisterCard`](../apps/web/src/components/landing/hero-register-card.tsx) right |
 | Stats | 25+ years, 10L+ profiles, 12 hr photo SLA, 100% screened |
 | Assisted service | Brokers, referrals, lower cost vs typical portals; Know more → `#pricing` |
-| Membership | Cards from [`lib/plans.ts`](../apps/web/src/lib/plans.ts) — Free 3 months (14 Sep 2026), 3m ₹300, 6m ₹500, 9m ₹750, 12m ₹1000, Till U Marry ₹1500. Choose Plan → `/register` |
+| Membership | Cards from [`lib/plans.ts`](../apps/web/src/lib/plans.ts) — Free / Silver ₹499 / Gold ₹999 / Platinum ₹1,499 (3 months). Free for 3 months from 14 Sep 2026. Choose Plan → `/register` |
 | Trust / stories / communities | Success stories, language/community chips, pan-India copy |
 | Sticky mobile CTA | Bottom bar on small screens |
 
@@ -32,9 +32,11 @@ Six steps, progress bar, saves to `sessionStorage` via `saveProfile()`:
 
 1. Phone + OTP
 2. Profile for (Myself / Son / Daughter / …) + name, gender, DOB, marital status
-3. Community (religion, caste, mother tongue, city)
-4. Education, occupation, company, income
+3. Community — religion, caste, mother tongue, **brothers count**, **sisters count** (summary via `formatSiblings()`)
+4. Education, occupation, company, income, city
 5. Partner age range + religions
 6. Photos, selfie or govt ID, optional horoscope PDF — [`step-verify.tsx`](../apps/web/src/components/signup/step-verify.tsx)
 
 After submit: verification pending, then `/dashboard`. Photos stay “private until approval” (12-hour SLA copy).
+
+Siblings fields are also shown on `/profile` and editable on `/profile/edit`.

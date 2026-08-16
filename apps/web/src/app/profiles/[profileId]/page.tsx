@@ -1,9 +1,7 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 import type { ReactNode } from "react"
 import { getAllMatchIds, getMatchById } from "@/lib/matches"
 import {
-  ArrowLeft,
   Briefcase,
   CheckCircle2,
   GraduationCap,
@@ -66,45 +64,33 @@ export default async function MatchProfilePage({ params }: { params: Promise<{ p
   if (!profile) notFound()
 
   return (
-    /* Full-viewport container — no header at all */
-    <div className="fixed inset-0 flex flex-col bg-background lg:flex-row">
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        {/* LEFT: portrait photo, no scroll */}
+        <aside className="relative flex shrink-0 flex-col overflow-hidden px-4 pt-3 lg:w-[40%] lg:max-w-[480px] lg:px-5 lg:pt-5">
+          <div className="relative mx-auto aspect-[3/4] w-full max-h-[min(72dvh,640px)] overflow-hidden rounded-2xl shadow-md">
+            <ProfileGallery
+              name={profile.fullName}
+              age={profile.age}
+              city={profile.city}
+              state={profile.state}
+              lastActive={profile.lastActive}
+              photos={profile.photos}
+              photoVerified={profile.photoVerified}
+              verified={profile.verified}
+              hasHoroscope={profile.hasHoroscope}
+            />
 
-      {/* ── LEFT: full-height photo gallery ── */}
-      <div className="relative flex-shrink-0 lg:w-[42%] h-[55dvh] lg:h-full">
-        <ProfileGallery
-          name={profile.fullName}
-          age={profile.age}
-          city={profile.city}
-          state={profile.state}
-          lastActive={profile.lastActive}
-          photos={profile.photos}
-          photoVerified={profile.photoVerified}
-          verified={profile.verified}
-          hasHoroscope={profile.hasHoroscope}
-        />
+            <span className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-1 text-[11px] font-bold text-white shadow backdrop-blur">
+              <Star className="h-3 w-3 fill-current" /> {profile.matchPercent}% match
+            </span>
+          </div>
+        </aside>
 
-        {/* Floating back button */}
-        <Link
-          href="/dashboard"
-          className="absolute left-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#fffbf4]/90 text-primary shadow-md backdrop-blur ring-1 ring-secondary/30 hover:bg-[#fffbf4] transition-colors"
-          aria-label="Back to matches"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-
-        {/* Match % badge */}
-        <span className="absolute right-4 top-4 z-30 inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2.5 py-1 text-xs font-bold text-white shadow backdrop-blur">
-          <Star className="h-3.5 w-3.5 fill-current" /> {profile.matchPercent}% match
-        </span>
-      </div>
-
-      {/* ── RIGHT: scrollable details ── */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {/* Thin gold top rule */}
-        <div className="gold-rule" />
-
-        <div className="flex-1 overflow-y-auto hide-scrollbar">
-          <div className="space-y-4 p-4 pb-[6.5rem] sm:p-6 sm:pb-[6.5rem]">
+        {/* RIGHT: details column */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto hide-scrollbar">
+            <div className="space-y-4 p-4 pb-[6.5rem] sm:p-6 sm:pb-[6.5rem]">
 
             {/* Quick pills */}
             <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -178,9 +164,9 @@ export default async function MatchProfilePage({ params }: { params: Promise<{ p
 
           </div>
         </div>
+        </div>
       </div>
 
-      {/* Action bar — fixed at bottom */}
       <ProfileActionBar profileId={profile.id} />
     </div>
   )

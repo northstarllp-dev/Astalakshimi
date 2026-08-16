@@ -4,15 +4,47 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { getPlanById, saveCurrentPlanId } from "@/lib/plans"
-import { ArrowLeft, CheckCircle2 } from "lucide-react"
+import {
+  DURATION_ADDONS,
+  activatePlan,
+  addInvoice,
+  computeAddonPrice,
+  getPlanById,
+  getUnlockPreview,
+  type PlanId,
+} from "@/lib/plans"
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CreditCard,
+  Landmark,
+  Lock,
+  Smartphone,
+  Wallet,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+
+type PayMethod = "upi" | "card" | "netbanking" | "wallet"
+
+const PAY_METHODS: { id: PayMethod; label: string; hint: string; icon: typeof Smartphone }[] = [
+  { id: "upi", label: "UPI", hint: "GPay, PhonePe, Paytm", icon: Smartphone },
+  { id: "card", label: "Card", hint: "Visa, Mastercard, RuPay", icon: CreditCard },
+  { id: "netbanking", label: "Netbanking", hint: "All major banks", icon: Landmark },
+  { id: "wallet", label: "Wallets", hint: "Paytm, Amazon Pay", icon: Wallet },
+]
 
 function CheckoutInner() {
   const router = useRouter()
   const params = useSearchParams()
-  const planId = params.get("plan") || "3m"
+  const planId = (params.get("plan") || "gold") as PlanId
+  const isRenew = params.get("renew") === "1"
   const plan = getPlanById(planId)
+  const [durationId, setDurationId] = React.useState<(typeof DURATION_ADDONS)[number]["id"]>("3m")
+  const [method, setMethod] = React.useState<PayMethod>("upi")
+  const [upiId, setUpiId] = React.useState("")
+  const [paying, setPaying] = React.useState(false)
   const [done, setDone] = React.useState(false)
+  const [error, setError] = React.useState("")
 
   if (!plan) {
     return (
@@ -25,14 +57,41 @@ function CheckoutInner() {
     )
   }
 
+  const addon = DURATION_ADDONS.find((d) => d.id === durationId) ?? DURATION_ADDONS[0]
+  const priced =
+    plan.priceInPaise === 0
+      ? { label: "₹0", paise: 0 }
+      : computeAddonPrice(plan.priceInPaise, addon.multiplier)
+  const unlocks = getUnlockPreview(plan.id)
+  const durationDays =
+    addon.id === "3m" ? plan.durationDays : addon.id === "6m" ? plan.durationDays * 2 : 365
+
   const confirm = () => {
-    saveCurrentPlanId(plan.id)
-    setDone(true)
-    setTimeout(() => router.push("/plans"), 1200)
+    setError("")
+    if (plan.priceInPaise > 0 && method === "upi" && upiId.trim().length < 3) {
+      setError("Enter a valid UPI ID to continue (demo).")
+      return
+    }
+    setPaying(true)
+    window.setTimeout(() => {
+      activatePlan(plan.id, durationDays)
+      if (plan.priceInPaise > 0) {
+        addInvoice({
+          planId: plan.id,
+          planName: `${plan.name} (${addon.label})`,
+          amount: priced.label,
+          method: PAY_METHODS.find((m) => m.id === method)?.label ?? method,
+          status: "paid",
+        })
+      }
+      setPaying(false)
+      setDone(true)
+      window.setTimeout(() => router.push("/plans"), 1400)
+    }, 900)
   }
 
   return (
-    <main className="mx-auto max-w-lg space-y-5 px-3 py-5 sm:px-4 md:py-8">
+    <main className="mx-auto max-w-3xl space-y-5 px-3 py-5 sm:px-4 md:py-8">
       <div className="flex items-center gap-3">
         <Link
           href="/plans"
@@ -41,46 +100,156 @@ function CheckoutInner() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <h1 className="font-serif text-2xl font-bold">Checkout</h1>
+        <div>
+          <h1 className="font-serif text-2xl font-bold">{isRenew ? "Renew plan" : "Upgrade checkout"}</h1>
+          <p className="text-xs text-muted-foreground">Secured by Razorpay (demo flow)</p>
+        </div>
       </div>
 
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Selected plan</p>
-        <h2 className="mt-2 font-serif text-3xl font-bold">{plan.name}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{plan.period}</p>
-        <p className="mt-4 font-serif text-4xl font-bold text-primary">{plan.price}</p>
-        <ul className="mt-5 space-y-2 text-sm">
-          {plan.features.map((f) => (
-            <li key={f} className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-secondary" /> {f}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="space-y-4">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Selected plan</p>
+            <h2 className="mt-2 font-serif text-3xl font-bold">{plan.name}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{plan.tagline}</p>
+            <p className="mt-4 font-serif text-4xl font-bold text-primary">{priced.label}</p>
+            <p className="text-xs text-muted-foreground">for {addon.label}</p>
 
-      {done ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-5 text-center text-emerald-900">
-          <CheckCircle2 className="mx-auto h-8 w-8" />
-          <p className="mt-2 font-semibold">Plan activated (demo)</p>
-          <p className="text-sm">Returning to membership…</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <Button className="w-full" onClick={confirm}>
-            Pay later (demo)
-          </Button>
-          <p className="text-center text-xs text-muted-foreground">
-            Razorpay / PhonePe will plug in later. This only saves your selection on this device.
-          </p>
-        </div>
-      )}
+            {plan.priceInPaise > 0 && (
+              <div className="mt-5 grid grid-cols-3 gap-2">
+                {DURATION_ADDONS.map((d) => {
+                  const p = computeAddonPrice(plan.priceInPaise, d.multiplier)
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setDurationId(d.id)}
+                      className={cn(
+                        "rounded-2xl border px-2 py-3 text-center transition-colors",
+                        durationId === d.id
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border hover:border-primary/40"
+                      )}
+                    >
+                      <p className="text-xs font-semibold">{d.label}</p>
+                      <p className="mt-1 text-sm font-bold">{p.label}</p>
+                      {"saveLabel" in d && d.saveLabel ? (
+                        <p className="mt-0.5 text-[10px] text-emerald-700">{d.saveLabel}</p>
+                      ) : null}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <p className="text-xs font-semibold tracking-[0.18em] text-gold uppercase">You&apos;ll unlock</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {unlocks.join(" · ")}.
+            </p>
+            <ul className="mt-4 space-y-2">
+              {unlocks.map((item) => (
+                <li key={item} className="flex items-center gap-2 text-sm">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Lock className="h-3.5 w-3.5" />
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          {done ? (
+            <div className="py-8 text-center text-emerald-900">
+              <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+              <p className="mt-3 font-serif text-2xl font-bold">Payment successful</p>
+              <p className="mt-1 text-sm text-emerald-800/80">
+                {plan.name} is active. Invoice saved. Returning to plans…
+              </p>
+            </div>
+          ) : (
+            <>
+              <h3 className="font-semibold">Pay with Razorpay</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                UPI, cards, netbanking, and wallets — demo checkout only.
+              </p>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {PAY_METHODS.map((m) => {
+                  const Icon = m.icon
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setMethod(m.id)}
+                      className={cn(
+                        "rounded-2xl border px-3 py-3 text-left transition-colors",
+                        method === m.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/40"
+                      )}
+                    >
+                      <Icon className="h-4 w-4 text-primary" />
+                      <p className="mt-2 text-sm font-semibold">{m.label}</p>
+                      <p className="text-[11px] text-muted-foreground">{m.hint}</p>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {method === "upi" && plan.priceInPaise > 0 && (
+                <div className="mt-4 space-y-1.5">
+                  <label htmlFor="upi" className="text-xs font-semibold">
+                    UPI ID
+                  </label>
+                  <input
+                    id="upi"
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    placeholder="name@oksbi"
+                    className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
+              )}
+
+              {method === "card" && (
+                <div className="mt-4 space-y-2 rounded-xl border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  Card fields appear in the live Razorpay modal. This demo skips collecting card data.
+                </div>
+              )}
+
+              {error && (
+                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {error}
+                </p>
+              )}
+
+              <Button className="mt-5 w-full" size="lg" disabled={paying} onClick={confirm}>
+                {paying
+                  ? "Processing…"
+                  : plan.priceInPaise === 0
+                    ? "Activate free plan"
+                    : `Pay ${priced.label}`}
+              </Button>
+              <p className="mt-3 text-center text-[11px] text-muted-foreground">
+                One-tap upgrade. Live Razorpay keys plug in later — this saves plan + invoice on this device.
+              </p>
+            </>
+          )}
+        </section>
+      </div>
     </main>
   )
 }
 
 export default function CheckoutPage() {
   return (
-    <React.Suspense fallback={<main className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</main>}>
+    <React.Suspense
+      fallback={<main className="px-4 py-10 text-center text-sm text-muted-foreground">Loading checkout…</main>}
+    >
       <CheckoutInner />
     </React.Suspense>
   )

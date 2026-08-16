@@ -24,6 +24,11 @@ export type MatchProfile = {
   verified: boolean
   photoVerified: boolean
   hasHoroscope: boolean
+  premium: boolean
+  joinedDaysAgo: number
+  manglik: "Yes" | "No" | "Don't know"
+  star: string
+  willingToRelocate: boolean
   photos: string[]
   lifestyle: {
     diet: string
@@ -72,6 +77,11 @@ export const MATCHES: MatchProfile[] = [
     verified: true,
     photoVerified: true,
     hasHoroscope: true,
+    premium: true,
+    joinedDaysAgo: 2,
+    manglik: "No",
+    star: "Rohini",
+    willingToRelocate: false,
     photos: [...IMAGES.profiles.priya],
     lifestyle: { diet: "Vegetarian", smoking: "No", drinking: "No" },
     family: {
@@ -114,6 +124,11 @@ export const MATCHES: MatchProfile[] = [
     verified: true,
     photoVerified: true,
     hasHoroscope: true,
+    premium: true,
+    joinedDaysAgo: 12,
+    manglik: "No",
+    star: "Hasta",
+    willingToRelocate: true,
     photos: [...IMAGES.profiles.ananya],
     lifestyle: { diet: "Eggetarian", smoking: "No", drinking: "Occasionally" },
     family: {
@@ -156,6 +171,11 @@ export const MATCHES: MatchProfile[] = [
     verified: true,
     photoVerified: false,
     hasHoroscope: true,
+    premium: false,
+    joinedDaysAgo: 4,
+    manglik: "Don't know",
+    star: "Ashwini",
+    willingToRelocate: true,
     photos: [...IMAGES.profiles.shruti],
     lifestyle: { diet: "Vegetarian", smoking: "No", drinking: "No" },
     family: {
@@ -198,6 +218,11 @@ export const MATCHES: MatchProfile[] = [
     verified: true,
     photoVerified: true,
     hasHoroscope: false,
+    premium: false,
+    joinedDaysAgo: 6,
+    manglik: "No",
+    star: "Punarvasu",
+    willingToRelocate: false,
     photos: [...IMAGES.profiles.meera],
     lifestyle: { diet: "Vegetarian", smoking: "No", drinking: "No" },
     family: {
@@ -240,6 +265,11 @@ export const MATCHES: MatchProfile[] = [
     verified: true,
     photoVerified: true,
     hasHoroscope: true,
+    premium: true,
+    joinedDaysAgo: 21,
+    manglik: "Yes",
+    star: "Revati",
+    willingToRelocate: true,
     photos: [...IMAGES.profiles.riya],
     lifestyle: { diet: "Vegetarian", smoking: "No", drinking: "No" },
     family: {

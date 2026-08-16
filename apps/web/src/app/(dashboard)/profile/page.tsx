@@ -6,17 +6,22 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { CompletenessRing } from "@/components/profile/completeness-ring"
 import { emptySignupData, loadProfile, type SignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import { profileCompleteness } from "@/lib/user-activity"
 import {
   Camera,
+  CheckCircle2,
   ChevronRight,
   Clock3,
   FileText,
+  IdCard,
   Pencil,
-  Settings,
+  Phone,
   ShieldCheck,
   Sparkles,
+  Users,
+  XCircle,
 } from "lucide-react"
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -51,6 +56,31 @@ export default function MyProfilePage() {
         )
       : null
 
+  const verificationItems = [
+    {
+      icon: Phone,
+      label: "Phone verified",
+      done: Boolean(data.phone),
+      href: "/settings",
+      note: "Auto-earned at signup",
+    },
+    {
+      icon: IdCard,
+      label: "ID verified",
+      done: verified,
+      pending: pending && data.verificationMethod === "govt_id",
+      href: "/profile/edit#verification",
+      note: data.govtIdType ? `${data.govtIdType} uploaded` : "Upload Aadhaar / PAN / Passport",
+    },
+    {
+      icon: Users,
+      label: "Family verified",
+      done: false,
+      href: "/profile/edit#verification",
+      note: "Add a family member's number",
+    },
+  ]
+
   if (!profile) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10 text-center">
@@ -67,6 +97,7 @@ export default function MyProfilePage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-5 px-3 py-5 sm:px-4 md:py-8">
+      {/* Header card with ring */}
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="relative h-36 bg-gradient-to-br from-[#3d120c] via-[#6b1024] to-primary sm:h-44">
           <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/40 to-transparent" />
@@ -99,13 +130,21 @@ export default function MyProfilePage() {
             </div>
           </div>
 
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between text-xs font-semibold">
-              <span className="text-muted-foreground">Profile completeness</span>
-              <span className="text-primary">{completeness}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${completeness}%` }} />
+          {/* Completeness ring */}
+          <div className="mt-4 flex items-center gap-4 rounded-2xl bg-muted/40 p-4">
+            <CompletenessRing percentage={completeness} size={88} strokeWidth={8} />
+            <div className="min-w-0 flex-1">
+              <p className="font-serif text-base font-bold">Profile completeness</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {completeness >= 90
+                  ? "Excellent — your profile stands out to families."
+                  : completeness >= 60
+                    ? "Good progress. Add more details to attract better matches."
+                    : "Add more details to improve your match visibility."}
+              </p>
+              <Link href="/profile/edit" className="mt-1.5 inline-block text-xs font-semibold text-primary hover:underline">
+                Improve your score →
+              </Link>
             </div>
           </div>
 
@@ -145,35 +184,96 @@ export default function MyProfilePage() {
             </Link>
             <Link href="/settings">
               <Button variant="outline" size="sm" className="h-10 w-full">
-                <Settings className="mr-1.5 h-3.5 w-3.5" /> Settings
+                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Privacy
               </Button>
             </Link>
           </div>
         </div>
       </section>
 
+      {/* Verification score card */}
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="font-serif text-lg font-bold">Basics</h2>
+        <h2 className="font-serif text-lg font-bold">Verification badges</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">Build trust with families by completing verifications.</p>
+        <div className="mt-4 space-y-2.5">
+          {verificationItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-3 transition-colors hover:bg-muted"
+              >
+                <span
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                    item.done ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">{item.label}</p>
+                  <p className="text-xs text-muted-foreground">{item.note}</p>
+                </div>
+                {item.done ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                ) : item.pending ? (
+                  <Clock3 className="h-5 w-5 text-amber-500" />
+                ) : (
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                )}
+              </Link>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Basics */}
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-lg font-bold">Basic info</h2>
+          <Link href="/profile/edit#basics" className="text-xs font-semibold text-primary hover:underline">
+            Edit
+          </Link>
+        </div>
         <dl className="mt-2">
           <Row label="Gender" value={data.gender} />
           <Row label="Marital status" value={data.maritalStatus} />
+          <Row label="Height" value={data.height} />
+          <Row label="Complexion" value={data.complexion} />
+          <Row label="Diet" value={data.diet} />
           <Row label="Profile for" value={data.profileFor} />
           <Row label="Phone" value={data.phone ? `+91 ${data.phone}` : ""} />
         </dl>
       </section>
 
+      {/* Community */}
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="font-serif text-lg font-bold">Community</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-lg font-bold">Community details</h2>
+          <Link href="/profile/edit#community" className="text-xs font-semibold text-primary hover:underline">
+            Edit
+          </Link>
+        </div>
         <dl className="mt-2">
           <Row label="Religion" value={data.religion} />
           <Row label="Caste / community" value={data.caste} />
+          <Row label="Subcaste / gotra" value={data.subcaste || data.gotra} />
+          <Row label="Star / nakshatra" value={data.star} />
+          <Row label="Rashi" value={data.rashi} />
+          <Row label="Manglik" value={data.manglik} />
           <Row label="Mother tongue" value={data.motherTongue} />
-          <Row label="City" value={data.city} />
         </dl>
       </section>
 
+      {/* Education & career */}
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="font-serif text-lg font-bold">Education & career</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-lg font-bold">Education & career</h2>
+          <Link href="/profile/edit#career" className="text-xs font-semibold text-primary hover:underline">
+            Edit
+          </Link>
+        </div>
         <dl className="mt-2">
           <Row label="Education" value={data.otherEducation || data.education} />
           <Row label="Occupation" value={data.otherOccupation || data.occupation} />
@@ -182,16 +282,77 @@ export default function MyProfilePage() {
         </dl>
       </section>
 
+      {/* Family */}
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-lg font-bold">Family details</h2>
+          <Link href="/profile/edit#family" className="text-xs font-semibold text-primary hover:underline">
+            Edit
+          </Link>
+        </div>
+        <dl className="mt-2">
+          <Row label="Family type" value={data.familyType} />
+          <Row label="Family status" value={data.familyStatus} />
+          <Row label="Father's occupation" value={data.fatherOccupation} />
+          <Row label="Mother's occupation" value={data.motherOccupation} />
+          <Row label="Siblings" value={data.siblings} />
+        </dl>
+      </section>
+
+      {/* Location */}
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-lg font-bold">Location</h2>
+          <Link href="/profile/edit#location" className="text-xs font-semibold text-primary hover:underline">
+            Edit
+          </Link>
+        </div>
+        <dl className="mt-2">
+          <Row label="City" value={data.city} />
+          <Row label="State" value={data.state} />
+          <Row label="Willing to relocate" value={data.willingToRelocate} />
+        </dl>
+      </section>
+
+      {/* About me */}
+      {data.aboutMe && (
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif text-lg font-bold">About me</h2>
+            <Link href="/profile/edit#about" className="text-xs font-semibold text-primary hover:underline">
+              Edit
+            </Link>
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-foreground">{data.aboutMe}</p>
+        </section>
+      )}
+
+      {/* Partner preferences */}
       <section id="preferences" className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="font-serif text-lg font-bold">Partner preferences</h2>
-          <Link href="/profile/edit#preferences" className="text-xs font-semibold text-primary">
+          <Link href="/profile/edit#preferences" className="text-xs font-semibold text-primary hover:underline">
             Edit
           </Link>
         </div>
         <dl className="mt-2">
           <Row label="Age range" value={`${data.prefAgeMin} – ${data.prefAgeMax} yrs`} />
           <Row label="Religions" value={data.prefReligion.join(", ")} />
+        </dl>
+      </section>
+
+      {/* Horoscope */}
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-lg font-bold">Horoscope details</h2>
+          <Link href="/profile/edit#horoscope" className="text-xs font-semibold text-primary hover:underline">
+            Edit
+          </Link>
+        </div>
+        <dl className="mt-2">
+          <Row label="Birth time" value={data.birthTime} />
+          <Row label="Birth place" value={data.birthPlace} />
+          <Row label="Horoscope PDF" value={data.horoscopeName} />
         </dl>
       </section>
 

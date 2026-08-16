@@ -29,7 +29,7 @@ export function HeroRegisterCard() {
   const [motherTongue, setMotherTongue] = React.useState("Hindi")
 
   return (
-    <div className="relative rounded-3xl p-6 sm:p-8 border-[1.5px] border-secondary/40 bg-[#2e0a0c] shadow-2xl shadow-black/60">
+    <div className="relative rounded-3xl p-6 sm:p-8 border-[1.5px] border-secondary/40 bg-[#2e0a0c]/75 backdrop-blur-md shadow-2xl shadow-black/60">
       {/* Top ornament */}
       <div className="mb-5 flex items-center gap-2">
         <div className="h-px flex-1 bg-gradient-to-r from-transparent to-secondary/40" />

@@ -75,13 +75,13 @@ export default function LandingPage() {
         <div className="md:hidden flex flex-col">
 
           {/* Full hero image with overlaid text */}
-          <div className="relative h-[72vh] min-h-[420px] w-full">
+          <div className="relative h-[40vh] min-h-[280px] w-full">
             <Image
               src={IMAGES.hero}
               alt="Traditional Indian wedding celebration"
               fill
               priority
-              className="object-cover object-[center_25%]"
+              className="object-cover object-[center_50%]"
               sizes="100vw"
             />
 
@@ -104,8 +104,8 @@ export default function LandingPage() {
               <div className="h-px w-10 bg-gradient-to-r from-secondary/60 to-transparent" />
             </div>
 
-            {/* Headline overlaid at the bottom of the image */}
-            <div className="absolute bottom-0 inset-x-0 px-5 pb-7 space-y-3">
+            {/* Headline overlaid — moved up */}
+            <div className="absolute bottom-0 inset-x-0 px-5 pb-14 space-y-0">
               <h1
                 className="font-serif text-[2.6rem] font-bold leading-[1.07] tracking-tight text-white drop-shadow-xl"
                 style={{ fontFamily: "var(--font-cormorant), serif", textShadow: "0 2px 16px rgba(0,0,0,0.6)" }}
@@ -133,13 +133,13 @@ export default function LandingPage() {
 
 
         {/* ───── DESKTOP LAYOUT ───── */}
-        <div className="relative hidden min-h-[760px] md:block">
+        <div className="relative hidden min-h-[430px] md:block">
           <Image
             src={IMAGES.hero}
             alt="Traditional Indian wedding celebration"
             fill
             priority
-            className="object-cover object-[center_30%]"
+            className="object-cover object-[center_18%]"
             sizes="100vw"
           />
           {/* Cinematic gradient  darkens left & right, clear centre */}
@@ -148,7 +148,7 @@ export default function LandingPage() {
           <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
           <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-secondary/60 to-transparent" />
 
-          <div className="relative z-10 mx-auto flex w-full max-w-[96%] items-center justify-between gap-12 px-8 py-28">
+          <div className="relative z-10 mx-auto flex w-full max-w-[96%] items-center justify-between gap-12 px-8 py-8">
             {/* Left: Copy */}
             <div className="w-full max-w-lg space-y-8 text-white">
               <div className="flex items-center gap-4">
@@ -296,71 +296,165 @@ export default function LandingPage() {
       </section>
 
       {/* ── Membership Plans ── */}
-      <section id="pricing" className="kolam-surface border-b border-secondary/15 py-16 md:py-20">
-        <div className="mx-auto max-w-6xl px-4">
-          <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="royal-label mb-2">Transparent pricing</p>
-              <h2 className="font-serif text-3xl font-bold text-primary md:text-4xl">Membership Plans</h2>
+      <section id="pricing" className="relative overflow-hidden border-b border-secondary/20 py-20 md:py-28"
+        style={{ background: "linear-gradient(160deg, #1a0e08 0%, #2a1008 35%, #1a0608 65%, #0d1a10 100%)" }}
+      >
+        {/* Subtle kolam dots */}
+        <div className="pointer-events-none absolute inset-0 opacity-[0.06]"
+          style={{ backgroundImage: "radial-gradient(circle, #b8901f 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+        {/* Gold top rule */}
+        <div className="absolute inset-x-0 top-0 h-[2px]" style={{ background: "linear-gradient(90deg, transparent, #b8901f 30%, #e8c84a 50%, #b8901f 70%, transparent)" }} />
+        {/* Gold bottom rule */}
+        <div className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: "linear-gradient(90deg, transparent, #b8901f 30%, #e8c84a 50%, #b8901f 70%, transparent)" }} />
+
+        <div className="relative mx-auto max-w-6xl px-4">
+          {/* Section header */}
+          <div className="mb-14 text-center">
+            <p className="mb-3 text-[11px] font-bold tracking-[0.35em] uppercase" style={{ color: "#b8901f" }}>Transparent pricing</p>
+            <h2 className="font-serif text-4xl font-bold text-white md:text-5xl" style={{ textShadow: "0 2px 20px rgba(184,144,31,0.3)" }}>
+              Membership Plans
+            </h2>
+            <div className="mx-auto mt-4 flex items-center justify-center gap-3">
+              <div className="h-px w-16" style={{ background: "linear-gradient(90deg, transparent, #b8901f)" }} />
+              <span style={{ color: "#e8c84a" }}>✦</span>
+              <div className="h-px w-16" style={{ background: "linear-gradient(90deg, #b8901f, transparent)" }} />
             </div>
-            <p className="max-w-md text-sm text-muted-foreground">
-              Lower than typical big-portal packages. Free for 3 months starting{" "}
-              <span className="font-semibold text-foreground">14 September 2026</span>.
+            <p className="mt-4 text-sm text-white/50">
+              Free · Silver · Gold · Platinum · Free for 3 months starting{" "}
+              <span className="font-semibold text-white/80">14 September 2026</span>
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {MEMBERSHIP_PLANS.map((plan) => (
-              <article
-                key={plan.id}
-                className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
-              >
-                {"badge" in plan && plan.badge ? (
-                  <div className="bg-peacock px-3 py-2.5 text-center text-[11px] font-semibold leading-snug text-white">
-                    {plan.badge}
-                  </div>
-                ) : (
-                  <div className="border-b border-border px-4 pb-1 pt-5">
-                    <h3 className="text-sm font-bold text-foreground">{plan.name}</h3>
-                    <p className="mt-2 font-serif text-3xl font-bold text-primary">{plan.price}</p>
-                  </div>
-                )}
+          {/* Cards grid — Gold elevated */}
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
+            {MEMBERSHIP_PLANS.map((plan) => {
+              const isGold = plan.id === "gold"
+              const isPlatinum = plan.id === "platinum"
 
-                <div className="flex flex-1 flex-col px-4 py-4">
+              if (isGold) {
+                return (
+                  <article
+                    key={plan.id}
+                    className="relative flex flex-col overflow-visible rounded-3xl lg:-mt-6 lg:mb-0 animate-in"
+                    style={{
+                      background: "linear-gradient(145deg, #1a0e08, #2a1008)",
+                      boxShadow: "0 0 0 2px #b8901f, 0 0 40px rgba(184,144,31,0.35), 0 24px 60px rgba(0,0,0,0.6)",
+                    }}
+                  >
+                    {/* Glow halo */}
+                    <div className="pointer-events-none absolute -inset-px rounded-3xl opacity-40"
+                      style={{ background: "linear-gradient(145deg, rgba(232,200,74,0.2), transparent 60%)" }} />
+
+                    {/* Most popular banner */}
+                    <div className="relative flex items-center justify-center gap-2 rounded-t-3xl px-4 py-3"
+                      style={{ background: "linear-gradient(90deg, #a07818, #e8c84a 40%, #d4a843 60%, #a07818)" }}
+                    >
+                      <span className="text-[11px] font-bold tracking-[0.25em] uppercase" style={{ color: "#1a0e08" }}>
+                        ✦ Most Popular ✦
+                      </span>
+                    </div>
+
+                    <div className="flex flex-1 flex-col px-5 py-6">
+                      {/* Plan name */}
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="font-serif text-xl font-bold" style={{ color: "#e8c84a" }}>Gold</span>
+                      </div>
+                      <p className="text-xs text-white/50">{plan.tagline}</p>
+
+                      {/* Price */}
+                      <div className="my-5">
+                        <p className="font-serif text-5xl font-bold leading-none" style={{ color: "#e8c84a", textShadow: "0 0 20px rgba(232,200,74,0.4)" }}>
+                          {plan.price}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-white/40">/ {plan.period}</p>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="mb-4 h-px" style={{ background: "linear-gradient(90deg, transparent, #b8901f 50%, transparent)" }} />
+
+                      {/* Features */}
+                      <ul className="flex-1 space-y-2.5">
+                        {plan.features.map((f) => (
+                          <li key={f} className="flex items-center gap-2.5 text-sm text-white/80">
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]"
+                              style={{ background: "rgba(184,144,31,0.25)", color: "#e8c84a" }}>✓</span>
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* CTA */}
+                      <Link href="/register" className="mt-6">
+                        <button className="w-full rounded-xl py-3 text-sm font-bold tracking-wide transition-all hover:opacity-90 active:scale-[0.98]"
+                          style={{ background: "linear-gradient(90deg, #a07818, #e8c84a 40%, #d4a843 70%, #a07818)", color: "#1a0e08" }}>
+                          Choose Gold
+                        </button>
+                      </Link>
+                    </div>
+                  </article>
+                )
+              }
+
+              // Non-gold cards
+              const badgeColor = isPlatinum
+                ? { bg: "linear-gradient(90deg, #1a2a3a, #2a3a4a)", text: "#a8c4e0" }
+                : { bg: "rgba(255,255,255,0.06)", text: "rgba(255,255,255,0.45)" }
+
+              return (
+                <article
+                  key={plan.id}
+                  className="relative flex flex-col overflow-hidden rounded-2xl"
+                  style={{
+                    background: "rgba(255,255,255,0.04)",
+                    backdropFilter: "blur(12px)",
+                    border: isPlatinum ? "1px solid rgba(168,196,224,0.3)" : "1px solid rgba(255,255,255,0.09)",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                  }}
+                >
+                  {/* Badge */}
                   {plan.badge ? (
-                    <>
-                      <h3 className="text-sm font-bold text-foreground">{plan.name}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">{plan.period}</p>
-                    </>
+                    <div className="px-4 py-2.5 text-center text-[11px] font-semibold tracking-wider"
+                      style={{ background: badgeColor.bg, color: badgeColor.text }}>
+                      {plan.badge}
+                    </div>
                   ) : (
-                    <p className="text-xs font-medium text-muted-foreground">{plan.period}</p>
+                    <div className="h-[38px]" />
                   )}
 
-                  <ul className="mt-4 space-y-1.5 text-xs text-foreground/80">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-1.5">
-                        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-secondary" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="flex flex-1 flex-col px-4 py-5">
+                    <p className="font-serif text-lg font-bold text-white/90">{plan.name}</p>
+                    <p className="mt-1 text-xs text-white/40">{plan.tagline}</p>
 
-                  <Link href="/register" className="mt-auto pt-5">
-                    <Button
-                      variant="secondary"
-                      className="w-full rounded-lg text-sm font-semibold"
-                    >
-                      Choose Plan
-                    </Button>
-                  </Link>
-                </div>
-              </article>
-            ))}
+                    <div className="my-4">
+                      <p className="font-serif text-3xl font-bold text-white/90">{plan.price}</p>
+                      <p className="mt-0.5 text-xs text-white/30">/ {plan.period}</p>
+                    </div>
+
+                    <div className="mb-4 h-px bg-white/[0.07]" />
+
+                    <ul className="flex-1 space-y-2">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-center gap-2 text-xs text-white/60">
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#b8901f" }} />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Link href="/register" className="mt-5">
+                      <button className="w-full rounded-xl border py-2.5 text-sm font-semibold transition-all hover:bg-white/10"
+                        style={{ borderColor: "rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.7)" }}>
+                        {plan.id === "free" ? "Start free" : "Choose Plan"}
+                      </button>
+                    </Link>
+                  </div>
+                </article>
+              )
+            })}
           </div>
 
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Compare fairly: many national matrimony sites charge thousands for similar community plans.
-            Astalakshimi keeps memberships simple — from ₹300 to ₹1500 Till U Marry.
+          <p className="mt-10 text-center text-xs text-white/30">
+            Upgrade anytime · Cancel anytime · Prices include GST
           </p>
         </div>
       </section>

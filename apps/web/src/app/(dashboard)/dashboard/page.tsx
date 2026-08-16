@@ -3,120 +3,52 @@
 import * as React from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
-import { MATCHES, type MatchProfile } from "@/lib/matches"
+import { MATCHES } from "@/lib/matches"
 import { loadProfile, VERIFICATION_SLA_HOURS, type SignupData } from "@/lib/profile-store"
+import { isPaidMember } from "@/lib/plans"
 import {
+  addSavedSearch,
   addSkipped,
   clearSkipped,
   getReceivedInterests,
+  loadSavedSearches,
   loadShortlist,
   loadSkipped,
   sendInterest,
+  type SavedSearch,
 } from "@/lib/user-activity"
+import {
+  applyDiscover,
+  BROWSE_TABS,
+  DEFAULT_DISCOVER,
+  EMPTY_ADVANCED,
+  fromPartnerPreferences,
+  uniqueField,
+  type AdvancedFilters,
+  type BrowseTab,
+  type DiscoverQuery,
+} from "@/lib/discover"
 import { cn } from "@/lib/utils"
 import {
+  Bookmark,
   ChevronDown,
-  ChevronUp,
   Clock3,
+  Crown,
   Filter,
-  Search,
+  Heart,
+  Lock,
   SlidersHorizontal,
   X,
 } from "lucide-react"
 
-// ─────────────────────────────────────────────
-// Filter definitions
-// ─────────────────────────────────────────────
-type AgeRange = "20-25" | "26-30" | "31-35" | "36-40" | "40+"
-type MatchQuality = "All matches" | "Newly joined" | "Near you" | "Premium" | "With horoscope"
+const HEIGHT_BANDS = ["Up to 5'4\"", "5'5\" – 5'8\"", "5'9\" & above"]
+const EDUCATION_GROUPS = ["B.Tech", "B.E", "MBA", "M.Sc", "Ph.D", "M.Phil", "Post Doctorate"]
 
-interface ActiveFilters {
-  matchQuality: MatchQuality
-  ageRanges: AgeRange[]
-  communities: string[]
-  motherTongues: string[]
-  educations: string[]
-  cities: string[]
-  incomes: string[]
-  maritalStatuses: string[]
-}
-
-const DEFAULT_FILTERS: ActiveFilters = {
-  matchQuality: "All matches",
-  ageRanges: [],
-  communities: [],
-  motherTongues: [],
-  educations: [],
-  cities: [],
-  incomes: [],
-  maritalStatuses: [],
-}
-
-const AGE_RANGES: AgeRange[] = ["20-25", "26-30", "31-35", "36-40", "40+"]
-const MATCH_QUALITY_OPTIONS: MatchQuality[] = [
-  "All matches",
-  "Newly joined",
-  "Near you",
-  "Premium",
-  "With horoscope",
-]
-
-function getUniqueValues<K extends keyof MatchProfile>(
-  matches: MatchProfile[],
-  key: K,
-  limit = 8
-): string[] {
-  const vals = Array.from(new Set(matches.map((m) => String(m[key])))).filter(Boolean)
-  return vals.slice(0, limit)
-}
-
-function applyFilters(matches: MatchProfile[], f: ActiveFilters, city?: string): MatchProfile[] {
-  let result = matches
-
-  // Match quality
-  if (f.matchQuality === "Newly joined")
-    result = result.filter((m) =>
-      ["Online now", "Today", "2 hours ago"].includes(m.lastActive)
-    )
-  else if (f.matchQuality === "Near you")
-    result = city ? result.filter((m) => m.city.toLowerCase() === city.toLowerCase()) : result
-  else if (f.matchQuality === "Premium") result = result.filter((m) => m.photoVerified)
-  else if (f.matchQuality === "With horoscope") result = result.filter((m) => m.hasHoroscope)
-
-  // Age ranges
-  if (f.ageRanges.length > 0) {
-    result = result.filter((m) =>
-      f.ageRanges.some((r) => {
-        const [lo, hi] = r === "40+" ? [40, 99] : r.split("-").map(Number)
-        return m.age >= lo && m.age <= (hi ?? 99)
-      })
-    )
-  }
-  if (f.communities.length > 0)
-    result = result.filter((m) => f.communities.includes(m.community))
-  if (f.motherTongues.length > 0)
-    result = result.filter((m) => f.motherTongues.includes(m.motherTongue))
-  if (f.educations.length > 0)
-    result = result.filter((m) =>
-      f.educations.some((e) => m.education.toLowerCase().includes(e.toLowerCase()))
-    )
-  if (f.cities.length > 0) result = result.filter((m) => f.cities.includes(m.city))
-  if (f.incomes.length > 0) result = result.filter((m) => f.incomes.includes(m.income))
-  if (f.maritalStatuses.length > 0)
-    result = result.filter((m) => f.maritalStatuses.includes(m.maritalStatus))
-
-  return result
-}
-
-// ─────────────────────────────────────────────
-// Collapsible filter section
-// ─────────────────────────────────────────────
 function FilterSection({
   title,
   children,
-  defaultOpen = true,
+  defaultOpen = false,
 }: {
   title: string
   children: React.ReactNode
@@ -124,14 +56,14 @@ function FilterSection({
 }) {
   const [open, setOpen] = React.useState(defaultOpen)
   return (
-    <div className="border-b border-border py-3">
+    <div className="border-b border-border py-3 last:border-b-0">
       <button
         type="button"
         className="flex w-full items-center justify-between text-sm font-semibold text-foreground"
         onClick={() => setOpen((v) => !v)}
       >
         {title}
-        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
       {open && <div className="mt-2.5 space-y-1.5">{children}</div>}
     </div>
@@ -160,401 +92,474 @@ function CheckItem({
   )
 }
 
-// ─────────────────────────────────────────────
-// Left filter sidebar
-// ─────────────────────────────────────────────
-function FilterSidebar({
-  filters,
-  onChange,
-  onReset,
-  resultCount,
-}: {
-  filters: ActiveFilters
-  onChange: (f: ActiveFilters) => void
-  onReset: () => void
-  resultCount: number
-}) {
-  const toggle = <T extends string>(arr: T[], val: T): T[] =>
-    arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]
-
-  const communities = getUniqueValues(MATCHES, "community")
-  const motherTongues = getUniqueValues(MATCHES, "motherTongue")
-  const cities = getUniqueValues(MATCHES, "city")
-  const incomes = getUniqueValues(MATCHES, "income")
-  const maritalStatuses = getUniqueValues(MATCHES, "maritalStatus")
-  const educationGroups = ["B.Tech", "MBA", "MBBS", "M.Sc", "B.Com", "CA", "B.Sc", "M.Tech"]
-
-  return (
-    <aside className="w-full shrink-0 rounded-2xl border border-border bg-card p-4 md:w-64 md:sticky md:top-[5.5rem] md:max-h-[calc(100vh-6rem)] md:overflow-y-auto md:hide-scrollbar">
-      {/* Header */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-primary" />
-          <span className="font-semibold text-foreground">Filters</span>
-        </div>
-        <button
-          type="button"
-          onClick={onReset}
-          className="text-xs font-semibold text-primary hover:underline"
-        >
-          Clear all
-        </button>
-      </div>
-      <p className="mb-3 text-xs text-muted-foreground">
-        <span className="font-semibold text-primary">{resultCount}</span> profiles found
-      </p>
-
-      {/* Match quality */}
-      <FilterSection title="Show me">
-        {MATCH_QUALITY_OPTIONS.map((q) => (
-          <CheckItem
-            key={q}
-            label={q}
-            checked={filters.matchQuality === q}
-            onChange={() => onChange({ ...filters, matchQuality: q })}
-          />
-        ))}
-      </FilterSection>
-
-      {/* Age */}
-      <FilterSection title="Age">
-        {AGE_RANGES.map((r) => (
-          <CheckItem
-            key={r}
-            label={r === "40+" ? "40 & above" : `${r} years`}
-            checked={filters.ageRanges.includes(r)}
-            onChange={() => onChange({ ...filters, ageRanges: toggle(filters.ageRanges, r) })}
-          />
-        ))}
-      </FilterSection>
-
-      {/* Community */}
-      <FilterSection title="Community">
-        {communities.map((c) => (
-          <CheckItem
-            key={c}
-            label={c}
-            checked={filters.communities.includes(c)}
-            onChange={() => onChange({ ...filters, communities: toggle(filters.communities, c) })}
-          />
-        ))}
-      </FilterSection>
-
-      {/* Mother tongue */}
-      <FilterSection title="Mother Tongue" defaultOpen={false}>
-        {motherTongues.map((t) => (
-          <CheckItem
-            key={t}
-            label={t}
-            checked={filters.motherTongues.includes(t)}
-            onChange={() =>
-              onChange({ ...filters, motherTongues: toggle(filters.motherTongues, t) })
-            }
-          />
-        ))}
-      </FilterSection>
-
-      {/* Education */}
-      <FilterSection title="Education" defaultOpen={false}>
-        {educationGroups.map((e) => (
-          <CheckItem
-            key={e}
-            label={e}
-            checked={filters.educations.includes(e)}
-            onChange={() =>
-              onChange({ ...filters, educations: toggle(filters.educations, e) })
-            }
-          />
-        ))}
-      </FilterSection>
-
-      {/* City */}
-      <FilterSection title="City" defaultOpen={false}>
-        {cities.map((c) => (
-          <CheckItem
-            key={c}
-            label={c}
-            checked={filters.cities.includes(c)}
-            onChange={() => onChange({ ...filters, cities: toggle(filters.cities, c) })}
-          />
-        ))}
-      </FilterSection>
-
-      {/* Income */}
-      <FilterSection title="Annual Income" defaultOpen={false}>
-        {incomes.map((i) => (
-          <CheckItem
-            key={i}
-            label={i}
-            checked={filters.incomes.includes(i)}
-            onChange={() => onChange({ ...filters, incomes: toggle(filters.incomes, i) })}
-          />
-        ))}
-      </FilterSection>
-
-      {/* Marital status */}
-      <FilterSection title="Marital Status" defaultOpen={false}>
-        {maritalStatuses.map((s) => (
-          <CheckItem
-            key={s}
-            label={s}
-            checked={filters.maritalStatuses.includes(s)}
-            onChange={() =>
-              onChange({ ...filters, maritalStatuses: toggle(filters.maritalStatuses, s) })
-            }
-          />
-        ))}
-      </FilterSection>
-    </aside>
-  )
+function toggle(arr: string[], val: string) {
+  return arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]
 }
 
-// ─────────────────────────────────────────────
-// Active filter chips
-// ─────────────────────────────────────────────
-function ActiveFilterChips({
-  filters,
-  onChange,
-}: {
-  filters: ActiveFilters
-  onChange: (f: ActiveFilters) => void
-}) {
-  const chips: { label: string; onRemove: () => void }[] = []
-
-  if (filters.matchQuality !== "All matches")
-    chips.push({
-      label: filters.matchQuality,
-      onRemove: () => onChange({ ...filters, matchQuality: "All matches" }),
-    })
-  filters.ageRanges.forEach((r) =>
-    chips.push({ label: r, onRemove: () => onChange({ ...filters, ageRanges: filters.ageRanges.filter((v) => v !== r) }) })
-  )
-  filters.communities.forEach((c) =>
-    chips.push({ label: c, onRemove: () => onChange({ ...filters, communities: filters.communities.filter((v) => v !== c) }) })
-  )
-  filters.motherTongues.forEach((t) =>
-    chips.push({ label: t, onRemove: () => onChange({ ...filters, motherTongues: filters.motherTongues.filter((v) => v !== t) }) })
-  )
-  filters.educations.forEach((e) =>
-    chips.push({ label: e, onRemove: () => onChange({ ...filters, educations: filters.educations.filter((v) => v !== e) }) })
-  )
-  filters.cities.forEach((c) =>
-    chips.push({ label: c, onRemove: () => onChange({ ...filters, cities: filters.cities.filter((v) => v !== c) }) })
-  )
-  filters.incomes.forEach((i) =>
-    chips.push({ label: i, onRemove: () => onChange({ ...filters, incomes: filters.incomes.filter((v) => v !== i) }) })
-  )
-  filters.maritalStatuses.forEach((s) =>
-    chips.push({ label: s, onRemove: () => onChange({ ...filters, maritalStatuses: filters.maritalStatuses.filter((v) => v !== s) }) })
-  )
-
-  if (chips.length === 0) return null
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {chips.map((chip) => (
-        <span
-          key={chip.label}
-          className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-semibold text-primary"
-        >
-          {chip.label}
-          <button type="button" onClick={chip.onRemove} aria-label={`Remove ${chip.label} filter`}>
-            <X className="h-3 w-3" />
-          </button>
-        </span>
-      ))}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────
-// Main dashboard page
-// ─────────────────────────────────────────────
 export default function DashboardPage() {
   const [profile, setProfile] = React.useState<SignupData | null>(null)
-  const [filters, setFilters] = React.useState<ActiveFilters>(DEFAULT_FILTERS)
+  const [query, setQuery] = React.useState<DiscoverQuery>(DEFAULT_DISCOVER)
   const [skipped, setSkipped] = React.useState<string[]>([])
-  const [query, setQuery] = React.useState("")
+  const [paid, setPaid] = React.useState(false)
+  const [saved, setSaved] = React.useState<SavedSearch[]>([])
+  const [moreOpen, setMoreOpen] = React.useState(false)
+  const [saveOpen, setSaveOpen] = React.useState(false)
+  const [saveLabel, setSaveLabel] = React.useState("")
+  const [paywall, setPaywall] = React.useState<string | null>(null)
   const [interestCount, setInterestCount] = React.useState(0)
   const [shortlistCount, setShortlistCount] = React.useState(0)
-  const [mobileFilterOpen, setMobileFilterOpen] = React.useState(false)
 
   React.useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfile(loadProfile())
     setSkipped(loadSkipped())
+    setPaid(isPaidMember())
+    setSaved(loadSavedSearches())
     setInterestCount(getReceivedInterests().filter((i) => i.status === "pending").length)
     setShortlistCount(loadShortlist().length)
   }, [])
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
   const pending = profile?.verificationStatus === "pending"
-  const photoCount = profile?.photos.length ?? 0
-  const hasHoroscope = Boolean(profile?.horoscopeName)
+  const userCity = profile?.city || "Chennai"
 
-  const visibleMatches = React.useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const remaining = MATCHES.filter((m) => !skipped.includes(m.id))
-    const filtered = applyFilters(remaining, filters, profile?.city)
-    if (!q) return filtered
-    return filtered.filter((m) =>
-      [m.fullName, m.city, m.community, m.occupation, m.education, m.motherTongue]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    )
-  }, [skipped, filters, profile?.city, query])
+  const visibleMatches = React.useMemo(
+    () => applyDiscover(MATCHES, query, skipped, userCity),
+    [query, skipped, userCity]
+  )
+
+  const setQuick = (patch: Partial<DiscoverQuery>) => {
+    setQuery((q) => ({ ...q, ...patch }))
+  }
+
+  const setAdvanced = (patch: Partial<AdvancedFilters>) => {
+    setQuery((q) => ({ ...q, advanced: { ...q.advanced, ...patch } }))
+  }
+
+  const requirePaid = (feature: string, action: () => void) => {
+    if (paid) {
+      setPaywall(null)
+      action()
+      return
+    }
+    setPaywall(feature)
+  }
+
+  const applyPreferences = () => {
+    setQuery((q) => ({ ...q, ...fromPartnerPreferences(profile), advanced: EMPTY_ADVANCED }))
+  }
+
+  const cities = uniqueField("city")
+  const communities = uniqueField("community")
+  const occupations = uniqueField("occupation")
+  const incomes = uniqueField("income")
+  const diets = Array.from(new Set(MATCHES.map((m) => m.lifestyle.diet)))
+  const stars = uniqueField("star")
 
   return (
     <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 md:py-8">
-      {/* ── Header row ── */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Namaste</p>
-          <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">
-            Namaste, {firstName}
-          </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            <span className="font-semibold text-primary">{visibleMatches.length}</span> profiles match today
+          <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Search & browse</p>
+          <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">Discover</h1>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Namaste, {firstName}. Apply a filter and results update instantly — no search button.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Search bar */}
-          <label className="flex flex-1 items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm shadow-sm sm:w-64 sm:flex-none">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="City, community, profession…"
-              className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
-            />
-          </label>
-          {/* Mobile filter toggle */}
-          <button
-            type="button"
-            className="md:hidden tap-target inline-flex items-center justify-center rounded-full border border-border bg-card shadow-sm"
-            onClick={() => setMobileFilterOpen((v) => !v)}
-            aria-label="Open filters"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-          </button>
-          {/* Stat pills */}
-          <div className="hidden gap-2 sm:flex">
-            {[
-              { label: "Interests", value: String(interestCount), href: "/inbox" },
-              { label: "Shortlisted", value: String(shortlistCount), href: "/shortlist" },
-              { label: "Views", value: "21", href: "/notifications" },
-            ].map((stat) => (
-              <Link
-                key={stat.label}
-                href={stat.href}
-                className="min-w-[64px] rounded-xl border border-border bg-card px-3 py-2 text-center transition-colors hover:border-primary/30"
-              >
-                <p className="font-serif text-lg font-bold leading-none text-primary">{stat.value}</p>
-                <p className="mt-1 text-[10px] font-medium text-muted-foreground">{stat.label}</p>
-              </Link>
-            ))}
-          </div>
+        <div className="hidden gap-2 sm:flex">
+          {[
+            { label: "Interests", value: String(interestCount), href: "/interests" },
+            { label: "Shortlisted", value: String(shortlistCount), href: "/interests?tab=shortlisted" },
+            { label: "Views", value: "21", href: "/notifications" },
+          ].map((stat) => (
+            <Link
+              key={stat.label}
+              href={stat.href}
+              className="min-w-[64px] rounded-xl border border-border bg-card px-3 py-2 text-center hover:border-primary/30"
+            >
+              <p className="font-serif text-lg font-bold leading-none text-primary">{stat.value}</p>
+              <p className="mt-1 text-[10px] font-medium text-muted-foreground">{stat.label}</p>
+            </Link>
+          ))}
         </div>
       </div>
 
-      {/* Pending review banner */}
       {pending && (
         <div className="mb-5 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-[#fff8ef] shadow-sm">
-          <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
-                <Clock3 className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-semibold text-amber-950">Your profile is under review</p>
-                <p className="mt-0.5 text-sm text-amber-900/75">
-                  Photos stay private until approval — usually within {VERIFICATION_SLA_HOURS} hours.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Badge variant="outline" className="border-transparent bg-white/80 text-[11px] text-amber-900">
-                    {photoCount} photo{photoCount === 1 ? "" : "s"}
-                  </Badge>
-                  <Badge variant="outline" className="border-transparent bg-white/80 text-[11px] text-amber-900">
-                    {profile?.verificationMethod === "govt_id" ? "ID uploaded" : "Selfie done"}
-                  </Badge>
-                  {hasHoroscope && (
-                    <Badge variant="outline" className="border-transparent bg-white/80 text-[11px] text-amber-900">
-                      Horoscope PDF
-                    </Badge>
-                  )}
-                </div>
-              </div>
+          <div className="flex items-start gap-3 p-3.5 sm:p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+              <Clock3 className="h-5 w-5" />
             </div>
-            <Link
-              href="/profile"
-              className="shrink-0 rounded-xl bg-white/70 px-3 py-2 text-center text-xs font-semibold text-amber-900"
-            >
-              ETA &lt; {VERIFICATION_SLA_HOURS} hrs
-            </Link>
+            <div>
+              <p className="font-semibold text-amber-950">Your profile is under review</p>
+              <p className="mt-0.5 text-sm text-amber-900/75">
+                Photos stay private until approval — usually within {VERIFICATION_SLA_HOURS} hours.
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Two-column layout ── */}
-      <div className="flex gap-5">
-        {/* Left: Filter sidebar — hidden on mobile (shown in drawer) */}
-        <div className={cn("hidden md:block", mobileFilterOpen && "!block fixed inset-0 z-50 overflow-auto bg-background p-4 md:relative md:inset-auto md:z-auto md:overflow-visible md:p-0")}>
-          {mobileFilterOpen && (
-            <div className="mb-3 flex items-center justify-between md:hidden">
-              <span className="font-semibold">Filters</span>
-              <button type="button" onClick={() => setMobileFilterOpen(false)}>
+      {/* Quick search — 3 fields, live */}
+      <section className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="grid gap-4 md:grid-cols-3">
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Age range</span>
+            <div className="mt-2 flex items-center gap-3">
+              <input
+                type="range"
+                min={18}
+                max={50}
+                value={query.ageMin}
+                onChange={(e) => {
+                  const ageMin = Math.min(Number(e.target.value), query.ageMax)
+                  setQuick({ ageMin })
+                }}
+                className="w-full accent-primary"
+                aria-label="Minimum age"
+              />
+              <input
+                type="range"
+                min={18}
+                max={50}
+                value={query.ageMax}
+                onChange={(e) => {
+                  const ageMax = Math.max(Number(e.target.value), query.ageMin)
+                  setQuick({ ageMax })
+                }}
+                className="w-full accent-primary"
+                aria-label="Maximum age"
+              />
+            </div>
+            <p className="mt-1 text-sm font-semibold text-primary">
+              {query.ageMin} – {query.ageMax} yrs
+            </p>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</span>
+            <select
+              value={query.city}
+              onChange={(e) => setQuick({ city: e.target.value })}
+              className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+            >
+              <option value="">Any city</option>
+              {cities.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Community</span>
+            <select
+              value={query.community}
+              onChange={(e) => setQuick({ community: e.target.value })}
+              className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+            >
+              <option value="">Any community</option>
+              {communities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" variant="soft" size="sm" onClick={applyPreferences}>
+            <Heart className="mr-1.5 h-3.5 w-3.5" /> My preferences
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => requirePaid("Advanced filters", () => setMoreOpen(true))}
+          >
+            {paid ? <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" /> : <Lock className="mr-1.5 h-3.5 w-3.5" />}
+            More filters
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => requirePaid("Saved searches", () => setSaveOpen(true))}
+          >
+            {paid ? <Bookmark className="mr-1.5 h-3.5 w-3.5" /> : <Lock className="mr-1.5 h-3.5 w-3.5" />}
+            Save search
+          </Button>
+          {saved.length > 0 && paid && (
+            <select
+              className="h-9 rounded-full border border-border bg-background px-3 text-sm"
+              defaultValue=""
+              onChange={(e) => {
+                const item = saved.find((s) => s.id === e.target.value)
+                if (!item) return
+                setQuick({ ageMin: item.ageMin, ageMax: item.ageMax, city: item.city, community: item.community, tab: "all" })
+              }}
+              aria-label="Saved searches"
+            >
+              <option value="" disabled>
+                Saved searches
+              </option>
+              {saved.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            className="ml-auto text-xs font-semibold text-primary hover:underline"
+            onClick={() => setQuery(DEFAULT_DISCOVER)}
+          >
+            Clear all
+          </button>
+        </div>
+      </section>
+
+      {paywall && (
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-secondary/40 bg-[#fff8ef] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold text-foreground">{paywall} is a Premium feature</p>
+            <p className="text-sm text-muted-foreground">Upgrade to unlock 20+ filters, saved searches, and high-intent tabs.</p>
+          </div>
+          <Link href="/plans">
+            <Button size="sm">
+              <Crown className="mr-1.5 h-3.5 w-3.5" /> See plans
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {/* Browse tabs */}
+      <div className="mb-4 flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+        {BROWSE_TABS.map((tab) => {
+          const locked = Boolean(tab.paid) && !paid
+          const active = query.tab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                if (locked) {
+                  setPaywall(tab.label)
+                  return
+                }
+                setPaywall(null)
+                setQuick({ tab: tab.id })
+              }}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold",
+                active ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {locked && <Lock className="h-3.5 w-3.5" />}
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <p className="mb-3 text-sm text-muted-foreground">
+        <span className="font-semibold text-primary">{visibleMatches.length}</span> profiles · sorted by match score
+      </p>
+
+      <div className="space-y-3">
+        {visibleMatches.map((match, index) => (
+          <MatchListCard
+            key={match.id}
+            match={match}
+            featured={index === 0 && query.tab === "all"}
+            priority={index === 0}
+            onSkip={(id) => setSkipped(addSkipped(id))}
+            onConnect={(id) => sendInterest(id)}
+          />
+        ))}
+        {visibleMatches.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+            <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
+            <p className="mt-3 font-semibold">No profiles for this search</p>
+            <p className="mt-1 text-sm text-muted-foreground">Widen age, city, or community — results update as you adjust.</p>
+            <Button
+              className="mt-4"
+              onClick={() => {
+                clearSkipped()
+                setSkipped([])
+                setQuery(DEFAULT_DISCOVER)
+              }}
+            >
+              Reset search
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {moreOpen && paid && (
+        <div className="fixed inset-0 z-[60] flex justify-end bg-black/40" onClick={() => setMoreOpen(false)}>
+          <aside
+            className="h-full w-full max-w-sm overflow-y-auto bg-[#fffbf4] p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                <h2 className="font-semibold">More filters</h2>
+              </div>
+              <button type="button" onClick={() => setMoreOpen(false)} aria-label="Close">
                 <X className="h-5 w-5" />
               </button>
             </div>
-          )}
-          <FilterSidebar
-            filters={filters}
-            onChange={setFilters}
-            onReset={() => { setFilters(DEFAULT_FILTERS); setMobileFilterOpen(false) }}
-            resultCount={visibleMatches.length}
-          />
-        </div>
-
-        {/* Right: Match list with auto-scroll */}
-        <div className="min-w-0 flex-1">
-          {/* Active filter chips */}
-          <ActiveFilterChips filters={filters} onChange={setFilters} />
-
-          {/* Match list */}
-          <div className="mt-3 space-y-3">
-            {visibleMatches.map((match, index) => (
-              <MatchListCard
-                key={match.id}
-                match={match}
-                featured={index === 0 && filters.matchQuality === "All matches" && !query}
-                priority={index === 0}
-                onSkip={(id) => setSkipped(addSkipped(id))}
-                onConnect={(id) => sendInterest(id)}
+            <p className="mb-3 text-xs text-muted-foreground">Results update as you tick a box.</p>
+            <FilterSection title="Height">
+              {HEIGHT_BANDS.map((h) => (
+                <CheckItem
+                  key={h}
+                  label={h}
+                  checked={query.advanced.heights.includes(h)}
+                  onChange={() => setAdvanced({ heights: toggle(query.advanced.heights, h) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Education">
+              {EDUCATION_GROUPS.map((e) => (
+                <CheckItem
+                  key={e}
+                  label={e}
+                  checked={query.advanced.educations.includes(e)}
+                  onChange={() => setAdvanced({ educations: toggle(query.advanced.educations, e) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Income">
+              {incomes.map((i) => (
+                <CheckItem
+                  key={i}
+                  label={i}
+                  checked={query.advanced.incomes.includes(i)}
+                  onChange={() => setAdvanced({ incomes: toggle(query.advanced.incomes, i) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Occupation">
+              {occupations.map((o) => (
+                <CheckItem
+                  key={o}
+                  label={o}
+                  checked={query.advanced.occupations.includes(o)}
+                  onChange={() => setAdvanced({ occupations: toggle(query.advanced.occupations, o) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Diet">
+              {diets.map((d) => (
+                <CheckItem
+                  key={d}
+                  label={d}
+                  checked={query.advanced.diets.includes(d)}
+                  onChange={() => setAdvanced({ diets: toggle(query.advanced.diets, d) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Smoking">
+              {["No", "Occasionally", "Yes"].map((s) => (
+                <CheckItem
+                  key={s}
+                  label={s}
+                  checked={query.advanced.smoking.includes(s)}
+                  onChange={() => setAdvanced({ smoking: toggle(query.advanced.smoking, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Drinking">
+              {["No", "Occasionally", "Yes"].map((s) => (
+                <CheckItem
+                  key={s}
+                  label={s}
+                  checked={query.advanced.drinking.includes(s)}
+                  onChange={() => setAdvanced({ drinking: toggle(query.advanced.drinking, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Manglik status">
+              {["Yes", "No", "Don't know"].map((s) => (
+                <CheckItem
+                  key={s}
+                  label={s}
+                  checked={query.advanced.manglik.includes(s)}
+                  onChange={() => setAdvanced({ manglik: toggle(query.advanced.manglik, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Horoscope star">
+              {stars.map((s) => (
+                <CheckItem
+                  key={s}
+                  label={s}
+                  checked={query.advanced.stars.includes(s)}
+                  onChange={() => setAdvanced({ stars: toggle(query.advanced.stars, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Willing to relocate">
+              <CheckItem
+                label="Yes"
+                checked={query.advanced.relocate === "yes"}
+                onChange={(v) => setAdvanced({ relocate: v ? "yes" : "" })}
               />
-            ))}
+              <CheckItem
+                label="No"
+                checked={query.advanced.relocate === "no"}
+                onChange={(v) => setAdvanced({ relocate: v ? "no" : "" })}
+              />
+            </FilterSection>
+            <Button className="mt-4 w-full" onClick={() => setMoreOpen(false)}>
+              Done
+            </Button>
+          </aside>
+        </div>
+      )}
 
-            {visibleMatches.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
-                <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
-                <p className="mt-3 font-semibold">No matches with these filters</p>
-                <Button
-                  className="mt-4"
-                  onClick={() => {
-                    clearSkipped()
-                    setSkipped([])
-                    setQuery("")
-                    setFilters(DEFAULT_FILTERS)
-                  }}
-                >
-                  Reset all filters
-                </Button>
-              </div>
-            )}
+      {saveOpen && paid && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setSaveOpen(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-serif text-xl font-bold">Save this search</h2>
+            <p className="mt-1 text-sm text-muted-foreground">We’ll notify you when new profiles match (demo).</p>
+            <input
+              value={saveLabel}
+              onChange={(e) => setSaveLabel(e.target.value)}
+              placeholder='e.g. Engineers in Chennai'
+              className="mt-4 h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+            />
+            <div className="mt-4 flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setSaveOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={!saveLabel.trim()}
+                onClick={() => {
+                  setSaved(
+                    addSavedSearch({
+                      label: saveLabel.trim(),
+                      ageMin: query.ageMin,
+                      ageMax: query.ageMax,
+                      city: query.city,
+                      community: query.community,
+                    })
+                  )
+                  setSaveLabel("")
+                  setSaveOpen(false)
+                }}
+              >
+                Save
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </main>
   )
 }

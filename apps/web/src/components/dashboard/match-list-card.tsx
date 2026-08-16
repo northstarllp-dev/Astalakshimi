@@ -74,24 +74,17 @@ export function MatchListCard({
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-black/20" />
 
-            {/* Top badges */}
-            <div className="absolute left-2.5 right-2.5 top-2.5 flex flex-wrap items-start justify-between gap-1.5">
-              <div className="flex flex-wrap gap-1.5">
-                <Badge className="border-transparent bg-emerald-500 text-[11px] font-bold text-white">
-                  <Star className="fill-current" /> {match.matchPercent}%
-                </Badge>
-                {match.photoVerified && (
-                  <Badge
-                    variant="outline"
-                    className="border-transparent bg-black/50 text-[11px] font-semibold text-white backdrop-blur"
-                  >
-                    <BadgeCheck className="text-secondary" /> Verified
-                  </Badge>
-                )}
-              </div>
-              {featured && (
-                <Badge variant="secondary" className="text-[11px] font-bold">
-                  <Sparkles /> Top
+            {/* Photo badges — match % + verified only, stacked */}
+            <div className="absolute left-2.5 top-2.5 flex flex-col items-start gap-1.5">
+              <Badge className="border-transparent bg-emerald-500 text-[11px] font-bold text-white">
+                <Star className="fill-current" /> {match.matchPercent}%
+              </Badge>
+              {match.photoVerified && (
+                <Badge
+                  variant="outline"
+                  className="border-transparent bg-black/50 text-[11px] font-semibold text-white backdrop-blur"
+                >
+                  <BadgeCheck className="text-secondary" /> Verified
                 </Badge>
               )}
             </div>
@@ -154,6 +147,29 @@ export function MatchListCard({
 
         {/* ── Details column ── */}
         <div className="flex flex-col justify-between gap-3 p-3.5 sm:p-4">
+          <div className="flex flex-wrap gap-1.5">
+            {featured && (
+              <Badge variant="secondary" className="text-[11px] font-bold">
+                <Sparkles className="h-3 w-3" /> Top
+              </Badge>
+            )}
+            {match.joinedDaysAgo <= 7 && (
+              <Badge className="border-transparent bg-primary text-[11px] font-bold text-white">New</Badge>
+            )}
+            {match.premium && (
+              <Badge className="border-transparent bg-[#b8901f] text-[11px] font-bold text-white">
+                <Sparkles className="h-3 w-3" /> Premium
+              </Badge>
+            )}
+            {["Online now", "Today", "2 hours ago"].includes(match.lastActive) && (
+              <Badge
+                variant="outline"
+                className="border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-800"
+              >
+                <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active today
+              </Badge>
+            )}
+          </div>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
             <Detail label="Education" value={match.education} />
             <Detail label="Profession" value={match.occupation} />

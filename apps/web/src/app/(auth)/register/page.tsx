@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { Logo } from "@/components/ui/logo"
@@ -22,20 +22,31 @@ import { ArrowLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   emptySignupData,
+  formatSiblings,
   getPrefix,
   saveProfile,
+  SIBLING_COUNTS,
   type SignupData,
 } from "@/lib/profile-store"
 import { StepHeading, StepProgress, TapCard } from "@/components/signup/shared"
 import { Step6Verify, VerificationSubmitted } from "@/components/signup/step-verify"
 
 const TOTAL_STEPS = 6
+const REFERRED_BY_KEY = "astalakshimi.referredBy"
 
-export default function SignupPage() {
+function SignupPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
   const [data, setData] = useState<SignupData>(emptySignupData)
+
+  React.useEffect(() => {
+    const ref = searchParams.get("ref")
+    if (ref && typeof window !== "undefined") {
+      sessionStorage.setItem(REFERRED_BY_KEY, ref)
+    }
+  }, [searchParams])
 
   const updateData = (fields: Partial<SignupData>) => {
     setData((prev) => ({ ...prev, ...fields }))
@@ -53,6 +64,7 @@ export default function SignupPage() {
   const finishVerification = () => {
     const payload: SignupData = {
       ...data,
+      siblings: formatSiblings(data.brothersCount, data.sistersCount),
       verificationStatus: "pending",
       submittedAt: new Date().toISOString(),
     }
@@ -120,6 +132,20 @@ export default function SignupPage() {
         </AnimatePresence>
       </main>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex min-h-dvh items-center justify-center bg-background text-sm text-muted-foreground">
+          Loading…
+        </div>
+      }
+    >
+      <SignupPageInner />
+    </React.Suspense>
   )
 }
 
@@ -466,6 +492,14 @@ function Step3Community({
   const isComplete = data.religion && isCasteValid && data.motherTongue
   const prefix = data.profileFor ? `${getPrefix(data.profileFor)} ` : ""
 
+  const setSiblings = (brothersCount: number, sistersCount: number) => {
+    updateData({
+      brothersCount,
+      sistersCount,
+      siblings: formatSiblings(brothersCount, sistersCount),
+    })
+  }
+
   return (
     <div className="space-y-8">
       <StepHeading title="Community & background" subtitle="These details help families find the right match." />
@@ -514,6 +548,56 @@ function Step3Community({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-border bg-muted/40 p-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Siblings</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              How many brothers and sisters? Choose 0 if only child.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="brothers">{prefix}Brothers</Label>
+              <Select
+                value={String(data.brothersCount)}
+                onValueChange={(v) => setSiblings(Number(v), data.sistersCount)}
+              >
+                <SelectTrigger id="brothers" className="w-full bg-card">
+                  <SelectValue placeholder="Brothers" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SIBLING_COUNTS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n === 5 ? "5+" : String(n)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sisters">{prefix}Sisters</Label>
+              <Select
+                value={String(data.sistersCount)}
+                onValueChange={(v) => setSiblings(data.brothersCount, Number(v))}
+              >
+                <SelectTrigger id="sisters" className="w-full bg-card">
+                  <SelectValue placeholder="Sisters" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SIBLING_COUNTS.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n === 5 ? "5+" : String(n)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <p className="text-sm font-medium text-primary">
+            {formatSiblings(data.brothersCount, data.sistersCount)}
+          </p>
         </div>
       </div>
       <Button className="w-full" size="lg" disabled={!isComplete} onClick={nextStep}>
@@ -582,6 +666,12 @@ function Step4Work({
                 <SelectItem value="M.Sc">M.Sc</SelectItem>
               </SelectGroup>
               <SelectGroup>
+                <SelectLabel>Higher Education</SelectLabel>
+                <SelectItem value="Ph.D">Ph.D</SelectItem>
+                <SelectItem value="M.Phil">M.Phil</SelectItem>
+                <SelectItem value="Post Doctorate">Post Doctorate</SelectItem>
+              </SelectGroup>
+              <SelectGroup>
                 <SelectLabel>Others</SelectLabel>
                 <SelectItem value="Diploma">Diploma</SelectItem>
                 <SelectItem value="Other">Other (type below)</SelectItem>
@@ -593,6 +683,13 @@ function Step4Work({
               placeholder="Type education degree..."
               value={data.otherEducation}
               onChange={(e) => updateData({ otherEducation: e.target.value })}
+            />
+          )}
+          {data.education && (
+            <Input
+              placeholder="Specialization / Stream (optional, e.g. Computer Science)"
+              value={data.educationStream}
+              onChange={(e) => updateData({ educationStream: e.target.value })}
             />
           )}
         </div>
