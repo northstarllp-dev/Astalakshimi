@@ -7,13 +7,13 @@ import { Logo } from "@/components/ui/logo"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
-import { loadProfile, type SignupData } from "@/lib/profile-store"
-import { getUnreadNotificationCount } from "@/lib/user-activity"
+import { useProfileQuery, useUnreadCountQuery } from "@/hooks/queries"
 import { cn } from "@/lib/utils"
 import { Bell, Search } from "lucide-react"
 
 const desktopLinks = [
-  { href: "/dashboard", label: "Discover", match: (p: string) => p === "/dashboard" },
+  { href: "/home", label: "Home", match: (p: string) => p === "/home" },
+  { href: "/dashboard", label: "Discover", match: (p: string) => p === "/dashboard" || p.startsWith("/search") },
   { href: "/interests", label: "Interests", match: (p: string) => p.startsWith("/interests") },
   { href: "/plans", label: "Premium", match: (p: string) => p.startsWith("/plans") || p.startsWith("/checkout") },
   { href: "/profile", label: "Profile", match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") },
@@ -21,14 +21,8 @@ const desktopLinks = [
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const [profile, setProfile] = React.useState<SignupData | null>(null)
-  const [unread, setUnread] = React.useState(0)
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setProfile(loadProfile())
-    setUnread(getUnreadNotificationCount())
-  }, [pathname])
+  const { data: profile } = useProfileQuery()
+  const { data: unread = 0 } = useUnreadCountQuery()
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
   const pending = profile?.verificationStatus === "pending"
@@ -44,7 +38,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-50 border-b border-secondary/30 bg-[#fffbf4]/92 backdrop-blur-xl safe-top">
         <div className="gold-rule" />
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 md:h-16">
-          <Logo href="/dashboard" />
+          <Logo href="/home" />
           <nav className="hidden items-center gap-1 md:flex">
             {desktopLinks.map((link) => (
               <Link

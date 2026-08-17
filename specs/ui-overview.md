@@ -9,11 +9,11 @@ Read this after [tech-stack.md](./tech-stack.md) and [architecture.md](./archite
 
 | File | Covers |
 | --- | --- |
-| [ui-changes.md](./ui-changes.md) | Change log — Discover, notifications, siblings, profile layout, deploy notes |
+| [ui-changes.md](./ui-changes.md) | Change log — Home hub, portal gating, Discover, notifications |
 | [ui-ux.md](./ui-ux.md) | Colour codes, type, spacing, motion, buttons, UX rules |
 | [ui-theme.md](./ui-theme.md) | Logo, chrome, imagery (short recap) |
 | [ui-public-auth.md](./ui-public-auth.md) | Landing, login, register |
-| [ui-dashboard.md](./ui-dashboard.md) | Discover, interests, inbox, plans, my profile, settings, notifications |
+| [ui-dashboard.md](./ui-dashboard.md) | Home hub, Discover (gated), interests, inbox, plans, my profile, settings, notifications |
 | [ui-profile-view.md](./ui-profile-view.md) | Other-member profile page (`/profiles/[id]`) |
 
 ## Route map
@@ -21,8 +21,9 @@ Read this after [tech-stack.md](./tech-stack.md) and [architecture.md](./archite
 ```
 /                         landing (public)
 /login                    OTP login
-/register                 6-step signup (includes siblings)
-/dashboard                Discover — search & browse
+/register                 5-step signup (short; profile ~25% after submit)
+/home                     Home hub — top 4 matches + activity (post-signup landing)
+/dashboard                Discover — search & browse (verified + 80% complete)
 /search                   legacy search + filters
 /interests                interests inbox
 /inbox                    interests / accepted / messages
@@ -39,16 +40,11 @@ Read this after [tech-stack.md](./tech-stack.md) and [architecture.md](./archite
 
 ## Navigation
 
-Mobile bottom nav (4 tabs) in [`mobile-bottom-nav.tsx`](../apps/web/src/components/layout/mobile-bottom-nav.tsx):
+Mobile bottom nav (5 tabs) in [`mobile-bottom-nav.tsx`](../apps/web/src/components/layout/mobile-bottom-nav.tsx): Home · Discover · Interests · Premium · Profile.
 
-| Tab | Route |
-| --- | --- |
-| Discover | `/dashboard` |
-| Interests | `/interests` |
-| Premium | `/plans` |
-| Profile | `/profile` |
+Desktop logged-in header in [`dashboard-shell.tsx`](../apps/web/src/components/layout/dashboard-shell.tsx): Home, Discover, Interests, Premium, Profile. Bell → `/notifications`. Avatar → `/profile`. Logo → `/home`.
 
-Desktop logged-in header in [`dashboard-shell.tsx`](../apps/web/src/components/layout/dashboard-shell.tsx): Discover, Interests, Inbox, Premium, Profile. Bell → `/notifications` (unread count). Avatar → `/profile`. Profile match view hides the mobile bottom nav.
+Discover / Interests / Search / Shortlist always appear. Incomplete or unverified members see a **Complete your profile** screen on those routes (not a hidden tab).
 
 ## Mock data (no API)
 
@@ -56,6 +52,9 @@ Desktop logged-in header in [`dashboard-shell.tsx`](../apps/web/src/components/l
 | --- | --- |
 | `src/lib/matches.ts` | Demo match profiles + premium / joinedDaysAgo / manglik / star |
 | `src/lib/discover.ts` | Quick + advanced filters, browse tabs, preference apply |
+| `src/lib/portal-access.ts` | Home unlock rule, top matches, activity teasers |
+| `src/lib/validation.ts` | Zod schemas for login, signup, edit, search, checkout |
+| `src/hooks/queries.ts` | TanStack Query keys/hooks over mock sessionStorage |
 | `src/lib/plans.ts` | Plans, `isPaidMember()`, checkout helpers |
 | `src/lib/profile-store.ts` | Signup / my-profile (`brothersCount`, `sistersCount`, `siblings`) |
 | `src/lib/user-activity.ts` | Skip, shortlist, interests, settings, **notifications**, saved searches |

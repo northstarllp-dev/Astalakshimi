@@ -2,9 +2,11 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { loadProfile } from "@/lib/profile-store"
+import { PlanCompare } from "@/components/plans/plan-compare"
+import { useInvoicesQuery, useProfileQuery, useSubscriptionQuery } from "@/hooks/queries"
 import {
   MEMBERSHIP_PLANS,
   PLAN_FEATURE_MATRIX,
@@ -15,14 +17,11 @@ import {
   getOrCreateReferralCode,
   getPlanById,
   getReferralLink,
-  loadInvoices,
-  loadSubscription,
   shouldShowRenewal,
   type InvoiceRecord,
   type PlanId,
-  type SubscriptionRecord,
 } from "@/lib/plans"
-import { cn } from "@/lib/utils"
+import { planSelectSchema } from "@/lib/validation"
 import {
   Check,
   Copy,
@@ -36,36 +35,45 @@ import {
   X,
 } from "lucide-react"
 
-const TIER_ORDER: PlanId[] = ["free", "silver", "gold", "platinum"]
+const TIER_ORDER: PlanId[] = ["free", "silver", "gold", "platinum", "diamond"]
 
 export default function PlansPage() {
-  const [sub, setSub] = React.useState<SubscriptionRecord | null>(null)
-  const [invoices, setInvoices] = React.useState<InvoiceRecord[]>([])
+  const router = useRouter()
+  const { data: profile } = useProfileQuery()
+  const { data: sub } = useSubscriptionQuery()
+  const { data: invoices = [] } = useInvoicesQuery()
   const [referralCode, setReferralCode] = React.useState("")
   const [referralLink, setReferralLink] = React.useState("")
   const [copied, setCopied] = React.useState(false)
   const [selectedCompare, setSelectedCompare] = React.useState<PlanId>("gold")
+  const didInitSelection = React.useRef(false)
 
   React.useEffect(() => {
-    const profile = loadProfile()
-    const subscription = loadSubscription()
     const code = getOrCreateReferralCode(profile?.fullName || profile?.phone || "member")
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSub(subscription)
-    setInvoices(loadInvoices())
     setReferralCode(code)
     setReferralLink(getReferralLink(code))
-    if (subscription.planId !== "platinum") {
-      const next = TIER_ORDER[Math.min(TIER_ORDER.indexOf(subscription.planId) + 1, TIER_ORDER.length - 1)]
-      setSelectedCompare(next === "free" ? "silver" : next)
-    }
-  }, [])
+  }, [profile])
+
+  React.useEffect(() => {
+    if (!sub || didInitSelection.current) return
+    didInitSelection.current = true
+    if (sub.planId === "diamond") return
+    const next = TIER_ORDER[Math.min(TIER_ORDER.indexOf(sub.planId) + 1, TIER_ORDER.length - 1)]
+    setSelectedCompare(next === "free" ? "silver" : next)
+  }, [sub])
 
   const current = sub ? getPlanById(sub.planId) : getPlanById("free")
   const remaining = sub ? daysRemaining(sub.expiresAt) : 0
   const showRenewal = sub ? shouldShowRenewal(sub.expiresAt) : false
   const previewPlan = getPlanById(selectedCompare)
   const unlockedLabels = current?.features ?? []
+  const currentPlanId = sub?.planId ?? "free"
+
+  const choosePlan = (planId: PlanId) => {
+    const parsed = planSelectSchema.safeParse({ planId })
+    if (!parsed.success) return
+    router.push(`/checkout?plan=${parsed.data.planId}`)
+  }
 
   const copyReferral = async () => {
     try {
@@ -97,8 +105,8 @@ export default function PlansPage() {
     <main className="mx-auto max-w-6xl space-y-8 px-3 py-5 sm:px-4 md:py-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Subscription & plans</p>
-          <h1 className="mt-1 font-serif text-3xl font-bold md:text-4xl">Upgrade when you&apos;re ready</h1>
+          <p className="royal-label">Subscription & plans</p>
+          <h1 className="mt-2 font-serif text-3xl font-bold md:text-4xl">Upgrade when you&apos;re ready</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
             See what you unlock before you pay. Feature previews beat a pricing table alone.
           </p>
@@ -110,7 +118,6 @@ export default function PlansPage() {
         )}
       </div>
 
-      {/* Current plan status */}
       <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         <div className="grid gap-0 md:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-4 p-5 md:p-6">
@@ -122,7 +129,16 @@ export default function PlansPage() {
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <Stat label="Active plan" value={current?.name ?? "Free"} />
-              <Stat label="Expires on" value={sub ? formatExpiry(sub.expiresAt) : "—"} />
+              <Stat
+                label="Expires on"
+                value={
+                  current?.id === "free" || current?.id === "diamond"
+                    ? current.period
+                    : sub
+                      ? formatExpiry(sub.expiresAt)
+                      : "—"
+                }
+              />
               <Stat label="Days remaining" value={`${remaining} day${remaining === 1 ? "" : "s"}`} />
             </div>
             <div>
@@ -145,31 +161,29 @@ export default function PlansPage() {
                   Renew now to keep contacts, chat, and interests without interruption. Renewal window opens{" "}
                   {RENEWAL_WINDOW_DAYS} days before expiry.
                 </p>
-                <Link href={`/checkout?plan=${current?.id ?? "silver"}&renew=1`} className="mt-3 inline-block">
-                  <Button size="sm">Renew {current?.name}</Button>
-                </Link>
-              </div>
-            ) : current?.id !== "platinum" ? (
-              <Link href={`/checkout?plan=${selectedCompare}`}>
-                <Button>
-                  <Sparkles className="mr-2 h-4 w-4" /> Upgrade to {previewPlan?.name}
+                <Button size="sm" className="mt-3" onClick={() => choosePlan(current?.id ?? "silver")}>
+                  Renew {current?.name}
                 </Button>
-              </Link>
+              </div>
+            ) : current?.id !== "diamond" ? (
+              <Button onClick={() => choosePlan(selectedCompare)}>
+                <Sparkles className="mr-2 h-4 w-4" /> Upgrade to {previewPlan?.name}
+              </Button>
             ) : (
               <p className="text-sm text-muted-foreground">You&apos;re on the highest plan. Enjoy unlimited access.</p>
             )}
           </div>
-          <div className="border-t border-border bg-gradient-to-br from-[#2a0f14] via-[#6b1024] to-primary p-5 text-white md:border-l md:border-t-0 md:p-6">
-            <p className="text-xs font-semibold tracking-[0.18em] uppercase text-white/60">Why upgrade</p>
-            <h3 className="mt-2 font-serif text-2xl font-bold">Locked features convert better than price alone</h3>
-            <ul className="mt-4 space-y-2.5 text-sm text-white/85">
+          <div className="border-t border-secondary/25 bg-[linear-gradient(160deg,#fff9f2_0%,#f7ead4_55%,#f3e0c8_100%)] p-5 md:border-l md:border-t-0 md:p-6">
+            <p className="royal-label">Why upgrade</p>
+            <h3 className="mt-2 font-serif text-2xl font-bold text-primary">Locked features convert better than price alone</h3>
+            <ul className="mt-4 space-y-2.5 text-sm text-foreground/80">
               {[
-                { icon: Lock, text: "Contact details stay locked on Free" },
-                { icon: Lock, text: "Chat unlocks after mutual interest on paid plans" },
-                { icon: Lock, text: "Advanced filters & horoscope on Gold+" },
+                { icon: Lock, text: "Mutual horoscope & contact stay locked on Free" },
+                { icon: Lock, text: "Advanced filters & priority listing on Gold+" },
+                { icon: Lock, text: "Unlimited interests on Platinum & Diamond" },
               ].map((item) => (
                 <li key={item.text} className="flex items-start gap-2">
-                  <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
+                  <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
                   {item.text}
                 </li>
               ))}
@@ -178,103 +192,26 @@ export default function PlansPage() {
         </div>
       </section>
 
-      {/* Plan comparison cards */}
-      <section className="space-y-4">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="font-serif text-2xl font-bold">Compare plans</h2>
-            <p className="text-sm text-muted-foreground">Free · Silver · Gold · Platinum</p>
-          </div>
-        </div>
+      <PlanCompare
+        currentPlanId={currentPlanId}
+        selectedPlanId={selectedCompare}
+        onSelect={setSelectedCompare}
+        onChoose={choosePlan}
+      />
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {MEMBERSHIP_PLANS.map((plan) => {
-            const isCurrent = plan.id === sub?.planId
-            const isSelected = plan.id === selectedCompare
-            return (
-              <article
-                key={plan.id}
-                className={cn(
-                  "relative flex flex-col overflow-hidden rounded-3xl border bg-card shadow-sm transition-shadow",
-                  plan.highlighted ? "border-secondary/50 ring-1 ring-secondary/30" : "border-border",
-                  isSelected && "shadow-md"
-                )}
-              >
-                {plan.badge && (
-                  <div className="bg-peacock px-3 py-2 text-center text-[11px] font-semibold text-white">
-                    {plan.badge}
-                  </div>
-                )}
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-serif text-xl font-bold">{plan.name}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">{plan.tagline}</p>
-                    </div>
-                    {isCurrent && (
-                      <Badge className="shrink-0 border-transparent bg-primary/10 text-primary">Current</Badge>
-                    )}
-                  </div>
-                  <p className="mt-4 font-serif text-3xl font-bold text-primary">{plan.price}</p>
-                  <p className="text-xs text-muted-foreground">/ {plan.period}</p>
-
-                  <ul className="mt-4 space-y-2 text-sm">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="mt-auto space-y-2 pt-5">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCompare(plan.id)}
-                      className={cn(
-                        "w-full rounded-full border px-3 py-2 text-xs font-semibold transition-colors",
-                        isSelected
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-primary/40"
-                      )}
-                    >
-                      Preview unlocks
-                    </button>
-                    {isCurrent ? (
-                      <Button variant="outline" className="w-full" disabled={plan.id === "free"}>
-                        Current plan
-                      </Button>
-                    ) : (
-                      <Link href={`/checkout?plan=${plan.id}`} className="block">
-                        <Button variant={plan.highlighted ? "secondary" : "default"} className="w-full">
-                          Upgrade
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* Feature unlock preview */}
       {previewPlan && (
         <section className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-semibold tracking-[0.18em] text-gold uppercase">Feature unlock preview</p>
+              <p className="royal-label">Feature unlock preview</p>
               <h2 className="mt-1 font-serif text-2xl font-bold">
                 You&apos;ll unlock with {previewPlan.name}
               </h2>
             </div>
-            {previewPlan.id !== sub?.planId && (
-              <Link href={`/checkout?plan=${previewPlan.id}`}>
-                <Button size="lg">
-                  Upgrade to {previewPlan.name} · {previewPlan.price}
-                </Button>
-              </Link>
+            {previewPlan.id !== currentPlanId && (
+              <Button size="lg" onClick={() => choosePlan(previewPlan.id)}>
+                Upgrade to {previewPlan.name} · {previewPlan.price}
+              </Button>
             )}
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
@@ -299,19 +236,23 @@ export default function PlansPage() {
         </section>
       )}
 
-      {/* Feature comparison table */}
       <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         <div className="border-b border-border px-5 py-4 md:px-6">
           <h2 className="font-serif text-xl font-bold">Full feature comparison</h2>
-          <p className="text-sm text-muted-foreground">Checkmarks show what each tier includes.</p>
+          <p className="text-sm text-muted-foreground">
+            Extra contacts are ₹29 each on every plan. Mutual horoscope & contact unlock on Silver and above.
+          </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-3 font-semibold md:px-6">Feature</th>
                 {MEMBERSHIP_PLANS.map((p) => (
-                  <th key={p.id} className="px-3 py-3 text-center font-semibold">
+                  <th
+                    key={p.id}
+                    className={`px-3 py-3 text-center font-semibold ${p.id === "gold" ? "text-gold" : ""}`}
+                  >
                     {p.name}
                   </th>
                 ))}
@@ -340,12 +281,11 @@ export default function PlansPage() {
         </div>
       </section>
 
-      {/* Refer and earn */}
       <section className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-secondary/30 bg-[#fff9f2] p-5 md:p-6">
           <div className="flex items-center gap-2 text-primary">
             <Gift className="h-5 w-5" />
-            <p className="text-xs font-semibold tracking-[0.18em] uppercase">Refer and earn</p>
+            <p className="royal-label">Refer and earn</p>
           </div>
           <h2 className="mt-2 font-serif text-2xl font-bold">Refer a friend → get 1 month Silver free</h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -366,7 +306,6 @@ export default function PlansPage() {
           </div>
         </div>
 
-        {/* Invoices */}
         <div className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
@@ -377,11 +316,9 @@ export default function PlansPage() {
             <div className="mt-6 rounded-2xl border border-dashed border-border px-4 py-8 text-center">
               <p className="text-sm font-medium">No invoices yet</p>
               <p className="mt-1 text-xs text-muted-foreground">They appear here after a successful payment.</p>
-              <Link href="/checkout?plan=gold" className="mt-4 inline-block">
-                <Button size="sm" variant="soft">
-                  Upgrade to create one
-                </Button>
-              </Link>
+              <Button size="sm" variant="soft" className="mt-4" onClick={() => choosePlan("gold")}>
+                Upgrade to create one
+              </Button>
             </div>
           ) : (
             <ul className="mt-4 space-y-2">
@@ -416,7 +353,7 @@ export default function PlansPage() {
       <section className="rounded-2xl border border-secondary/25 bg-card p-5 md:p-6">
         <h2 className="font-serif text-xl font-bold">Assisted Service</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Prefer a relationship manager? Platinum includes assisted shortlisting. Brokers and family referrals also get lower subscription options.
+          Prefer a relationship manager? Diamond includes until-marriage access. Brokers and family referrals also get lower subscription options.
         </p>
         <Link href="/#assisted" className="mt-4 inline-block">
           <Button variant="outline" size="sm">

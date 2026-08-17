@@ -35,7 +35,7 @@ South Indian heritage look: temple maroon, gold, cream, kolam surface. Implement
 | Component | Where |
 | --- | --- |
 | `SiteHeader` / `SiteFooter` | Public landing |
-| `DashboardShell` | All `(dashboard)` routes: gold-rule header, desktop links, bell, avatar |
+| `DashboardShell` | Logged-in chrome: Home, Discover, Interests, Premium, Profile; bell, avatar |
 | `MobileBottomNav` | Logged-in, mobile only |
 | `Button` variants | `default` maroon, `secondary` gold, `outline`, `ghost`, `soft` |
 

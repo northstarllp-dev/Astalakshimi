@@ -1,16 +1,19 @@
 import type { Metadata, Viewport } from "next"
-import { Cormorant_Garamond, Outfit, Tiro_Tamil } from "next/font/google"
+import { Cormorant_Garamond, Mukta, Tiro_Tamil } from "next/font/google"
+import { QueryProvider } from "@/providers/query-provider"
 import "./globals.css"
 
-const outfit = Outfit({
-  subsets: ["latin"],
-  variable: "--font-outfit",
+const mukta = Mukta({
+  subsets: ["latin", "devanagari"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-mukta",
   display: "swap",
 })
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
+  style: ["normal", "italic"],
   variable: "--font-cormorant",
   display: "swap",
 })
@@ -46,10 +49,10 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${outfit.variable} ${cormorant.variable} ${tiroTamil.variable}`}
+      className={`${mukta.variable} ${cormorant.variable} ${tiroTamil.variable}`}
     >
       <body className="kolam-surface antialiased min-h-dvh bg-background text-foreground">
-        {children}
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   )

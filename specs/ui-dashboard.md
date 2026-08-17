@@ -7,9 +7,24 @@ All of this is mock: skip / connect / shortlist / plan / notifications / saved s
 
 See also the full change log: [ui-changes.md](./ui-changes.md).
 
+## Home `/home`
+
+Post-signup landing (nav label **Home**). Always visible.
+
+Logic: [`lib/portal-access.ts`](../apps/web/src/lib/portal-access.ts). Completeness is weighted so signup-only profiles sit near **25%**.
+
+| Block | Behaviour |
+| --- | --- |
+| Completeness | Ring + missing steps until unlocked |
+| Verification | Pending review copy; demo approve marks verified |
+| Top matches | 4 portrait thumbnails (name + photo + match %) — [`MatchThumbCard`](../apps/web/src/components/dashboard/match-thumb-card.tsx) |
+| Activity | Who viewed you, you viewed, interests received, shortlisted you (locked overlays until unlock; viewers/shortlist also paid) |
+
+**Unlock Discover + Interests:** verified **and** completeness ≥ 80%. Until then those tabs stay visible and show [`CompleteProfileGate`](../apps/web/src/components/layout/complete-profile-gate.tsx) via [`RequireFullPortal`](../apps/web/src/components/layout/require-full-portal.tsx).
+
 ## Discover `/dashboard`
 
-Primary search & browse (nav label **Discover**).
+Primary search & browse (nav label **Discover**). Always in the nav. Incomplete / unverified members see **Complete your profile** instead of results.
 
 ### Quick search (all members)
 
@@ -44,11 +59,11 @@ Default sort: **match score** descending. Logic in [`lib/discover.ts`](../apps/w
 
 ## Search `/search`
 
-Legacy filter sheet (city, community, mother tongue, education, income, age, verified, horoscope). Prefer Discover for the main browse path. Link text points to Discover.
+Legacy filter sheet (city, community, mother tongue, education, income, age, verified, horoscope). Same complete-profile gate as Discover. Prefer Discover for the main browse path.
 
 ## Interests `/interests`
 
-Received / sent interest management (Accept / Decline). Linked from notifications (shortlisted / interest flows).
+Received / sent interest management (Accept / Decline). Always in the nav; incomplete profiles see **Complete your profile**. Linked from Home activity and notifications.
 
 ## Inbox `/inbox`
 
@@ -60,7 +75,7 @@ Tabs: **Interests** | **Accepted** | **Messages**
 
 ## Shortlist `/shortlist`
 
-Saved IDs from `toggleShortlist`. Skip on a card removes it from the list.
+Saved IDs from `toggleShortlist`. Gated with Discover. Skip on a card removes it from the list.
 
 ## Notifications `/notifications`
 
@@ -84,6 +99,8 @@ Monetisation surface.
 ### `/plans`
 
 - Current plan status, comparison, feature matrix, refer & earn, invoices (as implemented in `lib/plans.ts`)
+- Compare strip is cream heritage (not dark): Gold is featured with gold ring + filled CTA; Platinum uses peacock **Best value**; Diamond uses maroon **Until you marry**
+- Subscription and invoices load via TanStack Query; Choose Plan validates with Zod (`planSelectSchema`) then goes to `/checkout?plan={id}`
 
 ### `/checkout?plan={id}`
 

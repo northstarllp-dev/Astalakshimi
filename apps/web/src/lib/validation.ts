@@ -1,0 +1,159 @@
+import { z } from "zod"
+
+export const phoneSchema = z
+  .string()
+  .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number.")
+
+export const otpSchema = z.string().regex(/^\d{6}$/, "Enter the 6-digit OTP.")
+
+export const loginPhoneSchema = z.object({
+  phone: phoneSchema,
+})
+
+export const loginOtpSchema = z.object({
+  otp: otpSchema,
+})
+
+export const heroRegisterSchema = z.object({
+  looking: z.enum(["Bride", "Groom"]),
+  age: z.coerce.number().int().min(18, "Minimum age is 18.").max(70, "Enter a valid age."),
+  motherTongue: z.string().min(1, "Select a mother tongue."),
+})
+
+export const signupStep1Schema = z.object({
+  profileFor: z.string().min(1, "Choose who this profile is for."),
+  phone: phoneSchema,
+  terms: z.boolean().refine((value) => value === true, {
+    message: "Accept the terms to continue.",
+  }),
+})
+
+function dobAge(day: string, month: string, year: string, gender: string) {
+  const dob = new Date(`${year}-${month}-${day}`)
+  if (Number.isNaN(dob.getTime())) return { ok: false as const, message: "Invalid date." }
+  const today = new Date()
+  let age = today.getFullYear() - dob.getFullYear()
+  const m = today.getMonth() - dob.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age -= 1
+  const minAge = gender === "Male" ? 21 : 18
+  if (age < minAge) return { ok: false as const, message: `Must be at least ${minAge} years old.` }
+  if (age > 100) return { ok: false as const, message: "Please enter a valid age." }
+  return { ok: true as const, age }
+}
+
+export const signupStep2Schema = z
+  .object({
+    fullName: z
+      .string()
+      .trim()
+      .min(3, "Name must be at least 3 characters.")
+      .regex(/^[a-zA-Z\s]+$/, "Name can only contain letters."),
+    gender: z.string().min(1, "Select a gender."),
+    dobDay: z.string().regex(/^\d{2}$/, "Enter a valid day."),
+    dobMonth: z.string().regex(/^\d{2}$/, "Enter a valid month."),
+    dobYear: z.string().regex(/^\d{4}$/, "Enter a valid year."),
+    maritalStatus: z.string().min(1, "Select marital status."),
+    city: z.string().trim().min(2, "Enter your city."),
+  })
+  .superRefine((value, ctx) => {
+    const age = dobAge(value.dobDay, value.dobMonth, value.dobYear, value.gender)
+    if (!age.ok) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: age.message, path: ["dobYear"] })
+    }
+  })
+
+export const signupStep3Schema = z.object({
+  religion: z.string().min(1, "Select a religion."),
+  caste: z.string().trim().min(2, "Enter caste or community."),
+  motherTongue: z.string().min(1, "Select a mother tongue."),
+})
+
+export const signupStep5Schema = z.object({
+  otp: otpSchema,
+})
+
+export const profileEditSchema = z
+  .object({
+    phone: z.string().refine((value) => value.length === 0 || /^[6-9]\d{9}$/.test(value), {
+      message: "Enter a valid 10-digit mobile number.",
+    }),
+    fullName: z.string(),
+    aboutMe: z.string().max(300, "Keep this under 300 characters."),
+    prefAgeMin: z.number().int().min(18).max(80),
+    prefAgeMax: z.number().int().min(18).max(80),
+    brothersCount: z.number().int().min(0).max(5),
+    sistersCount: z.number().int().min(0).max(5),
+  })
+  .passthrough()
+  .superRefine((value, ctx) => {
+    if (value.prefAgeMin > value.prefAgeMax) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Minimum age cannot be above maximum age.",
+        path: ["prefAgeMin"],
+      })
+    }
+  })
+
+export const searchFiltersSchema = z
+  .object({
+    q: z.string(),
+    city: z.string(),
+    community: z.string(),
+    motherTongue: z.string(),
+    education: z.string(),
+    income: z.string(),
+    ageMin: z.number().int().min(18).max(80),
+    ageMax: z.number().int().min(18).max(80),
+    photoVerified: z.boolean(),
+    hasHoroscope: z.boolean(),
+  })
+  .refine((value) => value.ageMin <= value.ageMax, {
+    message: "Minimum age cannot be above maximum age.",
+    path: ["ageMin"],
+  })
+
+export const discoverQuickSchema = z
+  .object({
+    ageMin: z.number().int().min(18).max(50),
+    ageMax: z.number().int().min(18).max(50),
+    city: z.string(),
+    community: z.string(),
+  })
+  .refine((value) => value.ageMin <= value.ageMax, {
+    message: "Minimum age cannot be above maximum age.",
+    path: ["ageMin"],
+  })
+
+export const planSelectSchema = z.object({
+  planId: z.enum(["free", "silver", "gold", "platinum", "diamond"]),
+})
+
+export const checkoutSchema = z
+  .object({
+    method: z.enum(["upi", "card", "netbanking", "wallet"]),
+    upiId: z.string(),
+    paidPlan: z.boolean(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.paidPlan && value.method === "upi" && value.upiId.trim().length < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a valid UPI ID to continue (demo).",
+        path: ["upiId"],
+      })
+    }
+  })
+
+export const settingsListsSchema = z.object({
+  hideFromUsers: z.array(z.string()),
+  hideFromCities: z.array(z.string()),
+})
+
+export type LoginPhoneValues = z.infer<typeof loginPhoneSchema>
+export type LoginOtpValues = z.infer<typeof loginOtpSchema>
+export type HeroRegisterValues = z.infer<typeof heroRegisterSchema>
+export type SignupStep1Values = z.infer<typeof signupStep1Schema>
+export type SearchFiltersValues = z.infer<typeof searchFiltersSchema>
+export type CheckoutValues = z.infer<typeof checkoutSchema>
+export type PlanSelectValues = z.infer<typeof planSelectSchema>

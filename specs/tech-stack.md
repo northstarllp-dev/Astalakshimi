@@ -20,9 +20,8 @@ Use this stack. Do not replace a layer without updating this file.
 - App Router only (`src/app`). No Pages Router.
 - TypeScript strict. Shared types live in `packages/types` once the monorepo exists.
 - Tailwind + shadcn/ui for UI. Keep shadcn components in the web app (`apps/web/src/components/ui`), not a shared UI package.
-- All forms (login, register, search filters, profile edit, checkout) use **React Hook Form** with **Zod** resolvers.
-- Zod schemas that the API also needs live in `packages/validation` and are reused by NestJS.
-- Browser server-state (profiles, search, interests, shortlist, messages, notifications) uses **TanStack Query**. Do not fetch-and-store that data in ad-hoc `useEffect` + `useState` once the API exists.
+- All forms (login, register, search filters, profile edit, checkout) use **React Hook Form** with **Zod** resolvers. Current web schemas live in [`apps/web/src/lib/validation.ts`](../apps/web/src/lib/validation.ts) until `packages/validation` exists.
+- Browser server-state (profiles, search, interests, shortlist, messages, notifications) uses **TanStack Query** via [`apps/web/src/hooks/queries.ts`](../apps/web/src/hooks/queries.ts) and [`QueryProvider`](../apps/web/src/providers/query-provider.tsx). Query functions still read mock `sessionStorage` until the Nest API is wired.
 - Auth session on web: HTTP-only cookies via the API, or a thin Next.js BFF. Do not put access tokens in `localStorage`.
 
 ## Backend and data (target)

@@ -21,22 +21,21 @@ Countdown: [`hero-free-search-countdown.tsx`](../apps/web/src/components/landing
 File: [`apps/web/src/app/(auth)/login/page.tsx`](../apps/web/src/app/(auth)/login/page.tsx)
 
 - Desktop: temple-lamps image + “Your matches are waiting”
-- Phone (+91) → mock OTP send → 30s resend → continue to `/dashboard`
+- Phone (+91) → mock OTP send → 30s resend → continue to `/home`
 - No real SMS; frontend-only
 
 ## Register `/register`
 
 File: [`apps/web/src/app/(auth)/register/page.tsx`](../apps/web/src/app/(auth)/register/page.tsx)
 
-Six steps, progress bar, saves to `sessionStorage` via `saveProfile()`:
+Five steps, progress bar, saves to `sessionStorage` via `saveProfile()`. Kept short so the profile is about **25%** complete after submit:
 
-1. Phone + OTP
-2. Profile for (Myself / Son / Daughter / …) + name, gender, DOB, marital status
-3. Community — religion, caste, mother tongue, **brothers count**, **sisters count** (summary via `formatSiblings()`)
-4. Education, occupation, company, income, city
-5. Partner age range + religions
-6. Photos, selfie or govt ID, optional horoscope PDF — [`step-verify.tsx`](../apps/web/src/components/signup/step-verify.tsx)
+1. Profile for + mobile + terms
+2. Identity — name, gender, DOB, marital status, city
+3. Community — religion, caste, mother tongue, family type/status, **brothers count**, **sisters count**
+4. Photos, selfie or govt ID, optional horoscope PDF — [`step-verify.tsx`](../apps/web/src/components/signup/step-verify.tsx)
+5. OTP
 
-After submit: verification pending, then `/dashboard`. Photos stay “private until approval” (12-hour SLA copy).
+After submit: verification pending, then `/home`. Photos stay “private until approval” (12-hour SLA copy). Discover and Interests stay in the nav but show **Complete your profile** until verified **and** the profile is ≥ 80% complete.
 
 Siblings fields are also shown on `/profile` and editable on `/profile/edit`.

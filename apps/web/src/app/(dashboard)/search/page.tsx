@@ -6,23 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
+import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { MATCHES, type MatchProfile } from "@/lib/matches"
-import { addSkipped, loadSkipped, sendInterest } from "@/lib/user-activity"
+import { sendInterest } from "@/lib/user-activity"
+import { useMatchesQuery, useSkipMatchMutation, useSkippedQuery } from "@/hooks/queries"
+import { searchFiltersSchema, type SearchFiltersValues } from "@/lib/validation"
 import { Filter, SlidersHorizontal, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type Filters = {
-  q: string
-  city: string
-  community: string
-  motherTongue: string
-  education: string
-  income: string
-  ageMin: number
-  ageMax: number
-  photoVerified: boolean
-  hasHoroscope: boolean
-}
+type Filters = SearchFiltersValues
 
 const emptyFilters = (): Filters => ({
   q: "",
@@ -57,20 +49,32 @@ function applyFilters(matches: MatchProfile[], f: Filters, skipped: string[]) {
 }
 
 export default function SearchPage() {
+  return (
+    <RequireFullPortal>
+      <SearchPageInner />
+    </RequireFullPortal>
+  )
+}
+
+function SearchPageInner() {
+  const { data: matches = MATCHES } = useMatchesQuery()
+  const { data: skipped = [] } = useSkippedQuery()
+  const skipMutation = useSkipMatchMutation()
   const [filters, setFilters] = React.useState<Filters>(emptyFilters)
   const [draft, setDraft] = React.useState<Filters>(emptyFilters)
   const [open, setOpen] = React.useState(false)
-  const [skipped, setSkipped] = React.useState<string[]>([])
+  const [filterError, setFilterError] = React.useState("")
 
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSkipped(loadSkipped())
-  }, [])
-
-  const results = React.useMemo(() => applyFilters(MATCHES, filters, skipped), [filters, skipped])
+  const results = React.useMemo(() => applyFilters(matches, filters, skipped), [matches, filters, skipped])
 
   const applyDraft = () => {
-    setFilters(draft)
+    const parsed = searchFiltersSchema.safeParse(draft)
+    if (!parsed.success) {
+      setFilterError(parsed.error.issues[0]?.message ?? "Check the filters.")
+      return
+    }
+    setFilterError("")
+    setFilters(parsed.data)
     setOpen(false)
   }
 
@@ -111,7 +115,7 @@ export default function SearchPage() {
             key={match.id}
             match={match}
             priority={index === 0}
-            onSkip={(id) => setSkipped(addSkipped(id))}
+            onSkip={(id) => skipMutation.mutate(id)}
             onConnect={(id) => sendInterest(id)}
           />
         ))}
@@ -194,6 +198,7 @@ export default function SearchPage() {
                 Show results
               </Button>
             </div>
+            {filterError && <p className="mt-2 text-xs text-destructive">{filterError}</p>}
             <p className="mt-3 text-center text-xs text-muted-foreground">
               Prefer quick browse?{" "}
               <Link href="/dashboard" className="font-semibold text-primary">

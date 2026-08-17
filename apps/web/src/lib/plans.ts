@@ -1,4 +1,6 @@
-export type PlanId = "free" | "silver" | "gold" | "platinum"
+export type PlanId = "free" | "silver" | "gold" | "platinum" | "diamond"
+
+export const PLAN_IDS: PlanId[] = ["free", "silver", "gold", "platinum", "diamond"]
 
 export type PlanFeatureValue = boolean | string
 
@@ -9,6 +11,7 @@ export type PlanFeature = {
   silver: PlanFeatureValue
   gold: PlanFeatureValue
   platinum: PlanFeatureValue
+  diamond: PlanFeatureValue
 }
 
 export type MembershipPlan = {
@@ -48,18 +51,82 @@ export const REFERRAL_STORAGE_KEY = "astalakshimi.referral"
 
 export const CURRENT_PLAN_ID: PlanId = "free"
 export const RENEWAL_WINDOW_DAYS = 7
+export const EXTRA_CONTACT_FEE = 29
 
 /** Feature matrix for the comparison table */
 export const PLAN_FEATURE_MATRIX: PlanFeature[] = [
-  { key: "profile_search", label: "Profile search", free: true, silver: true, gold: true, platinum: true },
-  { key: "photo_verification", label: "Photo verification", free: true, silver: true, gold: true, platinum: true },
-  { key: "send_interests", label: "Send interests", free: "5 / month", silver: "20 / month", gold: "50 / month", platinum: "Unlimited" },
-  { key: "view_photos", label: "View member photos", free: "Blurred", silver: true, gold: true, platinum: true },
-  { key: "contact_details", label: "Contact details", free: false, silver: true, gold: true, platinum: true },
-  { key: "advanced_filters", label: "Advanced filters", free: false, silver: "Basic", gold: true, platinum: true },
-  { key: "horoscope_match", label: "Horoscope matching", free: false, silver: false, gold: true, platinum: true },
-  { key: "priority_listing", label: "Priority in search", free: false, silver: false, gold: true, platinum: true },
-  { key: "invoices", label: "Download invoices", free: false, silver: true, gold: true, platinum: true },
+  {
+    key: "photo_visibility",
+    label: "Photo visibility",
+    free: "Fully visible",
+    silver: "Fully visible",
+    gold: "Fully visible",
+    platinum: "Fully visible",
+    diamond: "Fully visible",
+  },
+  {
+    key: "discover_filters",
+    label: "Discover filters",
+    free: "Basic only",
+    silver: "Basic only",
+    gold: "Advanced suite",
+    platinum: "Advanced suite",
+    diamond: "Advanced suite",
+  },
+  {
+    key: "listing_priority",
+    label: "Listing priority",
+    free: "Standard",
+    silver: "Standard",
+    gold: "Priority boost",
+    platinum: "Priority boost",
+    diamond: "Priority boost",
+  },
+  {
+    key: "interest_quota",
+    label: "Interest quota",
+    free: "30 / month",
+    silver: "100 / 3 months",
+    gold: "500 / 6 months",
+    platinum: "Unlimited",
+    diamond: "Unlimited",
+  },
+  {
+    key: "contacts",
+    label: "Contact unlocks",
+    free: "3 unlocks · 50 chat messages",
+    silver: "10 / month",
+    gold: "Included",
+    platinum: "Unlimited",
+    diamond: "Unlimited",
+  },
+  {
+    key: "extra_contact",
+    label: "Extra contact",
+    free: `₹${EXTRA_CONTACT_FEE} each`,
+    silver: `₹${EXTRA_CONTACT_FEE} each`,
+    gold: `₹${EXTRA_CONTACT_FEE} each`,
+    platinum: `₹${EXTRA_CONTACT_FEE} each`,
+    diamond: `₹${EXTRA_CONTACT_FEE} each`,
+  },
+  {
+    key: "mutual_unlock",
+    label: "Mutual details unlock",
+    free: false,
+    silver: "Horoscope & contact",
+    gold: "Horoscope & contact",
+    platinum: "Horoscope & contact",
+    diamond: "Horoscope & contact",
+  },
+  {
+    key: "validity",
+    label: "Plan validity",
+    free: "Indefinite",
+    silver: "3 months",
+    gold: "6 months",
+    platinum: "12 months",
+    diamond: "Until marriage",
+  },
 ]
 
 export const MEMBERSHIP_PLANS: MembershipPlan[] = [
@@ -68,53 +135,89 @@ export const MEMBERSHIP_PLANS: MembershipPlan[] = [
     name: "Free",
     price: "₹0",
     priceInPaise: 0,
-    period: "3 months",
-    durationDays: 90,
-    badge: "Free for 3 months from 14 Sep 2026",
-    tagline: "Browse and send a few interests while you get started.",
-    features: ["Profile search", "5 interests / month", "Photo verification", "Blurred photos until upgrade"],
-    unlocks: ["Profile search", "Limited interests", "Photo verification"],
+    period: "Indefinite",
+    durationDays: 36500,
+    tagline: "Browse matches and send a few interests to get started.",
+    features: [
+      "Photos fully visible",
+      "Basic discover filters",
+      "30 interests / month",
+      "3 contact unlocks · 50 chat messages",
+      `₹${EXTRA_CONTACT_FEE} per extra contact`,
+    ],
+    unlocks: ["Profile search", "30 interests / month", "3 contact unlocks"],
   },
   {
     id: "silver",
     name: "Silver",
-    price: "₹499",
-    priceInPaise: 49900,
+    price: "₹299",
+    priceInPaise: 29900,
     period: "3 months",
     durationDays: 90,
-    tagline: "Unlock contacts and chat for serious matching.",
-    features: ["Contact details", "20 interests / month", "View photos", "Basic filters"],
-    unlocks: ["Contact details", "Advanced filters (basic)", "20 interests / month"],
+    tagline: "More interests, monthly contacts, and mutual details.",
+    features: [
+      "100 interests / 3 months",
+      "10 contact unlocks / month",
+      "Horoscope & contact on mutual match",
+      "Basic discover filters",
+      `₹${EXTRA_CONTACT_FEE} per extra contact`,
+    ],
+    unlocks: ["10 contacts / month", "Horoscope & contact", "100 interests / 3 months"],
   },
   {
     id: "gold",
     name: "Gold",
-    price: "₹999",
-    priceInPaise: 99900,
-    period: "3 months",
-    durationDays: 90,
+    price: "₹499",
+    priceInPaise: 49900,
+    period: "6 months",
+    durationDays: 180,
     badge: "Most popular",
-    tagline: "Maximum visibility with horoscope matching.",
-    features: ["Everything in Silver", "50 interests / month", "Horoscope match", "Priority listing", "Full advanced filters"],
-    unlocks: ["Contact details", "Advanced filters", "50 interests / month", "Horoscope match", "Priority listing"],
+    tagline: "Advanced filters and priority listing for serious matching.",
+    features: [
+      "500 interests / 6 months",
+      "Advanced filter suite",
+      "Priority listing boost",
+      "Horoscope & contact on mutual match",
+      `₹${EXTRA_CONTACT_FEE} per extra contact`,
+    ],
+    unlocks: ["Advanced filters", "Priority listing", "500 interests / 6 months", "Horoscope & contact"],
     highlighted: true,
   },
   {
     id: "platinum",
     name: "Platinum",
-    price: "₹1,499",
-    priceInPaise: 149900,
-    period: "3 months",
-    durationDays: 90,
+    price: "₹899",
+    priceInPaise: 89900,
+    period: "12 months",
+    durationDays: 365,
     badge: "Best value",
-    tagline: "Unlimited interests plus a dedicated relationship manager.",
-    features: ["Everything in Gold", "Unlimited interests", "Priority support", "Assisted shortlist"],
-    unlocks: [
-      "Contact details",
+    tagline: "Unlimited interests for a full year.",
+    features: [
       "Unlimited interests",
-      "Horoscope match",
-      "Priority listing",
+      "Unlimited contact unlocks",
+      "Advanced filter suite",
+      "Priority listing boost",
+      "Horoscope & contact on mutual match",
     ],
+    unlocks: ["Unlimited interests", "Unlimited contacts", "Advanced filters", "Priority listing"],
+  },
+  {
+    id: "diamond",
+    name: "Diamond",
+    price: "₹1,299",
+    priceInPaise: 129900,
+    period: "Until marriage",
+    durationDays: 36500,
+    badge: "Until you marry",
+    tagline: "Stay on the highest plan until you find your match.",
+    features: [
+      "Unlimited interests",
+      "Unlimited contact unlocks",
+      "Advanced filter suite",
+      "Priority listing boost",
+      "Valid until marriage",
+    ],
+    unlocks: ["Unlimited interests", "Unlimited contacts", "Priority listing", "Until-marriage access"],
   },
 ]
 
@@ -132,7 +235,7 @@ export function getPlanById(id: string) {
 export function loadCurrentPlanId(): PlanId {
   if (typeof window === "undefined") return CURRENT_PLAN_ID
   const raw = sessionStorage.getItem(PLAN_STORAGE_KEY)
-  if (raw === "silver" || raw === "gold" || raw === "platinum" || raw === "free") return raw
+  if (PLAN_IDS.includes(raw as PlanId)) return raw as PlanId
   // Migrate legacy duration plan ids to free
   if (raw && ["3m", "6m", "9m", "12m", "till-marry"].includes(raw)) return "silver"
   return CURRENT_PLAN_ID

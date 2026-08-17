@@ -2,11 +2,12 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Compass, Heart, Sparkles, UserRound } from "lucide-react"
+import { Compass, Heart, Home, Sparkles, UserRound } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const items = [
-  { href: "/dashboard", label: "Discover", icon: Compass, match: (p: string) => p === "/dashboard" },
+  { href: "/home", label: "Home", icon: Home, match: (p: string) => p === "/home" },
+  { href: "/dashboard", label: "Discover", icon: Compass, match: (p: string) => p === "/dashboard" || p.startsWith("/search") },
   { href: "/interests", label: "Interests", icon: Heart, match: (p: string) => p.startsWith("/interests") },
   { href: "/plans", label: "Premium", icon: Sparkles, match: (p: string) => p.startsWith("/plans") || p.startsWith("/checkout") },
   { href: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") || p.startsWith("/shortlist") },
@@ -17,7 +18,7 @@ export function MobileBottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-xl md:hidden safe-bottom">
-      <ul className="mx-auto grid max-w-lg grid-cols-4 px-1 pt-1">
+      <ul className="mx-auto grid max-w-lg grid-cols-5 px-0.5 pt-1">
         {items.map((item) => {
           const active = item.match(pathname)
           const Icon = item.icon
@@ -26,7 +27,7 @@ export function MobileBottomNav() {
               <Link
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium",
+                  "flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium sm:text-[11px]",
                   active ? "text-primary" : "text-muted-foreground"
                 )}
               >

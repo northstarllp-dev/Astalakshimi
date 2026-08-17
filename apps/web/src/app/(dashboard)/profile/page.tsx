@@ -7,8 +7,9 @@ import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
-import { emptySignupData, loadProfile, type SignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
+import { emptySignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import { profileCompleteness } from "@/lib/user-activity"
+import { useProfileQuery } from "@/hooks/queries"
 import {
   Camera,
   CheckCircle2,
@@ -35,12 +36,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export default function MyProfilePage() {
   const router = useRouter()
-  const [profile, setProfile] = React.useState<SignupData | null>(null)
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setProfile(loadProfile())
-  }, [])
+  const { data: profile = null, isPending } = useProfileQuery()
 
   const data = profile ?? emptySignupData()
   const completeness = profileCompleteness(data)
@@ -80,6 +76,10 @@ export default function MyProfilePage() {
       note: "Add a family member's number",
     },
   ]
+
+  if (isPending) {
+    return <main className="px-4 py-10 text-center text-sm text-muted-foreground">Loading…</main>
+  }
 
   if (!profile) {
     return (
@@ -138,9 +138,11 @@ export default function MyProfilePage() {
               <p className="mt-0.5 text-sm text-muted-foreground">
                 {completeness >= 90
                   ? "Excellent — your profile stands out to families."
-                  : completeness >= 60
-                    ? "Good progress. Add more details to attract better matches."
-                    : "Add more details to improve your match visibility."}
+                  : completeness >= 80
+                    ? "Profile is complete. Discover opens after verification."
+                    : completeness >= 60
+                      ? "Good progress. Reach 80% and get verified to unlock Discover."
+                      : "Signup is kept short — add the rest to unlock Discover and Interests."}
               </p>
               <Link href="/profile/edit" className="mt-1.5 inline-block text-xs font-semibold text-primary hover:underline">
                 Improve your score →

@@ -5,10 +5,8 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
-  DURATION_ADDONS,
   activatePlan,
   addInvoice,
-  computeAddonPrice,
   getPlanById,
   getUnlockPreview,
   type PlanId,
@@ -22,6 +20,9 @@ import {
   Smartphone,
   Wallet,
 } from "lucide-react"
+import { checkoutSchema } from "@/lib/validation"
+import { queryKeys } from "@/hooks/queries"
+import { useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
 
 type PayMethod = "upi" | "card" | "netbanking" | "wallet"
@@ -39,7 +40,7 @@ function CheckoutInner() {
   const planId = (params.get("plan") || "gold") as PlanId
   const isRenew = params.get("renew") === "1"
   const plan = getPlanById(planId)
-  const [durationId, setDurationId] = React.useState<(typeof DURATION_ADDONS)[number]["id"]>("3m")
+  const queryClient = useQueryClient()
   const [method, setMethod] = React.useState<PayMethod>("upi")
   const [upiId, setUpiId] = React.useState("")
   const [paying, setPaying] = React.useState(false)
@@ -57,28 +58,32 @@ function CheckoutInner() {
     )
   }
 
-  const addon = DURATION_ADDONS.find((d) => d.id === durationId) ?? DURATION_ADDONS[0]
   const priced =
     plan.priceInPaise === 0
       ? { label: "₹0", paise: 0 }
-      : computeAddonPrice(plan.priceInPaise, addon.multiplier)
+      : { label: plan.price, paise: plan.priceInPaise }
   const unlocks = getUnlockPreview(plan.id)
-  const durationDays =
-    addon.id === "3m" ? plan.durationDays : addon.id === "6m" ? plan.durationDays * 2 : 365
+  const durationDays = plan.durationDays
 
   const confirm = () => {
-    setError("")
-    if (plan.priceInPaise > 0 && method === "upi" && upiId.trim().length < 3) {
-      setError("Enter a valid UPI ID to continue (demo).")
+    const parsed = checkoutSchema.safeParse({
+      method,
+      upiId,
+      paidPlan: plan.priceInPaise > 0,
+    })
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Check the payment details.")
       return
     }
+    setError("")
     setPaying(true)
     window.setTimeout(() => {
       activatePlan(plan.id, durationDays)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.paid })
       if (plan.priceInPaise > 0) {
         addInvoice({
           planId: plan.id,
-          planName: `${plan.name} (${addon.label})`,
+          planName: `${plan.name} (${plan.period})`,
           amount: priced.label,
           method: PAY_METHODS.find((m) => m.id === method)?.label ?? method,
           status: "paid",
@@ -113,33 +118,12 @@ function CheckoutInner() {
             <h2 className="mt-2 font-serif text-3xl font-bold">{plan.name}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{plan.tagline}</p>
             <p className="mt-4 font-serif text-4xl font-bold text-primary">{priced.label}</p>
-            <p className="text-xs text-muted-foreground">for {addon.label}</p>
+            <p className="text-xs text-muted-foreground">/ {plan.period}</p>
 
             {plan.priceInPaise > 0 && (
-              <div className="mt-5 grid grid-cols-3 gap-2">
-                {DURATION_ADDONS.map((d) => {
-                  const p = computeAddonPrice(plan.priceInPaise, d.multiplier)
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => setDurationId(d.id)}
-                      className={cn(
-                        "rounded-2xl border px-2 py-3 text-center transition-colors",
-                        durationId === d.id
-                          ? "border-primary bg-primary/5 text-primary"
-                          : "border-border hover:border-primary/40"
-                      )}
-                    >
-                      <p className="text-xs font-semibold">{d.label}</p>
-                      <p className="mt-1 text-sm font-bold">{p.label}</p>
-                      {"saveLabel" in d && d.saveLabel ? (
-                        <p className="mt-0.5 text-[10px] text-emerald-700">{d.saveLabel}</p>
-                      ) : null}
-                    </button>
-                  )
-                })}
-              </div>
+              <p className="mt-4 text-xs text-muted-foreground">
+                Extra contacts are ₹29 each after your included unlocks.
+              </p>
             )}
           </div>
 

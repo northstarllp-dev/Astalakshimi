@@ -13,34 +13,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { loadProfile } from "@/lib/profile-store"
-import { loadSettings, saveSettings, type UserSettings } from "@/lib/user-activity"
-import { isPaidMember } from "@/lib/plans"
+import { type UserSettings } from "@/lib/user-activity"
+import { usePaidQuery, useProfileQuery, useSaveSettingsMutation, useSettingsQuery } from "@/hooks/queries"
 import { ArrowLeft, Lock, LogOut, MapPin, UserX, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function SettingsPage() {
   const router = useRouter()
-  const [settings, setSettings] = React.useState<UserSettings | null>(null)
-  const [phone, setPhone] = React.useState("")
-  const [paid, setPaid] = React.useState(false)
+  const { data: settings } = useSettingsQuery()
+  const { data: profile } = useProfileQuery()
+  const { data: paid = false } = usePaidQuery()
+  const saveMutation = useSaveSettingsMutation()
+  const phone = profile?.phone || ""
   const [hideUserInput, setHideUserInput] = React.useState("")
   const [hideCityInput, setHideCityInput] = React.useState("")
 
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSettings(loadSettings())
-    setPhone(loadProfile()?.phone || "")
-    setPaid(isPaidMember())
-  }, [])
-
   const update = (partial: Partial<UserSettings>) => {
-    setSettings((prev) => {
-      if (!prev) return prev
-      const next = { ...prev, ...partial }
-      saveSettings(next)
-      return next
-    })
+    if (!settings) return
+    saveMutation.mutate({ ...settings, ...partial })
   }
 
   if (!settings) {

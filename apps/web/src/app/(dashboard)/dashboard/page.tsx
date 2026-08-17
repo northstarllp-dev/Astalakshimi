@@ -4,20 +4,24 @@ import * as React from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
+import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { MATCHES } from "@/lib/matches"
-import { loadProfile, VERIFICATION_SLA_HOURS, type SignupData } from "@/lib/profile-store"
-import { isPaidMember } from "@/lib/plans"
+import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
+import { clearSkipped } from "@/lib/user-activity"
+import { useQueryClient } from "@tanstack/react-query"
 import {
-  addSavedSearch,
-  addSkipped,
-  clearSkipped,
-  getReceivedInterests,
-  loadSavedSearches,
-  loadShortlist,
-  loadSkipped,
-  sendInterest,
-  type SavedSearch,
-} from "@/lib/user-activity"
+  useAddSavedSearchMutation,
+  useInterestsQuery,
+  usePaidQuery,
+  useProfileQuery,
+  useSavedSearchesQuery,
+  useSendInterestMutation,
+  useShortlistQuery,
+  useSkipMatchMutation,
+  useSkippedQuery,
+  queryKeys,
+} from "@/hooks/queries"
+import { discoverQuickSchema } from "@/lib/validation"
 import {
   applyDiscover,
   BROWSE_TABS,
@@ -97,27 +101,31 @@ function toggle(arr: string[], val: string) {
 }
 
 export default function DashboardPage() {
-  const [profile, setProfile] = React.useState<SignupData | null>(null)
+  return (
+    <RequireFullPortal>
+      <DiscoverPage />
+    </RequireFullPortal>
+  )
+}
+
+function DiscoverPage() {
+  const queryClient = useQueryClient()
+  const { data: profile = null } = useProfileQuery()
+  const { data: skipped = [] } = useSkippedQuery()
+  const { data: paid = false } = usePaidQuery()
+  const { data: saved = [] } = useSavedSearchesQuery()
+  const { data: interests } = useInterestsQuery()
+  const { data: shortlist = [] } = useShortlistQuery()
+  const skipMutation = useSkipMatchMutation()
+  const connectMutation = useSendInterestMutation()
+  const saveSearchMutation = useAddSavedSearchMutation()
   const [query, setQuery] = React.useState<DiscoverQuery>(DEFAULT_DISCOVER)
-  const [skipped, setSkipped] = React.useState<string[]>([])
-  const [paid, setPaid] = React.useState(false)
-  const [saved, setSaved] = React.useState<SavedSearch[]>([])
   const [moreOpen, setMoreOpen] = React.useState(false)
   const [saveOpen, setSaveOpen] = React.useState(false)
   const [saveLabel, setSaveLabel] = React.useState("")
   const [paywall, setPaywall] = React.useState<string | null>(null)
-  const [interestCount, setInterestCount] = React.useState(0)
-  const [shortlistCount, setShortlistCount] = React.useState(0)
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setProfile(loadProfile())
-    setSkipped(loadSkipped())
-    setPaid(isPaidMember())
-    setSaved(loadSavedSearches())
-    setInterestCount(getReceivedInterests().filter((i) => i.status === "pending").length)
-    setShortlistCount(loadShortlist().length)
-  }, [])
+  const interestCount = interests?.pendingCount ?? 0
+  const shortlistCount = shortlist.length
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
   const pending = profile?.verificationStatus === "pending"
@@ -129,7 +137,17 @@ export default function DashboardPage() {
   )
 
   const setQuick = (patch: Partial<DiscoverQuery>) => {
-    setQuery((q) => ({ ...q, ...patch }))
+    setQuery((q) => {
+      const next = { ...q, ...patch }
+      const parsed = discoverQuickSchema.safeParse({
+        ageMin: next.ageMin,
+        ageMax: next.ageMax,
+        city: next.city,
+        community: next.community,
+      })
+      if (!parsed.success) return q
+      return { ...next, ...parsed.data }
+    })
   }
 
   const setAdvanced = (patch: Partial<AdvancedFilters>) => {
@@ -374,8 +392,8 @@ export default function DashboardPage() {
             match={match}
             featured={index === 0 && query.tab === "all"}
             priority={index === 0}
-            onSkip={(id) => setSkipped(addSkipped(id))}
-            onConnect={(id) => sendInterest(id)}
+            onSkip={(id) => skipMutation.mutate(id)}
+            onConnect={(id) => connectMutation.mutate(id)}
           />
         ))}
         {visibleMatches.length === 0 && (
@@ -387,7 +405,7 @@ export default function DashboardPage() {
               className="mt-4"
               onClick={() => {
                 clearSkipped()
-                setSkipped([])
+                queryClient.setQueryData(queryKeys.skipped, [])
                 setQuery(DEFAULT_DISCOVER)
               }}
             >
@@ -541,15 +559,13 @@ export default function DashboardPage() {
                 className="flex-1"
                 disabled={!saveLabel.trim()}
                 onClick={() => {
-                  setSaved(
-                    addSavedSearch({
-                      label: saveLabel.trim(),
-                      ageMin: query.ageMin,
-                      ageMax: query.ageMax,
-                      city: query.city,
-                      community: query.community,
-                    })
-                  )
+                  saveSearchMutation.mutate({
+                    label: saveLabel.trim(),
+                    ageMin: query.ageMin,
+                    ageMax: query.ageMax,
+                    city: query.city,
+                    community: query.community,
+                  })
                   setSaveLabel("")
                   setSaveOpen(false)
                 }}

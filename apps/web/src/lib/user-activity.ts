@@ -419,7 +419,7 @@ function seedNotifications(): NotificationItem[] {
       createdAt: now - 4 * 60 * 60 * 1000,
       category: "profile",
       kind: "new_match",
-      href: "/dashboard",
+      href: "/home",
       unread: true,
     },
     {
@@ -541,47 +541,72 @@ export function saveSettings(settings: UserSettings) {
   writeJson(SETTINGS_KEY, settings)
 }
 
+/** Weighted so a short signup lands near 25%. Discover unlocks at 80% + verified. */
 export function profileCompleteness(data: {
   fullName?: string
   city?: string
-  state?: string
-  education?: string
-  occupation?: string
-  photos?: string[]
-  motherTongue?: string
+  gender?: string
+  maritalStatus?: string
   religion?: string
   caste?: string
-  horoscopeName?: string
-  prefAgeMin?: number
-  prefAgeMax?: number
+  motherTongue?: string
+  familyType?: string
+  photos?: string[]
+  education?: string
+  occupation?: string
+  annualIncome?: string
+  companyName?: string
   height?: string
   diet?: string
   aboutMe?: string
-  familyType?: string
   willingToRelocate?: string
+  horoscopeName?: string
   birthTime?: string
   birthPlace?: string
 }): number {
-  const checks = [
-    Boolean(data.fullName),
-    Boolean(data.city),
-    Boolean(data.state),
-    Boolean(data.education),
-    Boolean(data.occupation),
-    (data.photos?.length ?? 0) >= 1,
-    (data.photos?.length ?? 0) >= 3,
-    Boolean(data.motherTongue),
-    Boolean(data.religion),
-    Boolean(data.caste),
-    Boolean(data.horoscopeName),
-    Boolean(data.prefAgeMin && data.prefAgeMax),
-    Boolean(data.height),
-    Boolean(data.diet),
-    Boolean(data.aboutMe && data.aboutMe.length >= 20),
-    Boolean(data.familyType),
-    Boolean(data.willingToRelocate),
-    Boolean(data.birthTime),
-    Boolean(data.birthPlace),
+  const groups = [
+    {
+      weight: 25,
+      checks: [
+        Boolean(data.fullName),
+        Boolean(data.city),
+        Boolean(data.gender),
+        Boolean(data.maritalStatus),
+        Boolean(data.religion),
+        Boolean(data.caste),
+        Boolean(data.motherTongue),
+        Boolean(data.familyType),
+      ],
+    },
+    {
+      weight: 20,
+      checks: [(data.photos?.length ?? 0) >= 1, (data.photos?.length ?? 0) >= 3],
+    },
+    {
+      weight: 20,
+      checks: [
+        Boolean(data.education),
+        Boolean(data.occupation),
+        Boolean(data.annualIncome || data.companyName),
+      ],
+    },
+    {
+      weight: 20,
+      checks: [
+        Boolean(data.height),
+        Boolean(data.diet),
+        Boolean(data.aboutMe && data.aboutMe.length >= 20),
+        Boolean(data.willingToRelocate),
+      ],
+    },
+    {
+      weight: 15,
+      checks: [Boolean(data.horoscopeName), Boolean(data.birthTime), Boolean(data.birthPlace)],
+    },
   ]
-  return Math.round((checks.filter(Boolean).length / checks.length) * 100)
+  const score = groups.reduce((sum, group) => {
+    const filled = group.checks.filter(Boolean).length
+    return sum + (filled / group.checks.length) * group.weight
+  }, 0)
+  return Math.round(score)
 }

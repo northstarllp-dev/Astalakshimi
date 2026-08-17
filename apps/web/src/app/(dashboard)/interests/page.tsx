@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { getMatchById } from "@/lib/matches"
 import {
   acceptInterest,
@@ -26,6 +27,7 @@ import {
   type RichInterestItem,
   type PrivateNotes,
 } from "@/lib/user-activity"
+import { useInvalidateInterests, useInterestsQuery } from "@/hooks/queries"
 import { cn } from "@/lib/utils"
 import {
   BadgeCheck,
@@ -856,29 +858,26 @@ function MenuAction({
 // Main page
 // ──────────────────────────────────────────────
 export default function InterestsPage() {
-  const [activeTab, setActiveTab] = React.useState<Tab>("received")
+  return (
+    <RequireFullPortal>
+      <InterestsPageInner />
+    </RequireFullPortal>
+  )
+}
 
-  // State
-  const [received, setReceived] = React.useState<RichInterestItem[]>([])
-  const [sent, setSent] = React.useState<RichInterestItem[]>([])
-  const [mutual, setMutual] = React.useState<RichInterestItem[]>([])
-  const [shortlisted, setShortlisted] = React.useState<string[]>([])
-  const [blocked, setBlocked] = React.useState<string[]>([])
-  const [notes, setNotes] = React.useState<PrivateNotes>({})
+function InterestsPageInner() {
+  const [activeTab, setActiveTab] = React.useState<Tab>("received")
+  const { data } = useInterestsQuery()
+  const invalidate = useInvalidateInterests()
+  const received = data?.received ?? []
+  const sent = data?.sent ?? []
+  const mutual = data?.mutual ?? []
+  const shortlisted = data?.shortlisted ?? []
+  const blocked = data?.blocked ?? []
+  const notes = data?.notes ?? {}
   const [noteTarget, setNoteTarget] = React.useState<string | null>(null)
 
-  const reload = React.useCallback(() => {
-    setReceived(getRichReceivedInterests())
-    setSent(getRichSentInterests())
-    setMutual(getMutualMatches())
-    setShortlisted(loadShortlist())
-    setBlocked(loadBlocked())
-    setNotes(loadPrivateNotes())
-  }, [])
-
-  React.useEffect(() => {
-    reload()
-  }, [reload])
+  const reload = invalidate
 
   // Badges
   const pendingReceived = received.filter((i) => i.status === "pending").length

@@ -4,9 +4,51 @@ Running log of product UI shipped in `apps/web` (frontend-only, mock `sessionSto
 
 ---
 
+## Plans compare redesign
+
+**Route:** `/plans`  
+**Files:** [`plans/page.tsx`](../apps/web/src/app/(dashboard)/plans/page.tsx), [`plan-compare.tsx`](../apps/web/src/components/plans/plan-compare.tsx)
+
+- Dark compare strip replaced with cream heritage cards (temple maroon / gold / peacock badges).
+- Gold stays the featured plan (gold banner, gold price, filled CTA). Horizontal scroll on small screens; five columns on large.
+- Plan choice is validated with Zod before checkout. Subscription + invoices use TanStack Query.
+
+---
+
+## Zod + TanStack Query
+
+**Files:** [`lib/validation.ts`](../apps/web/src/lib/validation.ts), [`hooks/queries.ts`](../apps/web/src/hooks/queries.ts), [`providers/query-provider.tsx`](../apps/web/src/providers/query-provider.tsx)
+
+- Forms use **React Hook Form** + **Zod** (login, register steps, hero register, profile edit, search filters, checkout UPI).
+- Profile, notifications, shortlist, interests, membership, and settings load through **TanStack Query**. Mutations invalidate the same keys. Mock source is still `sessionStorage`.
+
+---
+
+## Home hub + portal gating
+
+**Route:** `/home` (nav label **Home**)  
+**Files:** [`home/page.tsx`](../apps/web/src/app/(dashboard)/home/page.tsx), [`lib/portal-access.ts`](../apps/web/src/lib/portal-access.ts), [`match-thumb-card.tsx`](../apps/web/src/components/dashboard/match-thumb-card.tsx), [`dashboard-shell.tsx`](../apps/web/src/components/layout/dashboard-shell.tsx), [`mobile-bottom-nav.tsx`](../apps/web/src/components/layout/mobile-bottom-nav.tsx)
+
+Signup stays short, so a new profile lands around **25%** complete (`profileCompleteness` is weighted: basics from signup = 25%). After register/login, members go to **Home**, not Discover.
+
+### Home contents
+
+| Block | Behaviour |
+| --- | --- |
+| Completeness | Ring + next actions (photos, career, about, lifestyle, horoscope, verify) until unlocked |
+| Verification | Pending banner; demo **Approve now** sets `verificationStatus: verified` |
+| Top matches | **4** portrait thumbnails (photo + name + match % / Verified) |
+| Activity | Who viewed you, profiles you viewed, interests received, shortlisted you |
+
+### Unlock rule
+
+Discover, Interests, Search, and Shortlist stay in the nav. If the member is not yet verified **and** ≥ 80% complete, those pages show **Complete your profile** instead of results.
+
+---
+
 ## Discover — Search & Browse (Section 2)
 
-**Route:** `/dashboard` (nav label **Discover**, was Home)  
+**Route:** `/dashboard` (nav label **Discover**)  
 **Files:** [`dashboard/page.tsx`](../apps/web/src/app/(dashboard)/dashboard/page.tsx), [`lib/discover.ts`](../apps/web/src/lib/discover.ts), [`lib/matches.ts`](../apps/web/src/lib/matches.ts)
 
 ### Search modes
@@ -145,6 +187,6 @@ Dashboard filter accordion sections **default collapsed** (chevron down), matchi
 ## Related specs
 
 - [ui-overview.md](./ui-overview.md) — route map
-- [ui-dashboard.md](./ui-dashboard.md) — Discover, notifications, plans
+- [ui-dashboard.md](./ui-dashboard.md) — Home, Discover, notifications, plans
 - [ui-profile-view.md](./ui-profile-view.md) — other-member profile
 - [ui-public-auth.md](./ui-public-auth.md) — register siblings

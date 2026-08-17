@@ -95,10 +95,7 @@ export default function LandingPage() {
             {/* Welcome greeting */}
             <div className="absolute top-5 left-4 flex items-center gap-3">
               <div className="h-px w-6 bg-secondary/60" />
-              <p
-                className="text-sm tracking-[0.3em] text-secondary drop-shadow-lg uppercase"
-                style={{ fontFamily: "var(--font-cormorant), serif" }}
-              >
+              <p className="text-xs font-semibold tracking-[0.18em] text-secondary drop-shadow-lg uppercase">
                 Namaste
               </p>
               <div className="h-px w-10 bg-gradient-to-r from-secondary/60 to-transparent" />
@@ -107,16 +104,11 @@ export default function LandingPage() {
             {/* Headline overlaid — moved up */}
             <div className="absolute bottom-0 inset-x-0 px-5 pb-14 space-y-0">
               <h1
-                className="font-serif text-[2.6rem] font-bold leading-[1.07] tracking-tight text-white drop-shadow-xl"
-                style={{ fontFamily: "var(--font-cormorant), serif", textShadow: "0 2px 16px rgba(0,0,0,0.6)" }}
+                className="text-[2.35rem] font-bold leading-[1.12] tracking-tight text-white drop-shadow-xl"
+                style={{ textShadow: "0 2px 16px rgba(0,0,0,0.6)" }}
               >
                 Find a match<br />
-                <span
-                  className="gold-shimmer"
-                  style={{ fontFamily: "var(--font-cormorant), serif" }}
-                >
-                  across India
-                </span>
+                <span className="gold-shimmer">across India</span>
               </h1>
               <p className="text-sm text-white/75 leading-relaxed">
                 Every community. Every mother tongue. Trusted by families nationwide.
@@ -153,10 +145,7 @@ export default function LandingPage() {
             <div className="w-full max-w-lg space-y-8 text-white">
               <div className="flex items-center gap-4">
                 <div className="h-px w-10 bg-gradient-to-r from-transparent to-secondary/60" />
-                <p
-                  className="text-lg tracking-[0.35em] text-secondary drop-shadow-lg uppercase"
-                  style={{ fontFamily: "var(--font-cormorant), serif", lineHeight: 1.6 }}
-                >
+                <p className="text-sm font-semibold tracking-[0.18em] text-secondary drop-shadow-lg uppercase">
                   Namaste
                 </p>
                 <div className="h-px flex-1 bg-gradient-to-r from-secondary/60 to-transparent" />
@@ -164,16 +153,13 @@ export default function LandingPage() {
 
               <div className="space-y-2">
                 <h1
-                  className="font-serif text-[4rem] font-bold leading-[1.07] tracking-tight drop-shadow-xl"
-                  style={{ fontFamily: "var(--font-cormorant), serif", textShadow: "0 2px 24px rgba(0,0,0,0.5)" }}
+                  className="text-[3.5rem] font-bold leading-[1.1] tracking-tight drop-shadow-xl"
+                  style={{ textShadow: "0 2px 24px rgba(0,0,0,0.5)" }}
                 >
                   Find a match<br />
                   <span className="text-white/90">rooted in</span>
                 </h1>
-                <p
-                  className="font-serif text-[4rem] font-bold leading-[1.07] tracking-tight gold-shimmer"
-                  style={{ fontFamily: "var(--font-cormorant), serif" }}
-                >
+                <p className="text-[3.5rem] font-bold leading-[1.1] tracking-tight gold-shimmer">
                   Indian tradition
                 </p>
               </div>
@@ -320,22 +306,23 @@ export default function LandingPage() {
               <div className="h-px w-16" style={{ background: "linear-gradient(90deg, #b8901f, transparent)" }} />
             </div>
             <p className="mt-4 text-sm text-white/50">
-              Free · Silver · Gold · Platinum · Free for 3 months starting{" "}
-              <span className="font-semibold text-white/80">14 September 2026</span>
+              Free · Silver · Gold · Platinum · Diamond
             </p>
           </div>
 
-          {/* Cards grid — Gold elevated */}
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:items-end">
+          {/* Cards — always one row; scroll on smaller screens */}
+          <div className="-mx-4 overflow-x-auto px-4 pb-3 hide-scrollbar lg:mx-0 lg:overflow-visible lg:px-0">
+          <div className="flex min-w-max flex-nowrap items-end gap-4 lg:min-w-0 lg:grid lg:grid-cols-5">
             {MEMBERSHIP_PLANS.map((plan) => {
               const isGold = plan.id === "gold"
               const isPlatinum = plan.id === "platinum"
+              const isDiamond = plan.id === "diamond"
 
               if (isGold) {
                 return (
                   <article
                     key={plan.id}
-                    className="relative flex flex-col overflow-visible rounded-3xl lg:-mt-6 lg:mb-0 animate-in"
+                    className="relative flex w-[min(260px,82vw)] shrink-0 flex-col overflow-visible rounded-3xl lg:-mt-6 lg:mb-0 lg:w-auto animate-in"
                     style={{
                       background: "linear-gradient(145deg, #1a0e08, #2a1008)",
                       boxShadow: "0 0 0 2px #b8901f, 0 0 40px rgba(184,144,31,0.35), 0 24px 60px rgba(0,0,0,0.6)",
@@ -362,11 +349,11 @@ export default function LandingPage() {
                       <p className="text-xs text-white/50">{plan.tagline}</p>
 
                       {/* Price */}
-                      <div className="my-5">
+                      <div className="my-5 flex items-baseline gap-2">
                         <p className="font-serif text-5xl font-bold leading-none" style={{ color: "#e8c84a", textShadow: "0 0 20px rgba(232,200,74,0.4)" }}>
                           {plan.price}
                         </p>
-                        <p className="mt-1 text-xs font-medium text-white/40">/ {plan.period}</p>
+                        <p className="text-xs font-medium text-white/40">/ {plan.period}</p>
                       </div>
 
                       {/* Divider */}
@@ -396,18 +383,24 @@ export default function LandingPage() {
               }
 
               // Non-gold cards
-              const badgeColor = isPlatinum
+              const badgeColor = isDiamond
+                ? { bg: "linear-gradient(90deg, #3d120c, #6b1024)", text: "#e8c84a" }
+                : isPlatinum
                 ? { bg: "linear-gradient(90deg, #1a2a3a, #2a3a4a)", text: "#a8c4e0" }
                 : { bg: "rgba(255,255,255,0.06)", text: "rgba(255,255,255,0.45)" }
 
               return (
                 <article
                   key={plan.id}
-                  className="relative flex flex-col overflow-hidden rounded-2xl"
+                  className="relative flex w-[min(240px,80vw)] shrink-0 flex-col overflow-hidden rounded-2xl lg:w-auto"
                   style={{
                     background: "rgba(255,255,255,0.04)",
                     backdropFilter: "blur(12px)",
-                    border: isPlatinum ? "1px solid rgba(168,196,224,0.3)" : "1px solid rgba(255,255,255,0.09)",
+                    border: isDiamond
+                      ? "1px solid rgba(232,200,74,0.35)"
+                      : isPlatinum
+                        ? "1px solid rgba(168,196,224,0.3)"
+                        : "1px solid rgba(255,255,255,0.09)",
                     boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
                   }}
                 >
@@ -425,9 +418,9 @@ export default function LandingPage() {
                     <p className="font-serif text-lg font-bold text-white/90">{plan.name}</p>
                     <p className="mt-1 text-xs text-white/40">{plan.tagline}</p>
 
-                    <div className="my-4">
+                    <div className="my-4 flex items-baseline gap-1.5">
                       <p className="font-serif text-3xl font-bold text-white/90">{plan.price}</p>
-                      <p className="mt-0.5 text-xs text-white/30">/ {plan.period}</p>
+                      <p className="text-xs text-white/30">/ {plan.period}</p>
                     </div>
 
                     <div className="mb-4 h-px bg-white/[0.07]" />
@@ -451,6 +444,7 @@ export default function LandingPage() {
                 </article>
               )
             })}
+          </div>
           </div>
 
           <p className="mt-10 text-center text-xs text-white/30">
@@ -534,7 +528,7 @@ export default function LandingPage() {
                 </div>
                 <h3 className="font-serif text-base font-bold md:text-lg">{story.names}</h3>
                 <p className="text-xs text-muted-foreground">{story.place}</p>
-                <p className="text-xs leading-relaxed text-foreground/75 italic md:text-sm">&ldquo;{story.quote}&rdquo;</p>
+                <p className="font-serif text-xs leading-relaxed text-foreground/75 italic md:text-sm">&ldquo;{story.quote}&rdquo;</p>
               </div>
             </article>
           ))}

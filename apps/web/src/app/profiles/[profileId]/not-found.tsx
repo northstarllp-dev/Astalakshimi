@@ -10,7 +10,7 @@ export default function ProfileNotFound() {
       <p className="max-w-sm text-sm text-muted-foreground">
         This member may have deactivated their profile or the link is incorrect.
       </p>
-      <Link href="/dashboard">
+      <Link href="/home">
         <Button>Back to matches</Button>
       </Link>
     </div>

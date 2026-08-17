@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { Logo } from "@/components/ui/logo"
@@ -11,14 +12,26 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Image from "next/image"
 import { IMAGES } from "@/lib/images"
+import { loginOtpSchema, loginPhoneSchema, type LoginOtpValues, type LoginPhoneValues } from "@/lib/validation"
 import { ArrowLeft, ShieldCheck } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
-  const [phone, setPhone] = useState("")
-  const [otp, setOtp] = useState("")
-  const [otpSent, setOtpSent] = useState(false)
-  const [seconds, setSeconds] = useState(30)
+  const [otpSent, setOtpSent] = React.useState(false)
+  const [seconds, setSeconds] = React.useState(30)
+
+  const phoneForm = useForm<LoginPhoneValues>({
+    resolver: zodResolver(loginPhoneSchema),
+    defaultValues: { phone: "" },
+    mode: "onChange",
+  })
+  const otpForm = useForm<LoginOtpValues>({
+    resolver: zodResolver(loginOtpSchema),
+    defaultValues: { otp: "" },
+    mode: "onChange",
+  })
+
+  const phone = phoneForm.watch("phone")
 
   React.useEffect(() => {
     if (!otpSent || seconds <= 0) return
@@ -67,49 +80,56 @@ export default function LoginPage() {
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 12 }}
-                className="space-y-7"
               >
-                <div className="space-y-2 text-center md:text-left">
-                  <h2 className="font-serif text-3xl font-bold">Login</h2>
-                  <p className="text-sm text-muted-foreground">Enter the mobile number on your profile.</p>
-                </div>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-phone">Mobile number</Label>
-                    <div className="flex">
-                      <span className="inline-flex items-center rounded-l-xl border border-r-0 border-input bg-muted px-4 text-sm text-muted-foreground">
-                        +91
-                      </span>
-                      <Input
-                        id="login-phone"
-                        type="tel"
-                        inputMode="numeric"
-                        autoComplete="tel"
-                        placeholder="98765 43210"
-                        className="rounded-l-none text-lg"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                        maxLength={10}
-                      />
-                    </div>
+                <form
+                  className="space-y-7"
+                  onSubmit={phoneForm.handleSubmit(() => {
+                    setOtpSent(true)
+                    setSeconds(30)
+                    otpForm.reset({ otp: "" })
+                  })}
+                >
+                  <div className="space-y-2 text-center md:text-left">
+                    <h2 className="font-serif text-3xl font-bold">Login</h2>
+                    <p className="text-sm text-muted-foreground">Enter the mobile number on your profile.</p>
                   </div>
-                  <Button
-                    className="w-full h-12 text-lg rounded-full"
-                    disabled={!/^[6-9]\d{9}$/.test(phone)}
-                    onClick={() => {
-                      setOtpSent(true)
-                      setSeconds(30)
-                    }}
-                  >
-                    Send OTP
-                  </Button>
-                </div>
-                <p className="text-center text-sm text-muted-foreground">
-                  New to Astalakshimi?{" "}
-                  <Link href="/register" className="font-semibold text-primary">
-                    Register free
-                  </Link>
-                </p>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="login-phone">Mobile number</Label>
+                      <div className="flex">
+                        <span className="inline-flex items-center rounded-l-xl border border-r-0 border-input bg-muted px-4 text-sm text-muted-foreground">
+                          +91
+                        </span>
+                        <Input
+                          id="login-phone"
+                          type="tel"
+                          inputMode="numeric"
+                          autoComplete="tel"
+                          placeholder="98765 43210"
+                          className="rounded-l-none text-lg"
+                          maxLength={10}
+                          {...phoneForm.register("phone", {
+                            onChange: (event) => {
+                              event.target.value = event.target.value.replace(/\D/g, "")
+                            },
+                          })}
+                        />
+                      </div>
+                      {phoneForm.formState.errors.phone && (
+                        <p className="text-xs text-destructive">{phoneForm.formState.errors.phone.message}</p>
+                      )}
+                    </div>
+                    <Button className="w-full h-12 text-lg rounded-full" type="submit">
+                      Send OTP
+                    </Button>
+                  </div>
+                  <p className="text-center text-sm text-muted-foreground">
+                    New to Astalakshimi?{" "}
+                    <Link href="/register" className="font-semibold text-primary">
+                      Register free
+                    </Link>
+                  </p>
+                </form>
               </motion.div>
             ) : (
               <motion.div
@@ -117,39 +137,50 @@ export default function LoginPage() {
                 initial={{ opacity: 0, x: 12 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -12 }}
-                className="space-y-7"
               >
-                <div className="space-y-2 text-center md:text-left">
-                  <h2 className="font-serif text-2xl font-bold">Verify OTP</h2>
-                  <p className="text-sm text-muted-foreground">Enter the 6-digit code sent to +91 {phone}</p>
-                </div>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="••••••"
-                  className="h-14 text-center text-2xl tracking-[0.6em]"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  maxLength={6}
-                  autoFocus
-                />
-                <Button className="w-full" size="lg" disabled={otp.length !== 6} onClick={() => router.push("/dashboard")}>
-                  Login
-                </Button>
-                <div className="flex items-center justify-between text-sm">
-                  <button type="button" className="text-muted-foreground underline-offset-4 hover:underline" onClick={() => setOtpSent(false)}>
-                    Change number
-                  </button>
-                  <button
-                    type="button"
-                    disabled={seconds > 0}
-                    className="font-medium text-primary disabled:text-muted-foreground"
-                    onClick={() => setSeconds(30)}
-                  >
-                    {seconds > 0 ? `Resend in ${seconds}s` : "Resend OTP"}
-                  </button>
-                </div>
+                <form className="space-y-7" onSubmit={otpForm.handleSubmit(() => router.push("/home"))}>
+                  <div className="space-y-2 text-center md:text-left">
+                    <h2 className="font-serif text-2xl font-bold">Verify OTP</h2>
+                    <p className="text-sm text-muted-foreground">Enter the 6-digit code sent to +91 {phone}</p>
+                  </div>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="••••••"
+                    className="h-14 text-center text-2xl tracking-[0.6em]"
+                    maxLength={6}
+                    autoFocus
+                    {...otpForm.register("otp", {
+                      onChange: (event) => {
+                        event.target.value = event.target.value.replace(/\D/g, "")
+                      },
+                    })}
+                  />
+                  {otpForm.formState.errors.otp && (
+                    <p className="text-xs text-destructive">{otpForm.formState.errors.otp.message}</p>
+                  )}
+                  <Button className="w-full" size="lg" type="submit">
+                    Login
+                  </Button>
+                  <div className="flex items-center justify-between text-sm">
+                    <button
+                      type="button"
+                      className="text-muted-foreground underline-offset-4 hover:underline"
+                      onClick={() => setOtpSent(false)}
+                    >
+                      Change number
+                    </button>
+                    <button
+                      type="button"
+                      disabled={seconds > 0}
+                      className="font-medium text-primary disabled:text-muted-foreground"
+                      onClick={() => setSeconds(30)}
+                    >
+                      {seconds > 0 ? `Resend in ${seconds}s` : "Resend OTP"}
+                    </button>
+                  </div>
+                </form>
               </motion.div>
             )}
           </AnimatePresence>

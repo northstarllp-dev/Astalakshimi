@@ -4,17 +4,13 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { isPaidMember } from "@/lib/plans"
 import {
-  clearAllNotifications,
-  loadNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
   resolveNotificationHref,
   type NotificationCategory,
   type NotificationItem,
   type NotificationKind,
 } from "@/lib/user-activity"
+import { useNotificationMutations, useNotificationsQuery, usePaidQuery } from "@/hooks/queries"
 import { cn } from "@/lib/utils"
 import {
   Bell,
@@ -55,16 +51,11 @@ const kindIcon: Record<NotificationKind, React.ComponentType<{ className?: strin
 
 export default function NotificationsPage() {
   const router = useRouter()
-  const [items, setItems] = React.useState<NotificationItem[]>([])
+  const { data: items = [] } = useNotificationsQuery()
+  const { data: paid = false } = usePaidQuery()
+  const { markRead, markAllRead, clearAll } = useNotificationMutations()
   const [filter, setFilter] = React.useState<FilterTab>("all")
-  const [paid, setPaid] = React.useState(false)
   const [confirmClear, setConfirmClear] = React.useState(false)
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setItems(loadNotifications())
-    setPaid(isPaidMember())
-  }, [])
 
   const visible = React.useMemo(() => {
     const list = filter === "all" ? items : items.filter((n) => n.category === filter)
@@ -75,7 +66,7 @@ export default function NotificationsPage() {
 
   const openItem = (item: NotificationItem) => {
     const href = resolveNotificationHref(item, paid)
-    setItems(markNotificationRead(item.id))
+    markRead.mutate(item.id)
     router.push(href)
   }
 
@@ -99,7 +90,7 @@ export default function NotificationsPage() {
             variant="outline"
             size="sm"
             disabled={unreadCount === 0}
-            onClick={() => setItems(markAllNotificationsRead())}
+            onClick={() => markAllRead.mutate()}
           >
             <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Mark all read
           </Button>
@@ -190,8 +181,8 @@ export default function NotificationsPage() {
             {filter === "all" ? "You're all clear." : `Nothing in ${filter} yet.`}
           </p>
           {filter === "all" && (
-            <Link href="/dashboard" className="mt-4 inline-block">
-              <Button size="sm">Go to Discover</Button>
+            <Link href="/home" className="mt-4 inline-block">
+              <Button size="sm">Go to Home</Button>
             </Link>
           )}
         </div>
@@ -222,7 +213,7 @@ export default function NotificationsPage() {
               <Button
                 className="flex-1"
                 onClick={() => {
-                  setItems(clearAllNotifications())
+                  clearAll.mutate()
                   setConfirmClear(false)
                 }}
               >

@@ -18,8 +18,6 @@ import {
 } from "@/components/ui/select"
 import {
   emptySignupData,
-  loadProfile,
-  saveProfile,
   type SignupData,
   COMPLEXIONS,
   DIETS,
@@ -35,6 +33,10 @@ import {
   STARS,
   RASHIS,
 } from "@/lib/profile-store"
+import { useProfileQuery, useSaveProfileMutation } from "@/hooks/queries"
+import { profileEditSchema } from "@/lib/validation"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeft, Camera, Check, GripVertical, Star, Trash2, Upload, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -61,28 +63,31 @@ function EditSection({ id, title, children }: { id: string; title: string; child
 
 export default function ProfileEditPage() {
   const router = useRouter()
-  const [data, setData] = React.useState<SignupData>(emptySignupData())
+  const profileQuery = useProfileQuery()
+  const saveMutation = useSaveProfileMutation()
+  const form = useForm({
+    resolver: zodResolver(profileEditSchema),
+    values: profileQuery.data ?? emptySignupData(),
+  })
+  const data = form.watch() as SignupData
   const [saved, setSaved] = React.useState(false)
-  const [loaded, setLoaded] = React.useState(false)
   const [dragIndex, setDragIndex] = React.useState<number | null>(null)
   const fileRef = React.useRef<HTMLInputElement>(null)
 
-  React.useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- sessionStorage is client-only */
-    setData(loadProfile() ?? emptySignupData())
-    setLoaded(true)
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [])
-
-  const update = (fields: Partial<SignupData>) => setData((prev) => ({ ...prev, ...fields }))
-
-  const onSave = () => {
-    saveProfile(data)
-    setSaved(true)
-    setTimeout(() => {
-      router.push("/profile")
-    }, 600)
+  const update = (fields: Partial<SignupData>) => {
+    for (const [key, value] of Object.entries(fields)) {
+      form.setValue(key as keyof SignupData, value as never, { shouldDirty: true })
+    }
   }
+
+  const onSave = form.handleSubmit((values) => {
+    saveMutation.mutate({ ...(profileQuery.data ?? emptySignupData()), ...values } as SignupData, {
+      onSuccess: () => {
+        setSaved(true)
+        window.setTimeout(() => router.push("/profile"), 600)
+      },
+    })
+  })
 
   const onFiles = (files: FileList | null) => {
     if (!files) return
@@ -93,7 +98,7 @@ export default function ProfileEditPage() {
         const reader = new FileReader()
         reader.onload = () => {
           const url = String(reader.result)
-          setData((prev) => ({ ...prev, photos: [...prev.photos, url] }))
+          form.setValue("photos", [...(data.photos ?? []), url], { shouldDirty: true })
         }
         reader.readAsDataURL(file)
       })
@@ -115,7 +120,7 @@ export default function ProfileEditPage() {
     update({ photos: next })
   }
 
-  if (!loaded) {
+  if (profileQuery.isPending) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-10 text-center text-sm text-muted-foreground">
         Loading…

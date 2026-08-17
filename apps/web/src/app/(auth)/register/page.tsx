@@ -12,26 +12,35 @@ import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
 import { ArrowLeft, ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
 import {
   emptySignupData,
   formatSiblings,
-  getPrefix,
-  saveProfile,
   SIBLING_COUNTS,
+  RELIGIONS,
+  MOTHER_TONGUES,
+  MARITAL_STATUSES,
+  FAMILY_TYPES,
+  FAMILY_STATUS,
   type SignupData,
 } from "@/lib/profile-store"
 import { StepHeading, StepProgress, TapCard } from "@/components/signup/shared"
-import { Step6Verify, VerificationSubmitted } from "@/components/signup/step-verify"
+import { Step4Verify, VerificationSubmitted } from "@/components/signup/step-verify"
+import { useSaveProfileMutation } from "@/hooks/queries"
+import {
+  signupStep1Schema,
+  signupStep2Schema,
+  signupStep3Schema,
+  signupStep5Schema,
+} from "@/lib/validation"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 
-const TOTAL_STEPS = 6
+const TOTAL_STEPS = 5
 const REFERRED_BY_KEY = "astalakshimi.referredBy"
 
 function SignupPageInner() {
@@ -40,6 +49,7 @@ function SignupPageInner() {
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
   const [data, setData] = useState<SignupData>(emptySignupData)
+  const saveProfileMutation = useSaveProfileMutation()
 
   React.useEffect(() => {
     const ref = searchParams.get("ref")
@@ -68,9 +78,9 @@ function SignupPageInner() {
       verificationStatus: "pending",
       submittedAt: new Date().toISOString(),
     }
-    setData(payload)
-    saveProfile(payload)
-    setSubmitted(true)
+    saveProfileMutation.mutate(payload, {
+      onSuccess: () => setSubmitted(true),
+    })
   }
 
   return (
@@ -115,16 +125,17 @@ function SignupPageInner() {
             className="flex w-full flex-1 flex-col"
           >
             {submitted ? (
-              <VerificationSubmitted onContinue={() => router.push("/dashboard")} />
+              <VerificationSubmitted onContinue={() => router.push("/home")} />
             ) : (
               <>
-                {step === 1 && <Step1PhoneOTP data={data} updateData={updateData} nextStep={nextStep} />}
-                {step === 2 && <Step2ProfileFor data={data} updateData={updateData} nextStep={nextStep} />}
+                {step === 1 && <Step1AccountCreation data={data} updateData={updateData} nextStep={nextStep} />}
+                {step === 2 && <Step2Identity data={data} updateData={updateData} nextStep={nextStep} />}
                 {step === 3 && <Step3Community data={data} updateData={updateData} nextStep={nextStep} />}
-                {step === 4 && <Step4Work data={data} updateData={updateData} nextStep={nextStep} />}
-                {step === 5 && <Step5Prefs data={data} updateData={updateData} nextStep={nextStep} />}
-                {step === 6 && (
-                  <Step6Verify data={data} updateData={updateData} onSubmit={finishVerification} />
+                {step === 4 && (
+                  <Step4Verify data={data} updateData={updateData} onNext={nextStep} />
+                )}
+                {step === 5 && (
+                  <Step5OTP data={data} updateData={updateData} onSubmit={finishVerification} />
                 )}
               </>
             )}
@@ -149,7 +160,9 @@ export default function SignupPage() {
   )
 }
 
-function Step1PhoneOTP({
+// ─── Step 1: Account Creation ────────────────────────────────────────────────
+
+function Step1AccountCreation({
   data,
   updateData,
   nextStep,
@@ -158,109 +171,115 @@ function Step1PhoneOTP({
   updateData: (fields: Partial<SignupData>) => void
   nextStep: () => void
 }) {
-  const [otpSent, setOtpSent] = useState(false)
-  const [terms, setTerms] = useState(false)
-  const [seconds, setSeconds] = useState(30)
+  const form = useForm({
+    resolver: zodResolver(signupStep1Schema),
+    defaultValues: { profileFor: data.profileFor, phone: data.phone, terms: false },
+    mode: "onChange",
+  })
+  const profileFor = form.watch("profileFor")
 
-  React.useEffect(() => {
-    if (!otpSent || seconds <= 0) return
-    const id = window.setInterval(() => setSeconds((s) => s - 1), 1000)
-    return () => window.clearInterval(id)
-  }, [otpSent, seconds])
+  const profileOptions = [
+    { id: "Myself", icon: "👤" },
+    { id: "Son", icon: "👦" },
+    { id: "Daughter", icon: "👧" },
+    { id: "Brother", icon: "🧑" },
+    { id: "Sister", icon: "👩" },
+    { id: "Relative", icon: "👥" },
+  ]
 
   return (
-    <div className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 md:space-y-8">
-      <StepHeading title="Welcome to Astalakshimi" subtitle="Register free with your mobile number. Families across India, verified photos, no password needed." />
+    <form
+      className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8"
+      onSubmit={form.handleSubmit((values) => {
+        updateData({ profileFor: values.profileFor, phone: values.phone })
+        nextStep()
+      })}
+    >
+      <StepHeading
+        title="Create your account"
+        subtitle="Who is this profile for? Enter your mobile — we'll send an OTP after you've set up the profile."
+      />
 
-      {!otpSent ? (
-        <div className="flex flex-col flex-1 justify-between md:justify-start mt-8 md:mt-0">
-          <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="phone">Mobile number</Label>
-            <div className="flex">
-              <span className="inline-flex items-center rounded-l-xl border border-r-0 border-input bg-muted px-4 text-sm text-muted-foreground">
-                +91
-              </span>
-              <Input
-                id="phone"
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel"
-                placeholder="98765 43210"
-                className="rounded-l-none text-lg"
-                value={data.phone}
-                onChange={(e) => updateData({ phone: e.target.value.replace(/\D/g, "") })}
-                maxLength={10}
-              />
-            </div>
-          </div>
-
-          <label className="flex items-start gap-3 text-xs leading-relaxed text-muted-foreground">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 accent-primary"
-              checked={terms}
-              onChange={(e) => setTerms(e.target.checked)}
-            />
-            By continuing, you agree to our Terms of Service and Privacy Policy. Profiles are screened before they go live.
-          </label>
-
-          </div>
-
-          <div className="mt-auto space-y-4 pt-8 pb-4 md:mt-0 md:pb-0 md:pt-4">
-            <Button
-              className="w-full"
-              size="lg"
-              disabled={!/^[6-9]\d{9}$/.test(data.phone) || !terms}
+      {/* Profile for */}
+      <div className="space-y-3">
+        <Label className="text-sm font-semibold">Profile for</Label>
+        <div className="grid grid-cols-3 gap-2.5">
+          {profileOptions.map((opt) => (
+            <TapCard
+              key={opt.id}
+              selected={profileFor === opt.id}
               onClick={() => {
-                setOtpSent(true)
-                setSeconds(30)
+                let autoGender = data.gender
+                if (opt.id === "Son" || opt.id === "Brother") autoGender = "Male"
+                if (opt.id === "Daughter" || opt.id === "Sister") autoGender = "Female"
+                form.setValue("profileFor", opt.id, { shouldValidate: true })
+                updateData({ profileFor: opt.id, gender: autoGender })
               }}
-            >
-              Get OTP
-            </Button>
-            <p className="text-center text-sm text-muted-foreground">
-              Already a member?{" "}
-              <Link href="/login" className="font-semibold text-primary">
-                Login
-              </Link>
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col flex-1 justify-between md:justify-start mt-8 md:mt-0">
-          <div className="space-y-2 text-center">
-            <Label htmlFor="otp">Enter the 6-digit OTP sent to +91 {data.phone}</Label>
-            <Input
-              id="otp"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="••••••"
-              className="h-14 text-center text-2xl tracking-[0.6em]"
-              value={data.otp}
-              onChange={(e) => updateData({ otp: e.target.value.replace(/\D/g, "") })}
-              maxLength={6}
+              title={opt.id}
+              icon={opt.icon}
             />
-            <button
-              type="button"
-              disabled={seconds > 0}
-              className="text-xs font-medium text-primary disabled:text-muted-foreground"
-              onClick={() => setSeconds(30)}
-            >
-              {seconds > 0 ? `Resend OTP in 00:${String(seconds).padStart(2, "0")}` : "Resend OTP"}
-            </button>
-          </div>
-          <div className="mt-auto pt-8 pb-4 md:mt-0 md:pb-0 md:pt-4">
-            <Button className="w-full" size="lg" disabled={data.otp.length !== 6} onClick={nextStep}>
-              Verify & Continue
-            </Button>
-          </div>
+          ))}
         </div>
+        {form.formState.errors.profileFor && (
+          <p className="text-xs text-destructive">{form.formState.errors.profileFor.message}</p>
+        )}
+      </div>
+
+      {/* Mobile */}
+      <div className="space-y-2">
+        <Label htmlFor="phone">Mobile number</Label>
+        <div className="flex">
+          <span className="inline-flex items-center rounded-l-xl border border-r-0 border-input bg-muted px-4 text-sm text-muted-foreground">
+            +91
+          </span>
+          <Input
+            id="phone"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+            placeholder="98765 43210"
+            className="rounded-l-none text-lg"
+            maxLength={10}
+            {...form.register("phone", {
+              onChange: (event) => {
+                const next = event.target.value.replace(/\D/g, "")
+                event.target.value = next
+                updateData({ phone: next })
+              },
+            })}
+          />
+        </div>
+        {form.formState.errors.phone && (
+          <p className="text-xs text-destructive">{form.formState.errors.phone.message}</p>
+        )}
+      </div>
+
+      {/* Consent */}
+      <label className="flex items-start gap-3 text-xs leading-relaxed text-muted-foreground cursor-pointer">
+        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" {...form.register("terms")} />
+        By continuing, you agree to our Terms of Service and Privacy Policy. Profiles are screened
+        before they go live.
+      </label>
+      {form.formState.errors.terms && (
+        <p className="text-xs text-destructive">{form.formState.errors.terms.message}</p>
       )}
-    </div>
+
+      <div className="mt-auto space-y-4 pt-4">
+        <Button className="w-full" size="lg" type="submit">
+          Continue <ChevronRight className="ml-1 h-5 w-5" />
+        </Button>
+        <p className="text-center text-sm text-muted-foreground">
+          Already a member?{" "}
+          <Link href="/login" className="font-semibold text-primary">
+            Login
+          </Link>
+        </p>
+      </div>
+    </form>
   )
 }
+
+// ─── DOB helper ─────────────────────────────────────────────────────────────
 
 function DobFields({
   day,
@@ -343,7 +362,17 @@ function DobFields({
   )
 }
 
-function Step2ProfileFor({
+// Returns "His " / "Her " / "" based on profileFor + gender
+function genderPrefix(profileFor: string, gender: string): string {
+  if (!profileFor || profileFor === "Myself") return ""
+  if (gender === "Male") return "His "
+  if (gender === "Female") return "Her "
+  return "Their "
+}
+
+// ─── Step 2: Identity ────────────────────────────────────────────────────────
+
+function Step2Identity({
   data,
   updateData,
   nextStep,
@@ -352,132 +381,109 @@ function Step2ProfileFor({
   updateData: (fields: Partial<SignupData>) => void
   nextStep: () => void
 }) {
-  const profileOptions = [
-    { id: "Myself", icon: "👤" },
-    { id: "Son", icon: "👦" },
-    { id: "Daughter", icon: "👧" },
-    { id: "Brother", icon: "🧑" },
-    { id: "Sister", icon: "👩" },
-    { id: "Relative", icon: "👥" },
-  ]
-  const isDobComplete = data.dobDay.length === 2 && data.dobMonth.length === 2 && data.dobYear.length === 4
-  let isAgeValid = false
-  let ageError = ""
-  
-  if (isDobComplete) {
-    const dob = new Date(`${data.dobYear}-${data.dobMonth}-${data.dobDay}`)
-    if (!isNaN(dob.getTime())) {
-      const today = new Date()
-      let age = today.getFullYear() - dob.getFullYear()
-      const m = today.getMonth() - dob.getMonth()
-      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-        age--
-      }
-      const minAge = data.gender === "Male" ? 21 : 18
-      if (age < minAge) {
-        ageError = `Must be at least ${minAge} years old.`
-      } else if (age > 100) {
-        ageError = "Please enter a valid age."
-      } else {
-        isAgeValid = true
-      }
-    } else {
-      ageError = "Invalid date."
-    }
-  }
-
-  const isNameValid = data.fullName.trim().length >= 3 && /^[a-zA-Z\s]*$/.test(data.fullName)
-  const isComplete = data.profileFor && isNameValid && data.gender && isAgeValid && data.maritalStatus
+  const p = genderPrefix(data.profileFor, data.gender)
+  const form = useForm({
+    resolver: zodResolver(signupStep2Schema),
+    values: {
+      fullName: data.fullName,
+      gender: data.gender,
+      dobDay: data.dobDay,
+      dobMonth: data.dobMonth,
+      dobYear: data.dobYear,
+      maritalStatus: data.maritalStatus,
+      city: data.city,
+    },
+    mode: "onChange",
+  })
+  const errors = form.formState.errors
 
   return (
-    <div className="space-y-8">
-      <StepHeading title="Let's set up the profile" subtitle="Who are you creating this profile for?" />
+    <form className="space-y-8" onSubmit={form.handleSubmit(() => nextStep())}>
+      <StepHeading
+        title="Identity"
+        subtitle="Tell us about the person looking for a match."
+      />
 
-      <div className="grid grid-cols-3 gap-2.5">
-        {profileOptions.map((opt) => (
-          <TapCard
-            key={opt.id}
-            selected={data.profileFor === opt.id}
-            onClick={() => {
-              let autoGender = data.gender
-              if (opt.id === "Son" || opt.id === "Brother") autoGender = "Male"
-              if (opt.id === "Daughter" || opt.id === "Sister") autoGender = "Female"
-              updateData({ profileFor: opt.id, gender: autoGender })
-            }}
-            title={opt.id}
-            icon={opt.icon}
+      <div className="space-y-5">
+        {/* Name */}
+        <div className="space-y-2">
+          <Label htmlFor="fullName">{p}Full name</Label>
+          <Input
+            id="fullName"
+            placeholder="e.g. Priya Sharma"
+            autoComplete="name"
+            value={data.fullName}
+            onChange={(e) => updateData({ fullName: e.target.value })}
           />
-        ))}
-      </div>
+          {errors.fullName && (
+            <p className="text-xs text-destructive">{errors.fullName.message}</p>
+          )}
+        </div>
 
-      {data.profileFor && (
-        <div className="space-y-5 animate-in">
-          <div className="space-y-2">
-            <Label htmlFor="fullName">
-              {data.profileFor === "Myself" ? "Full name" : `${getPrefix(data.profileFor)} full name`}
-            </Label>
-            <Input
-              id="fullName"
-              placeholder="e.g. Priya Sharma"
-              autoComplete="name"
-              value={data.fullName}
-              onChange={(e) => updateData({ fullName: e.target.value })}
-            />
-            {data.fullName.length > 0 && data.fullName.trim().length < 3 && (
-              <p className="text-xs text-destructive">Name must be at least 3 characters.</p>
-            )}
-            {!/^[a-zA-Z\s]*$/.test(data.fullName) && (
-              <p className="text-xs text-destructive">Name can only contain letters.</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label>{data.profileFor === "Myself" ? "Gender" : `${getPrefix(data.profileFor)} gender`}</Label>
-            <div className="grid grid-cols-3 gap-2.5">
-              {["Male", "Female", "Other"].map((g) => (
-                <TapCard key={g} selected={data.gender === g} onClick={() => updateData({ gender: g })} title={g} />
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>{data.profileFor === "Myself" ? "Date of birth" : `${getPrefix(data.profileFor)} date of birth`}</Label>
-            <DobFields
-              day={data.dobDay}
-              month={data.dobMonth}
-              year={data.dobYear}
-              onChange={updateData}
-            />
-            {ageError && <p className="text-xs text-destructive">{ageError}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label>{data.profileFor === "Myself" ? "Marital status" : `${getPrefix(data.profileFor)} marital status`}</Label>
-            <Select
-              value={data.maritalStatus || undefined}
-              onValueChange={(maritalStatus) => updateData({ maritalStatus })}
-            >
-              <SelectTrigger className="w-full" aria-label="Marital status">
-                <SelectValue placeholder="Select marital status" />
-              </SelectTrigger>
-              <SelectContent>
-                {["Never Married", "Divorced", "Widowed", "Awaiting Divorce"].map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Gender */}
+        <div className="space-y-2">
+          <Label>Gender</Label>
+          <div className="grid grid-cols-3 gap-2.5">
+            {["Male", "Female", "Other"].map((g) => (
+              <TapCard key={g} selected={data.gender === g} onClick={() => updateData({ gender: g })} title={g} />
+            ))}
           </div>
         </div>
-      )}
 
-      <Button className="w-full" size="lg" disabled={!isComplete} onClick={nextStep}>
+        {/* DOB */}
+        <div className="space-y-2">
+          <Label>{p}Date of birth</Label>
+          <DobFields
+            day={data.dobDay}
+            month={data.dobMonth}
+            year={data.dobYear}
+            onChange={updateData}
+          />
+          {errors.dobYear && <p className="text-xs text-destructive">{errors.dobYear.message}</p>}
+          {errors.gender && <p className="text-xs text-destructive">{errors.gender.message}</p>}
+        </div>
+
+        {/* Marital status */}
+        <div className="space-y-2">
+          <Label>{p}Marital status</Label>
+          <Select
+            value={data.maritalStatus || undefined}
+            onValueChange={(maritalStatus) => updateData({ maritalStatus })}
+          >
+            <SelectTrigger className="w-full" aria-label="Marital status">
+              <SelectValue placeholder="Select marital status" />
+            </SelectTrigger>
+            <SelectContent>
+              {MARITAL_STATUSES.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {status}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Location */}
+        <div className="space-y-2">
+          <Label htmlFor="city">{p}Current city</Label>
+          <Input
+            id="city"
+            placeholder="e.g. Chennai, Bangalore"
+            value={data.city}
+            onChange={(e) => updateData({ city: e.target.value })}
+          />
+          {errors.city && <p className="text-xs text-destructive">{errors.city.message}</p>}
+        </div>
+      </div>
+
+      <Button className="w-full" size="lg" type="submit">
         Continue <ChevronRight className="ml-1 h-5 w-5" />
       </Button>
-    </div>
+    </form>
   )
 }
+
+// ─── Step 3: Community & Background ─────────────────────────────────────────
 
 function Step3Community({
   data,
@@ -488,9 +494,17 @@ function Step3Community({
   updateData: (fields: Partial<SignupData>) => void
   nextStep: () => void
 }) {
-  const isCasteValid = data.caste.trim().length >= 2
-  const isComplete = data.religion && isCasteValid && data.motherTongue
-  const prefix = data.profileFor ? `${getPrefix(data.profileFor)} ` : ""
+  const p = genderPrefix(data.profileFor, data.gender)
+  const form = useForm({
+    resolver: zodResolver(signupStep3Schema),
+    values: {
+      religion: data.religion,
+      caste: data.caste,
+      motherTongue: data.motherTongue,
+    },
+    mode: "onChange",
+  })
+  const errors = form.formState.errors
 
   const setSiblings = (brothersCount: number, sistersCount: number) => {
     updateData({
@@ -501,11 +515,16 @@ function Step3Community({
   }
 
   return (
-    <div className="space-y-8">
-      <StepHeading title="Community & background" subtitle="These details help families find the right match." />
+    <form className="space-y-8" onSubmit={form.handleSubmit(() => nextStep())}>
+      <StepHeading
+        title="Community & background"
+        subtitle="These details help families find the right match."
+      />
+
       <div className="space-y-5">
+        {/* Religion */}
         <div className="space-y-2">
-          <Label htmlFor="religion">{prefix}Religion</Label>
+          <Label htmlFor="religion">{p}Religion / community</Label>
           <Select
             value={data.religion || undefined}
             onValueChange={(religion) => updateData({ religion })}
@@ -514,25 +533,29 @@ function Step3Community({
               <SelectValue placeholder="Select religion" />
             </SelectTrigger>
             <SelectContent>
-              {["Hindu", "Muslim", "Christian", "Sikh", "Jain", "Buddhist", "Other"].map((r) => (
+              {RELIGIONS.map((r) => (
                 <SelectItem key={r} value={r}>
                   {r}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {errors.religion && <p className="text-xs text-destructive">{errors.religion.message}</p>}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="caste">{prefix}Caste / community</Label>
+          <Label htmlFor="caste">{p}Caste / community</Label>
           <Input
             id="caste"
-            placeholder="Type caste or community..."
+            placeholder="Type caste or community…"
             value={data.caste}
             onChange={(e) => updateData({ caste: e.target.value })}
           />
+          {errors.caste && <p className="text-xs text-destructive">{errors.caste.message}</p>}
         </div>
+
+        {/* Mother tongue */}
         <div className="space-y-2">
-          <Label htmlFor="tongue">{prefix}Mother tongue</Label>
+          <Label htmlFor="tongue">{p}Mother tongue</Label>
           <Select
             value={data.motherTongue || undefined}
             onValueChange={(motherTongue) => updateData({ motherTongue })}
@@ -541,7 +564,7 @@ function Step3Community({
               <SelectValue placeholder="Select language" />
             </SelectTrigger>
             <SelectContent>
-              {["Tamil", "Telugu", "Hindi", "Malayalam", "Kannada", "Marathi", "Bengali", "Gujarati"].map((l) => (
+              {MOTHER_TONGUES.map((l) => (
                 <SelectItem key={l} value={l}>
                   {l}
                 </SelectItem>
@@ -550,342 +573,197 @@ function Step3Community({
           </Select>
         </div>
 
-        <div className="space-y-3 rounded-2xl border border-border bg-muted/40 p-4">
+        {/* Family details */}
+        <div className="space-y-4 rounded-2xl border border-border bg-muted/40 p-4">
           <div>
-            <p className="text-sm font-semibold text-foreground">Siblings</p>
+            <p className="text-sm font-semibold text-foreground">Family details</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              How many brothers and sisters? Choose 0 if only child.
+              Brothers, sisters, and family background — used by families to assess compatibility.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="brothers">{prefix}Brothers</Label>
-              <Select
-                value={String(data.brothersCount)}
-                onValueChange={(v) => setSiblings(Number(v), data.sistersCount)}
-              >
-                <SelectTrigger id="brothers" className="w-full bg-card">
-                  <SelectValue placeholder="Brothers" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SIBLING_COUNTS.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n === 5 ? "5+" : String(n)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sisters">{prefix}Sisters</Label>
-              <Select
-                value={String(data.sistersCount)}
-                onValueChange={(v) => setSiblings(data.brothersCount, Number(v))}
-              >
-                <SelectTrigger id="sisters" className="w-full bg-card">
-                  <SelectValue placeholder="Sisters" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SIBLING_COUNTS.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n === 5 ? "5+" : String(n)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
+          {/* Family type */}
+          <div className="space-y-2">
+            <Label htmlFor="familyType">{p}Family type</Label>
+            <Select
+              value={data.familyType || undefined}
+              onValueChange={(familyType) => updateData({ familyType })}
+            >
+              <SelectTrigger id="familyType" className="w-full bg-card">
+                <SelectValue placeholder="Select family type" />
+              </SelectTrigger>
+              <SelectContent>
+                {FAMILY_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <p className="text-sm font-medium text-primary">
-            {formatSiblings(data.brothersCount, data.sistersCount)}
-          </p>
-        </div>
-      </div>
-      <Button className="w-full" size="lg" disabled={!isComplete} onClick={nextStep}>
-        Continue <ChevronRight className="ml-1 h-5 w-5" />
-      </Button>
-    </div>
-  )
-}
 
-function Step4Work({
-  data,
-  updateData,
-  nextStep,
-}: {
-  data: SignupData
-  updateData: (fields: Partial<SignupData>) => void
-  nextStep: () => void
-}) {
-  const isWorking = Boolean(data.occupation) && data.occupation !== "Not Working"
-  const isEduComplete = data.education && (data.education !== "Other" || data.otherEducation.trim().length >= 2)
-  const isOccComplete = data.occupation && (data.occupation !== "Other" || data.otherOccupation.trim().length >= 2)
-  const isWorkDetailsComplete = !isWorking || (data.companyName.trim().length >= 2 && Boolean(data.annualIncome))
-  const isComplete = isEduComplete && isOccComplete && isWorkDetailsComplete && data.city.trim().length >= 2
-  const prefix = data.profileFor ? `${getPrefix(data.profileFor)} ` : ""
-
-  return (
-    <div className="space-y-8">
-      <StepHeading title="Education & career" subtitle="Matches often filter by education, profession, company and income." />
-      <div className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="education">{prefix}Highest education</Label>
-          <Select
-            value={data.education || undefined}
-            onValueChange={(education) => updateData({ education })}
-          >
-            <SelectTrigger id="education" className="w-full">
-              <SelectValue placeholder="Select education" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Engineering / Design</SelectLabel>
-                <SelectItem value="B.E / B.Tech">B.E / B.Tech</SelectItem>
-                <SelectItem value="M.E / M.Tech">M.E / M.Tech</SelectItem>
-                <SelectItem value="B.Arch">B.Arch</SelectItem>
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel>Computers / IT</SelectLabel>
-                <SelectItem value="BCA">BCA</SelectItem>
-                <SelectItem value="MCA">MCA</SelectItem>
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel>Finance / Management</SelectLabel>
-                <SelectItem value="B.Com">B.Com</SelectItem>
-                <SelectItem value="MBA / PGDM">MBA / PGDM</SelectItem>
-                <SelectItem value="CA / CS">CA / CS</SelectItem>
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel>Medicine</SelectLabel>
-                <SelectItem value="MBBS">MBBS</SelectItem>
-                <SelectItem value="MD / MS">MD / MS</SelectItem>
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel>Arts / Science</SelectLabel>
-                <SelectItem value="B.A">B.A</SelectItem>
-                <SelectItem value="B.Sc">B.Sc</SelectItem>
-                <SelectItem value="M.Sc">M.Sc</SelectItem>
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel>Higher Education</SelectLabel>
-                <SelectItem value="Ph.D">Ph.D</SelectItem>
-                <SelectItem value="M.Phil">M.Phil</SelectItem>
-                <SelectItem value="Post Doctorate">Post Doctorate</SelectItem>
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel>Others</SelectLabel>
-                <SelectItem value="Diploma">Diploma</SelectItem>
-                <SelectItem value="Other">Other (type below)</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          {data.education === "Other" && (
-            <Input
-              placeholder="Type education degree..."
-              value={data.otherEducation}
-              onChange={(e) => updateData({ otherEducation: e.target.value })}
-            />
-          )}
-          {data.education && (
-            <Input
-              placeholder="Specialization / Stream (optional, e.g. Computer Science)"
-              value={data.educationStream}
-              onChange={(e) => updateData({ educationStream: e.target.value })}
-            />
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="occupation">{prefix}Occupation</Label>
-          <Select
-            value={data.occupation || undefined}
-            onValueChange={(occupation) => {
-              if (occupation === "Not Working") {
-                updateData({ occupation, companyName: "", annualIncome: "" })
-              } else {
-                updateData({ occupation })
-              }
-            }}
-          >
-            <SelectTrigger id="occupation" className="w-full">
-              <SelectValue placeholder="Select occupation" />
-            </SelectTrigger>
-            <SelectContent>
-              {[
-                "Private Sector",
-                "Government / Public Sector",
-                "Defense / Civil Services",
-                "Business / Self Employed",
-                "IT / Software Professional",
-                "Healthcare Professional / Doctor",
-                "Teacher / Academician",
-                "Finance / CA / CS",
-                "Lawyer / Legal",
-                "Not Working",
-                "Other",
-              ].map((o) => (
-                <SelectItem key={o} value={o}>
-                  {o}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {data.occupation === "Other" && (
-            <Input
-              placeholder="Type occupation..."
-              value={data.otherOccupation}
-              onChange={(e) => updateData({ otherOccupation: e.target.value })}
-            />
-          )}
-        </div>
-
-        {isWorking && (
-          <div className="space-y-5 animate-in">
-            <div className="space-y-2">
-              <Label htmlFor="companyName">
-                {data.occupation === "Business / Self Employed" ? `${prefix}Business / firm name` : `${prefix}Company name`}
-              </Label>
-              <Input
-                id="companyName"
-                placeholder={
-                  data.occupation === "Business / Self Employed"
-                    ? "e.g. Sharma Traders"
-                    : "e.g. TCS, Infosys, Google"
-                }
-                value={data.companyName}
-                onChange={(e) => updateData({ companyName: e.target.value })}
-                autoComplete="organization"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="annualIncome">{prefix}Annual income</Label>
-              <Select
-                value={data.annualIncome || undefined}
-                onValueChange={(annualIncome) => updateData({ annualIncome })}
-              >
-                <SelectTrigger id="annualIncome" className="w-full">
-                  <SelectValue placeholder="Select annual income" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    "Under ₹3 Lakh",
-                    "₹3 – 5 Lakh",
-                    "₹5 – 7 Lakh",
-                    "₹7 – 10 Lakh",
-                    "₹10 – 15 Lakh",
-                    "₹15 – 20 Lakh",
-                    "₹20 – 30 Lakh",
-                    "₹30 – 50 Lakh",
-                    "₹50 Lakh – 1 Crore",
-                    "Above ₹1 Crore",
-                    "Prefer not to say",
-                  ].map((income) => (
-                    <SelectItem key={income} value={income}>
-                      {income}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Shown only to serious matches. You can keep this private later.</p>
-            </div>
+          {/* Family status */}
+          <div className="space-y-2">
+            <Label htmlFor="familyStatus">{p}Family status</Label>
+            <Select
+              value={data.familyStatus || undefined}
+              onValueChange={(familyStatus) => updateData({ familyStatus })}
+            >
+              <SelectTrigger id="familyStatus" className="w-full bg-card">
+                <SelectValue placeholder="Select family status" />
+              </SelectTrigger>
+              <SelectContent>
+                {FAMILY_STATUS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        )}
 
-        <div className="space-y-2">
-          <Label htmlFor="city">{prefix}Current city</Label>
-          <Input
-            id="city"
-            placeholder="e.g. Chennai, Bangalore"
-            value={data.city}
-            onChange={(e) => updateData({ city: e.target.value })}
-          />
-        </div>
-      </div>
-      <Button className="w-full" size="lg" disabled={!isComplete} onClick={nextStep}>
-        Continue <ChevronRight className="ml-1 h-5 w-5" />
-      </Button>
-    </div>
-  )
-}
-
-function Step5Prefs({
-  data,
-  updateData,
-  nextStep,
-}: {
-  data: SignupData
-  updateData: (fields: Partial<SignupData>) => void
-  nextStep: () => void
-}) {
-  const isAgeValid = data.prefAgeMin >= 18 && data.prefAgeMax >= data.prefAgeMin && data.prefAgeMax <= 100
-  const isComplete = isAgeValid && data.prefReligion.length > 0
-  return (
-    <div className="space-y-8">
-      <StepHeading title="Partner preferences" subtitle="Tell us what you are looking for. You can change this later." />
-      <div className="space-y-6">
-        <div className="space-y-3">
-          <Label>
-            Age range ({data.prefAgeMin} – {data.prefAgeMax} years)
-          </Label>
-          <div className="flex items-center gap-3">
-            <Input
-              type="number"
-              inputMode="numeric"
-              value={data.prefAgeMin}
-              onChange={(e) => updateData({ prefAgeMin: Number(e.target.value) })}
-              className="w-24 text-center"
-            />
-            <span className="text-muted-foreground">to</span>
-            <Input
-              type="number"
-              inputMode="numeric"
-              value={data.prefAgeMax}
-              onChange={(e) => {
-                const max = Number(e.target.value)
-                updateData({ prefAgeMax: max })
-              }}
-              className="w-24 text-center"
-            />
-          </div>
-          {!isAgeValid && (
-            <p className="text-xs text-destructive">Please enter a valid age range (Min 18).</p>
-          )}
-        </div>
-        <div className="space-y-2">
-          <Label>Religion preference</Label>
-          <div className="flex flex-wrap gap-2">
-            {["Open to all", "Hindu", "Muslim", "Christian", "Sikh", "Jain"].map((rel) => {
-              const isSelected = data.prefReligion.includes(rel)
-              return (
-                <button
-                  type="button"
-                  key={rel}
-                  onClick={() => {
-                    if (rel === "Open to all") updateData({ prefReligion: ["Open to all"] })
-                    else {
-                      let next = data.prefReligion.filter((r) => r !== "Open to all")
-                      if (isSelected) next = next.filter((r) => r !== rel)
-                      else next = [...next, rel]
-                      updateData({ prefReligion: next })
-                    }
-                  }}
-                  className={cn(
-                    "rounded-full border px-4 py-2 text-sm transition-colors",
-                    isSelected
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/40"
-                  )}
+          {/* Siblings */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Siblings</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="brothers">{p}Brothers</Label>
+                <Select
+                  value={String(data.brothersCount)}
+                  onValueChange={(v) => setSiblings(Number(v), data.sistersCount)}
                 >
-                  {rel}
-                </button>
-              )
-            })}
+                  <SelectTrigger id="brothers" className="w-full bg-card">
+                    <SelectValue placeholder="Brothers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SIBLING_COUNTS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n === 5 ? "5+" : String(n)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sisters">{p}Sisters</Label>
+                <Select
+                  value={String(data.sistersCount)}
+                  onValueChange={(v) => setSiblings(data.brothersCount, Number(v))}
+                >
+                  <SelectTrigger id="sisters" className="w-full bg-card">
+                    <SelectValue placeholder="Sisters" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SIBLING_COUNTS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n === 5 ? "5+" : String(n)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <p className="text-sm font-medium text-primary">
+              {formatSiblings(data.brothersCount, data.sistersCount)}
+            </p>
           </div>
         </div>
       </div>
-      <Button className="w-full" size="lg" disabled={!isComplete} onClick={nextStep}>
-        Continue to photos <ChevronRight className="ml-1 h-5 w-5" />
+
+      <Button className="w-full" size="lg" type="submit">
+        Continue <ChevronRight className="ml-1 h-5 w-5" />
       </Button>
-    </div>
+    </form>
+  )
+}
+
+// ─── Step 5: OTP Verification ────────────────────────────────────────────────
+
+function Step5OTP({
+  data,
+  updateData,
+  onSubmit,
+}: {
+  data: SignupData
+  updateData: (fields: Partial<SignupData>) => void
+  onSubmit: () => void
+}) {
+  const form = useForm({
+    resolver: zodResolver(signupStep5Schema),
+    values: { otp: data.otp },
+    mode: "onChange",
+  })
+  const [seconds, setSeconds] = useState(30)
+  const [otpSent, setOtpSent] = useState(true)
+
+  React.useEffect(() => {
+    if (!otpSent || seconds <= 0) return
+    const id = window.setInterval(() => setSeconds((s) => s - 1), 1000)
+    return () => window.clearInterval(id)
+  }, [otpSent, seconds])
+
+  const resend = () => {
+    setSeconds(30)
+    setOtpSent(true)
+  }
+
+  return (
+    <form
+      className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8"
+      onSubmit={form.handleSubmit(() => onSubmit())}
+    >
+      <StepHeading
+        title="OTP verification"
+        subtitle={`We've sent a 6-digit code to +91 ${data.phone}. Enter it below to create your profile.`}
+      />
+
+      <div className="space-y-4">
+        <div className="space-y-2 text-center">
+          <Label htmlFor="otp" className="sr-only">
+            OTP
+          </Label>
+          <Input
+            id="otp"
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="••••••"
+            className="h-14 text-center text-2xl tracking-[0.6em]"
+            maxLength={6}
+            {...form.register("otp", {
+              onChange: (event) => {
+                const next = event.target.value.replace(/\D/g, "")
+                event.target.value = next
+                updateData({ otp: next })
+              },
+            })}
+          />
+          {form.formState.errors.otp && (
+            <p className="text-xs text-destructive">{form.formState.errors.otp.message}</p>
+          )}
+          <button
+            type="button"
+            disabled={seconds > 0}
+            className="text-xs font-medium text-primary disabled:text-muted-foreground"
+            onClick={resend}
+          >
+            {seconds > 0
+              ? `Resend OTP in 00:${String(seconds).padStart(2, "0")}`
+              : "Resend OTP"}
+          </button>
+        </div>
+
+        <p className="rounded-xl bg-muted/60 px-4 py-3 text-center text-xs text-muted-foreground">
+          Didn&apos;t receive it? Check that{" "}
+          <span className="font-semibold text-foreground">+91 {data.phone}</span> is correct.
+        </p>
+      </div>
+
+      <div className="mt-auto pt-4">
+        <Button className="w-full" size="lg" type="submit">
+          Verify &amp; create profile
+        </Button>
+      </div>
+    </form>
   )
 }

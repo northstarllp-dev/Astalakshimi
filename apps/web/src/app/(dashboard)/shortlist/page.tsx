@@ -4,17 +4,23 @@ import * as React from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
+import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { getMatchById } from "@/lib/matches"
-import { loadShortlist, sendInterest, toggleShortlist } from "@/lib/user-activity"
+import { useSendInterestMutation, useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
 import { Bookmark } from "lucide-react"
 
 export default function ShortlistPage() {
-  const [ids, setIds] = React.useState<string[]>([])
+  return (
+    <RequireFullPortal>
+      <ShortlistPageInner />
+    </RequireFullPortal>
+  )
+}
 
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIds(loadShortlist())
-  }, [])
+function ShortlistPageInner() {
+  const { data: ids = [] } = useShortlistQuery()
+  const toggleMutation = useToggleShortlistMutation()
+  const connectMutation = useSendInterestMutation()
 
   const matches = ids.map((id) => getMatchById(id)).filter(Boolean)
 
@@ -41,8 +47,8 @@ export default function ShortlistPage() {
             <MatchListCard
               key={match.id}
               match={match}
-              onSkip={(id) => setIds(toggleShortlist(id))}
-              onConnect={(id) => sendInterest(id)}
+              onSkip={(id) => toggleMutation.mutate(id)}
+              onConnect={(id) => connectMutation.mutate(id)}
             />
           ) : null
         )}

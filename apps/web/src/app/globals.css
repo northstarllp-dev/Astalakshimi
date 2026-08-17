@@ -59,8 +59,8 @@
   --radius-sm: calc(var(--radius) * 0.5);
   --radius-xl: calc(var(--radius) * 1.5);
 
-  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-cormorant), ui-serif, Georgia, serif;
+  --font-sans: var(--font-mukta), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-cormorant), ui-serif, Georgia, "Times New Roman", serif;
   --font-tamil: var(--font-tiro), ui-serif, Georgia, serif;
 }
 
@@ -80,6 +80,14 @@
     font-family: var(--font-sans), sans-serif;
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
+    letter-spacing: 0.01em;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif), ui-serif, Georgia, serif;
+    letter-spacing: 0.015em;
   }
 
   button,

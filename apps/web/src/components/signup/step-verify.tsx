@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Camera, CheckCircle2, Clock3, FileText, IdCard, ShieldCheck, Upload, X } from "lucide-react"
+import { Camera, CheckCircle2, Clock3, IdCard, ShieldCheck, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
@@ -18,7 +18,6 @@ import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 
 const MAX_PHOTOS = 6
 const MAX_IMAGE_MB = 5
-const MAX_PDF_MB = 10
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"]
 const ID_TYPES = ["Aadhaar", "PAN card", "Passport", "Driving licence", "Voter ID"]
 
@@ -41,14 +40,14 @@ function validateImage(file: File) {
   return null
 }
 
-export function Step6Verify({
+export function Step4Verify({
   data,
   updateData,
-  onSubmit,
+  onNext,
 }: {
   data: SignupData
   updateData: (fields: Partial<SignupData>) => void
-  onSubmit: () => void
+  onNext: () => void
 }) {
   const [error, setError] = React.useState("")
   const [cameraError, setCameraError] = React.useState("")
@@ -57,7 +56,6 @@ export function Step6Verify({
   const streamRef = React.useRef<MediaStream | null>(null)
   const photoInputRef = React.useRef<HTMLInputElement>(null)
   const idInputRef = React.useRef<HTMLInputElement>(null)
-  const horoscopeInputRef = React.useRef<HTMLInputElement>(null)
 
   const stopCamera = React.useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -141,20 +139,6 @@ export function Step6Verify({
     })
   }
 
-  const addHoroscope = (file: File | undefined) => {
-    if (!file) return
-    if (file.type !== "application/pdf") {
-      setError("Horoscope must be a PDF file.")
-      return
-    }
-    if (file.size > MAX_PDF_MB * 1024 * 1024) {
-      setError(`Horoscope PDF must be under ${MAX_PDF_MB} MB.`)
-      return
-    }
-    setError("")
-    updateData({ horoscopeName: file.name, horoscopeSize: file.size })
-  }
-
   const identityReady =
     (data.verificationMethod === "selfie" && Boolean(data.selfiePhoto)) ||
     (data.verificationMethod === "govt_id" && Boolean(data.govtIdPhoto) && Boolean(data.govtIdType))
@@ -177,7 +161,7 @@ export function Step6Verify({
     <div className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8 pb-8">
       <StepHeading
         title="Photos & verification"
-        subtitle="Add clear photos, verify with a selfie or government ID, and optionally upload your horoscope. Photos stay hidden until our team approves them  usually within 12 hours."
+        subtitle="Add clear photos and verify your identity with a selfie or government ID. Photos stay hidden until our team approves them — usually within 12 hours."
       />
 
       <section className="space-y-3">
@@ -371,69 +355,17 @@ export function Step6Verify({
         )}
       </section>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold">Horoscope / Kundli</h2>
-          <p className="text-xs text-muted-foreground">Optional, but recommended. Upload a PDF only (max {MAX_PDF_MB} MB).</p>
-        </div>
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-border bg-card p-4 text-left"
-          onClick={() => horoscopeInputRef.current?.click()}
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <FileText className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            {data.horoscopeName ? (
-              <>
-                <p className="truncate text-sm font-semibold">{data.horoscopeName}</p>
-                <p className="text-xs text-muted-foreground">{(data.horoscopeSize / 1024 / 1024).toFixed(1)} MB · PDF uploaded</p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm font-semibold">Upload horoscope PDF</p>
-                <p className="text-xs text-muted-foreground">Accepted by many families during matching</p>
-              </>
-            )}
-          </div>
-          {data.horoscopeName && (
-            <span
-              role="button"
-              tabIndex={0}
-              className="text-xs font-semibold text-muted-foreground"
-              onClick={(e) => {
-                e.stopPropagation()
-                updateData({ horoscopeName: "", horoscopeSize: 0 })
-              }}
-            >
-              Remove
-            </span>
-          )}
-        </button>
-        <input
-          ref={horoscopeInputRef}
-          type="file"
-          accept="application/pdf"
-          className="hidden"
-          onChange={(e) => {
-            addHoroscope(e.target.files?.[0])
-            e.target.value = ""
-          }}
-        />
-      </section>
-
       {error && (
         <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}
 
       <div className="mt-auto sticky bottom-0 z-40 -mx-4 border-t border-border bg-background/95 p-4 pt-6 backdrop-blur md:static md:-mx-0 md:border-0 md:bg-transparent md:p-0 md:pt-0 safe-bottom">
-        <Button className="w-full" size="lg" disabled={!canSubmit} onClick={onSubmit}>
-          Submit for verification
+        <Button className="w-full" size="lg" disabled={!canSubmit} onClick={onNext}>
+          Continue
         </Button>
         <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[11px] text-muted-foreground">
           <Clock3 className="h-3.5 w-3.5" />
-          Review within {VERIFICATION_SLA_HOURS} hours · photos stay private till then
+          Photos stay private until verified · usually within {VERIFICATION_SLA_HOURS} hours
         </p>
       </div>
     </div>
