@@ -1,0 +1,64 @@
+import { pgTable, uuid, varchar, text, integer, boolean, date, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
+import { users } from './users';
+
+export const genderEnum = pgEnum('gender', ['Male', 'Female', 'Other']);
+export const maritalStatusEnum = pgEnum('marital_status', ['Never Married', 'Divorced', 'Widowed', 'Awaiting Divorce']);
+export const educationLevelEnum = pgEnum('education_level', ['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'High School']);
+export const employmentStatusEnum = pgEnum('employment_status', ['Employed', 'Business Owner', 'Freelancer', 'Not Working']);
+export const companySectorEnum = pgEnum('company_sector', ['Private', 'Govt', 'MNC', 'Startup', 'Business']);
+export const photoPrivacyEnum = pgEnum('photo_privacy', ['blurred', 'accepted', 'visible']);
+
+export const profiles = pgTable('profiles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull().unique(),
+
+  // Profile Ownership & Basic Identity
+  profileFor: varchar('profile_for', { length: 20 }).notNull(), // Myself, Son, Daughter, Brother, Sister, Relative, Friend
+  fullName: varchar('full_name', { length: 100 }).notNull(),
+  gender: genderEnum('gender').notNull(),
+  dob: date('dob').notNull(),
+  maritalStatus: maritalStatusEnum('marital_status').notNull(),
+
+  // Conditional Children Fields (Triggered only if Divorced/Widowed)
+  hasChildren: boolean('has_children').default(false),
+  childrenCount: integer('children_count').default(0),
+  childrenLivingWithMe: boolean('children_living_with_me'), // true = Yes, false = No
+
+  // Physical Attributes & Bio
+  heightCm: integer('height_cm').notNull(), // From scrollable wheel / visual slider
+  aboutMe: text('about_me'), // Generated via Bio Builder prompts and editable
+
+  // Location
+  city: varchar('city', { length: 100 }).notNull(),
+  state: varchar('state', { length: 100 }).notNull(),
+  country: varchar('country', { length: 100 }).default('India').notNull(),
+
+  // Community & Background
+  religion: varchar('religion', { length: 50 }).notNull(),
+  caste: varchar('caste', { length: 100 }).notNull(),
+  subcaste: varchar('subcaste', { length: 100 }),
+  gotra: varchar('gotra', { length: 100 }),
+  motherTongue: varchar('mother_tongue', { length: 50 }).notNull(),
+
+  // Education & Career Details
+  educationLevel: educationLevelEnum('education_level').notNull(), // Bachelors, Masters, etc.
+  degree: varchar('degree', { length: 150 }).notNull(), // e.g. B.Tech Computer Science
+  collegeName: varchar('college_name', { length: 200 }), // Predictive autocomplete
+  employmentStatus: employmentStatusEnum('employment_status').notNull(), // Employed, Business Owner, etc.
+  profession: varchar('profession', { length: 150 }).notNull(), // Job title from autocomplete
+  companyName: varchar('company_name', { length: 150 }),
+  companySector: companySectorEnum('company_sector'), // Private, Govt, MNC, Startup
+  annualIncome: varchar('annual_income', { length: 50 }).notNull(), // Income bracket dropdown
+
+  // Privacy Settings
+  photoPrivacy: photoPrivacyEnum('photo_privacy').default('blurred').notNull(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  searchIdx: index('profiles_search_idx').on(table.gender, table.religion, table.caste, table.city),
+  dobIdx: index('profiles_dob_idx').on(table.dob),
+}));
+
+export type Profile = typeof profiles.$inferSelect;
+export type NewProfile = typeof profiles.$inferInsert;
