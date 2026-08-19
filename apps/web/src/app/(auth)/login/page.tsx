@@ -13,12 +13,15 @@ import { Label } from "@/components/ui/label"
 import Image from "next/image"
 import { IMAGES } from "@/lib/images"
 import { loginOtpSchema, loginPhoneSchema, type LoginOtpValues, type LoginPhoneValues } from "@/lib/validation"
-import { ArrowLeft, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react"
+import { apiClient } from "@/lib/api-client"
 
 export default function LoginPage() {
   const router = useRouter()
   const [otpSent, setOtpSent] = React.useState(false)
   const [seconds, setSeconds] = React.useState(30)
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState("")
 
   const phoneForm = useForm<LoginPhoneValues>({
     resolver: zodResolver(loginPhoneSchema),
@@ -38,6 +41,51 @@ export default function LoginPage() {
     const id = window.setInterval(() => setSeconds((s) => s - 1), 1000)
     return () => window.clearInterval(id)
   }, [otpSent, seconds])
+
+  const handleSendOtp = async (values: LoginPhoneValues) => {
+    setError("")
+    setLoading(true)
+    try {
+      await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true })
+      setOtpSent(true)
+      setSeconds(30)
+      otpForm.reset({ otp: "" })
+    } catch (err: any) {
+      setError(err.message || "Failed to send OTP. Please check the mobile number.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async (values: LoginOtpValues) => {
+    setError("")
+    setLoading(true)
+    try {
+      const auth = await apiClient.auth.verifyOtp({ phone: phoneForm.getValues("phone"), otp: values.otp })
+      if (auth.accessToken) {
+        apiClient.setToken(auth.accessToken)
+      }
+      if (auth.hasProfile) {
+        router.push("/home")
+      } else {
+        router.push("/register")
+      }
+    } catch (err: any) {
+      setError(err.message || "Invalid OTP. Please check and try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    setError("")
+    try {
+      await apiClient.auth.sendOtp({ phone: phoneForm.getValues("phone"), consentAccepted: true })
+      setSeconds(30)
+    } catch (err: any) {
+      setError(err.message || "Failed to resend OTP.")
+    }
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -83,11 +131,7 @@ export default function LoginPage() {
               >
                 <form
                   className="space-y-7"
-                  onSubmit={phoneForm.handleSubmit(() => {
-                    setOtpSent(true)
-                    setSeconds(30)
-                    otpForm.reset({ otp: "" })
-                  })}
+                  onSubmit={phoneForm.handleSubmit(handleSendOtp)}
                 >
                   <div className="space-y-2 text-center md:text-left">
                     <h2 className="font-serif text-3xl font-bold">Login</h2>
@@ -118,9 +162,18 @@ export default function LoginPage() {
                       {phoneForm.formState.errors.phone && (
                         <p className="text-xs text-destructive">{phoneForm.formState.errors.phone.message}</p>
                       )}
+                      {error && (
+                        <p className="text-xs text-destructive">{error}</p>
+                      )}
                     </div>
-                    <Button className="w-full h-12 text-lg rounded-full" type="submit">
-                      Send OTP
+                    <Button className="w-full h-12 text-lg rounded-full" type="submit" disabled={loading}>
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Sending OTP…
+                        </>
+                      ) : (
+                        "Send OTP"
+                      )}
                     </Button>
                   </div>
                   <p className="text-center text-sm text-muted-foreground">
@@ -136,9 +189,9 @@ export default function LoginPage() {
                 key="otp"
                 initial={{ opacity: 0, x: 12 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
+                exit={{ opacity: 0, x: 12 }}
               >
-                <form className="space-y-7" onSubmit={otpForm.handleSubmit(() => router.push("/home"))}>
+                <form className="space-y-7" onSubmit={otpForm.handleSubmit(handleVerifyOtp)}>
                   <div className="space-y-2 text-center md:text-left">
                     <h2 className="font-serif text-2xl font-bold">Verify OTP</h2>
                     <p className="text-sm text-muted-foreground">Enter the 6-digit code sent to +91 {phone}</p>
@@ -160,22 +213,34 @@ export default function LoginPage() {
                   {otpForm.formState.errors.otp && (
                     <p className="text-xs text-destructive">{otpForm.formState.errors.otp.message}</p>
                   )}
-                  <Button className="w-full" size="lg" type="submit">
-                    Login
+                  {error && (
+                    <p className="text-xs text-destructive">{error}</p>
+                  )}
+                  <Button className="w-full" size="lg" type="submit" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Logging in…
+                      </>
+                    ) : (
+                      "Login"
+                    )}
                   </Button>
                   <div className="flex items-center justify-between text-sm">
                     <button
                       type="button"
                       className="text-muted-foreground underline-offset-4 hover:underline"
-                      onClick={() => setOtpSent(false)}
+                      onClick={() => {
+                        setError("")
+                        setOtpSent(false)
+                      }}
                     >
                       Change number
                     </button>
                     <button
                       type="button"
-                      disabled={seconds > 0}
+                      disabled={seconds > 0 || loading}
                       className="font-medium text-primary disabled:text-muted-foreground"
-                      onClick={() => setSeconds(30)}
+                      onClick={handleResend}
                     >
                       {seconds > 0 ? `Resend in ${seconds}s` : "Resend OTP"}
                     </button>

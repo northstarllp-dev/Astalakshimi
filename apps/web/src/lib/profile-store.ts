@@ -188,7 +188,22 @@ export function getPrefix(profileFor: string) {
 
 export function saveProfile(data: SignupData) {
   if (typeof window === "undefined") return
-  sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(data))
+  try {
+    sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(data))
+  } catch (err) {
+    console.warn("Storage quota limit reached, saving sanitized lightweight profile:", err)
+    try {
+      const lightweight = {
+        ...data,
+        photos: data.photos.map((p) => p.startsWith("data:") ? "" : p),
+        selfiePhoto: data.selfiePhoto?.startsWith("data:") ? "" : data.selfiePhoto,
+        govtIdPhoto: data.govtIdPhoto?.startsWith("data:") ? "" : data.govtIdPhoto,
+      }
+      sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(lightweight))
+    } catch {
+      // Non-critical cache fallback
+    }
+  }
 }
 
 export function loadProfile(): SignupData | null {

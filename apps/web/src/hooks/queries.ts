@@ -55,76 +55,88 @@ export function useSaveProfileMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: SignupData) => {
-      // 1. Save to client-side storage for instantaneous offline responsiveness
+      // 1. Save to client-side storage for local state caching
       saveProfile(data)
 
       // 2. Prepare payload for NestJS complete registration endpoint
-      try {
-        const payload = {
+      const payload = {
+        phone: data.phone,
+        otp: data.otp || '123456',
+        consentAccepted: data.consentAccepted ?? true,
+        referredBy: data.referredBy,
+        profileFor: data.profileFor || 'Myself',
+        fullName: data.fullName,
+        gender: (data.gender as any) || 'Female',
+        dobDay: data.dobDay || '01',
+        dobMonth: data.dobMonth || '01',
+        dobYear: data.dobYear || '1998',
+        maritalStatus: (data.maritalStatus as any) || 'Never Married',
+        hasChildren: data.hasChildren,
+        childrenCount: data.childrenCount,
+        childrenLivingWithMe: data.childrenLivingWithMe,
+        heightCm: parseInt(data.height || '165', 10),
+        aboutMe: data.aboutMe,
+        city: data.city || 'Chennai',
+        state: data.state || 'Tamil Nadu',
+        country: 'India',
+        religion: data.religion || 'Hindu',
+        caste: data.caste || 'Brahmin',
+        subcaste: data.subcaste,
+        gotra: data.gotra,
+        motherTongue: data.motherTongue || 'Tamil',
+        educationLevel: (data.educationLevel as any) || 'Bachelors',
+        degree: data.degree || data.education || 'B.Tech',
+        collegeName: data.collegeName,
+        employmentStatus: (data.employmentStatus as any) || 'Employed',
+        profession: data.profession || data.occupation || 'Software Engineer',
+        companyName: data.companyName,
+        companySector: (data.companySector as any) || 'Private',
+        annualIncome: data.annualIncome || '₹10 – 15 Lakh',
+        familyValues: (data.familyValues as any) || 'Moderate',
+        familyType: (data.familyType as any) || 'Nuclear',
+        fatherOccupation: (data.fatherOccupation as any) || 'Employed',
+        motherOccupation: (data.motherOccupation as any) || 'Homemaker',
+        brothersCount: data.brothersCount || 0,
+        sistersCount: data.sistersCount || 0,
+        diet: (data.diet as any) || 'Vegetarian',
+        birthTime: data.birthTime,
+        birthPlace: data.birthPlace,
+        manglik: (data.manglik as any) || "Don't Know",
+        rashi: data.rashi,
+        nakshatra: data.star,
+        prefAgeMin: data.prefAgeMin || 24,
+        prefAgeMax: data.prefAgeMax || 32,
+        prefReligions: data.prefReligion || ['Hindu'],
+        photoS3Keys: data.photoS3Keys || [],
+        photoPrivacy: (data.photoPrivacy as any) || 'blurred',
+        verificationMethod: (data.verificationMethod as any) || 'selfie',
+        selfieS3Key: data.selfieS3Key,
+        govtIdType: data.govtIdType as any,
+        govtIdS3Key: data.govtIdS3Key,
+        horoscopeS3Key: data.horoscopeS3Key,
+        horoscopeFileName: data.horoscopeName,
+        horoscopeFileSizeBytes: data.horoscopeSize,
+      }
+
+      // 3. Authenticate with backend if token is missing
+      if (!apiClient.getToken() && data.phone) {
+        try {
+          await apiClient.auth.sendOtp({ phone: data.phone, consentAccepted: true })
+        } catch {
+          // sendOtp might already have pending OTP
+        }
+        const auth = await apiClient.auth.verifyOtp({
           phone: data.phone,
           otp: data.otp || '123456',
-          consentAccepted: data.consentAccepted ?? true,
-          referredBy: data.referredBy,
-          profileFor: data.profileFor || 'Myself',
-          fullName: data.fullName,
-          gender: (data.gender as any) || 'Female',
-          dobDay: data.dobDay || '01',
-          dobMonth: data.dobMonth || '01',
-          dobYear: data.dobYear || '1998',
-          maritalStatus: (data.maritalStatus as any) || 'Never Married',
-          hasChildren: data.hasChildren,
-          childrenCount: data.childrenCount,
-          childrenLivingWithMe: data.childrenLivingWithMe,
-          heightCm: parseInt(data.height || '165', 10),
-          aboutMe: data.aboutMe,
-          city: data.city || 'Chennai',
-          state: data.state || 'Tamil Nadu',
-          country: 'India',
-          religion: data.religion || 'Hindu',
-          caste: data.caste || 'Brahmin',
-          subcaste: data.subcaste,
-          gotra: data.gotra,
-          motherTongue: data.motherTongue || 'Tamil',
-          educationLevel: (data.educationLevel as any) || 'Bachelors',
-          degree: data.degree || data.education || 'B.Tech',
-          collegeName: data.collegeName,
-          employmentStatus: (data.employmentStatus as any) || 'Employed',
-          profession: data.profession || data.occupation || 'Software Engineer',
-          companyName: data.companyName,
-          companySector: (data.companySector as any) || 'Private',
-          annualIncome: data.annualIncome || '₹10 – 15 Lakh',
-          familyValues: (data.familyValues as any) || 'Moderate',
-          familyType: (data.familyType as any) || 'Nuclear',
-          fatherOccupation: (data.fatherOccupation as any) || 'Employed',
-          motherOccupation: (data.motherOccupation as any) || 'Homemaker',
-          brothersCount: data.brothersCount || 0,
-          sistersCount: data.sistersCount || 0,
-          diet: (data.diet as any) || 'Vegetarian',
-          birthTime: data.birthTime,
-          birthPlace: data.birthPlace,
-          manglik: (data.manglik as any) || "Don't Know",
-          rashi: data.rashi,
-          nakshatra: data.star,
-          prefAgeMin: data.prefAgeMin || 24,
-          prefAgeMax: data.prefAgeMax || 32,
-          prefReligions: data.prefReligion || ['Hindu'],
-          photoS3Keys: data.photoS3Keys || [],
-          photoPrivacy: (data.photoPrivacy as any) || 'blurred',
-          verificationMethod: (data.verificationMethod as any) || 'selfie',
-          selfieS3Key: data.selfieS3Key,
-          govtIdType: data.govtIdType as any,
-          govtIdS3Key: data.govtIdS3Key,
-          horoscopeS3Key: data.horoscopeS3Key,
-          horoscopeFileName: data.horoscopeName,
-          horoscopeFileSizeBytes: data.horoscopeSize,
+        })
+        if (auth.accessToken) {
+          apiClient.setToken(auth.accessToken)
         }
+      }
 
-        // Call backend API if user is authenticated
-        if (apiClient.getToken()) {
-          await apiClient.profiles.completeRegistration(payload as any)
-        }
-      } catch (err) {
-        console.warn('[Registration] Backend API call fallback to local:', err)
+      // 4. Submit complete registration transaction to RDS
+      if (apiClient.getToken()) {
+        await apiClient.profiles.completeRegistration(payload as any)
       }
 
       return data

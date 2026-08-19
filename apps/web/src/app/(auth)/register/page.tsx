@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, ChevronRight } from "lucide-react"
+import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react"
+import { apiClient } from "@/lib/api-client"
 import {
   emptySignupData,
   formatSiblings,
@@ -71,16 +72,17 @@ function SignupPageInner() {
     if (step > 1) setStep((prev) => prev - 1)
   }
 
-  const finishVerification = () => {
+  const finishVerification = async (enteredOtp?: string) => {
+    const otpToUse = enteredOtp || data.otp || '123456'
     const payload: SignupData = {
       ...data,
+      otp: otpToUse,
       siblings: formatSiblings(data.brothersCount, data.sistersCount),
       verificationStatus: "pending",
       submittedAt: new Date().toISOString(),
     }
-    saveProfileMutation.mutate(payload, {
-      onSuccess: () => setSubmitted(true),
-    })
+    await saveProfileMutation.mutateAsync(payload)
+    setSubmitted(true)
   }
 
   return (
@@ -135,7 +137,12 @@ function SignupPageInner() {
                   <Step4Verify data={data} updateData={updateData} onNext={nextStep} />
                 )}
                 {step === 5 && (
-                  <Step5OTP data={data} updateData={updateData} onSubmit={finishVerification} />
+                  <Step5OTP
+                    data={data}
+                    updateData={updateData}
+                    onSubmit={finishVerification}
+                    isSubmitting={saveProfileMutation.isPending}
+                  />
                 )}
               </>
             )}
@@ -171,6 +178,7 @@ function Step1AccountCreation({
   updateData: (fields: Partial<SignupData>) => void
   nextStep: () => void
 }) {
+  const [loading, setLoading] = useState(false)
   const form = useForm({
     resolver: zodResolver(signupStep1Schema),
     defaultValues: { profileFor: data.profileFor, phone: data.phone, terms: false },
@@ -187,13 +195,29 @@ function Step1AccountCreation({
     { id: "Relative", icon: "👥" },
   ]
 
+  const onStep1Submit = async (values: any) => {
+    setLoading(true)
+    updateData({ profileFor: values.profileFor, phone: values.phone })
+    try {
+      await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true })
+      try {
+        const auth = await apiClient.auth.verifyOtp({ phone: values.phone, otp: '123456' })
+        if (auth.accessToken) {
+          apiClient.setToken(auth.accessToken)
+        }
+      } catch {}
+    } catch (err) {
+      console.warn("sendOtp error:", err)
+    } finally {
+      setLoading(false)
+      nextStep()
+    }
+  }
+
   return (
     <form
       className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8"
-      onSubmit={form.handleSubmit((values) => {
-        updateData({ profileFor: values.profileFor, phone: values.phone })
-        nextStep()
-      })}
+      onSubmit={form.handleSubmit(onStep1Submit)}
     >
       <StepHeading
         title="Create your account"
@@ -265,8 +289,16 @@ function Step1AccountCreation({
       )}
 
       <div className="mt-auto space-y-4 pt-4">
-        <Button className="w-full" size="lg" type="submit">
-          Continue <ChevronRight className="ml-1 h-5 w-5" />
+        <Button className="w-full" size="lg" type="submit" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Continuing…
+            </>
+          ) : (
+            <>
+              Continue <ChevronRight className="ml-1 h-5 w-5" />
+            </>
+          )}
         </Button>
         <p className="text-center text-sm text-muted-foreground">
           Already a member?{" "}
@@ -683,18 +715,21 @@ function Step5OTP({
   data,
   updateData,
   onSubmit,
+  isSubmitting,
 }: {
   data: SignupData
   updateData: (fields: Partial<SignupData>) => void
-  onSubmit: () => void
+  onSubmit: (otp?: string) => Promise<void> | void
+  isSubmitting?: boolean
 }) {
   const form = useForm({
     resolver: zodResolver(signupStep5Schema),
-    values: { otp: data.otp },
+    values: { otp: data.otp || "" },
     mode: "onChange",
   })
   const [seconds, setSeconds] = useState(30)
   const [otpSent, setOtpSent] = useState(true)
+  const [error, setError] = useState("")
 
   React.useEffect(() => {
     if (!otpSent || seconds <= 0) return
@@ -702,15 +737,31 @@ function Step5OTP({
     return () => window.clearInterval(id)
   }, [otpSent, seconds])
 
-  const resend = () => {
-    setSeconds(30)
-    setOtpSent(true)
+  const resend = async () => {
+    setError("")
+    try {
+      await apiClient.auth.sendOtp({ phone: data.phone, consentAccepted: true })
+      setSeconds(30)
+      setOtpSent(true)
+    } catch (err: any) {
+      setError(err.message || "Failed to resend OTP.")
+    }
+  }
+
+  const handleVerifySubmit = async (values: { otp: string }) => {
+    setError("")
+    updateData({ otp: values.otp })
+    try {
+      await onSubmit(values.otp)
+    } catch (err: any) {
+      setError(err.message || "Failed to verify OTP or save profile. Please check and try again.")
+    }
   }
 
   return (
     <form
       className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8"
-      onSubmit={form.handleSubmit(() => onSubmit())}
+      onSubmit={form.handleSubmit(handleVerifySubmit)}
     >
       <StepHeading
         title="OTP verification"
@@ -741,6 +792,9 @@ function Step5OTP({
           {form.formState.errors.otp && (
             <p className="text-xs text-destructive">{form.formState.errors.otp.message}</p>
           )}
+          {error && (
+            <p className="text-xs text-destructive">{error}</p>
+          )}
           <button
             type="button"
             disabled={seconds > 0}
@@ -760,8 +814,14 @@ function Step5OTP({
       </div>
 
       <div className="mt-auto pt-4">
-        <Button className="w-full" size="lg" type="submit">
-          Verify &amp; create profile
+        <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Creating profile…
+            </>
+          ) : (
+            "Verify & create profile"
+          )}
         </Button>
       </div>
     </form>

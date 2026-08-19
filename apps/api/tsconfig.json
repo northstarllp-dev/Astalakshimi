@@ -18,7 +18,10 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@astalakshimi/database": ["../../packages/database/dist/index"],
+      "@astalakshimi/types": ["../../packages/types/dist/index"],
+      "@astalakshimi/validation": ["../../packages/validation/dist/index"]
     }
   },
   "include": ["src/**/*"],
