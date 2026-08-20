@@ -231,23 +231,28 @@ export class ProfilesService {
       }
 
       // 8. Upsert Verification
+      const method = payload.verificationMethod || 'selfie';
+      const selfieS3Key = payload.selfieS3Key && payload.selfieS3Key.trim() !== '' ? payload.selfieS3Key : null;
+      const govtIdType = payload.govtIdType && payload.govtIdType.trim() !== '' ? (payload.govtIdType as any) : null;
+      const govtIdS3Key = payload.govtIdS3Key && payload.govtIdS3Key.trim() !== '' ? payload.govtIdS3Key : null;
+
       await tx
         .insert(verifications)
         .values({
           profileId,
-          method: payload.verificationMethod,
-          selfieS3Key: payload.selfieS3Key ?? null,
-          govtIdType: payload.govtIdType ?? null,
-          govtIdS3Key: payload.govtIdS3Key ?? null,
+          method,
+          selfieS3Key,
+          govtIdType,
+          govtIdS3Key,
           status: 'pending',
         })
         .onConflictDoUpdate({
           target: verifications.profileId,
           set: {
-            method: payload.verificationMethod,
-            selfieS3Key: payload.selfieS3Key ?? null,
-            govtIdType: payload.govtIdType ?? null,
-            govtIdS3Key: payload.govtIdS3Key ?? null,
+            method,
+            selfieS3Key,
+            govtIdType,
+            govtIdS3Key,
             status: 'pending',
             updatedAt: new Date(),
           },

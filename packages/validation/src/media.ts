@@ -53,9 +53,9 @@ export const confirmPhotoSchema = z.object({
 
 export const confirmVerificationSchema = z.object({
   method: z.enum(['selfie', 'govt_id']),
-  selfieS3Key: z.string().optional(),
-  govtIdType: z.enum(['Aadhaar', 'PAN card', 'Passport', 'Driving licence', 'Voter ID']).optional(),
-  govtIdS3Key: z.string().optional(),
+  selfieS3Key: z.string().optional().nullable().or(z.literal('')),
+  govtIdType: z.enum(['Aadhaar', 'PAN card', 'Passport', 'Driving licence', 'Voter ID']).optional().nullable().or(z.literal('')),
+  govtIdS3Key: z.string().optional().nullable().or(z.literal('')),
 });
 
 export const confirmHoroscopeSchema = z.object({

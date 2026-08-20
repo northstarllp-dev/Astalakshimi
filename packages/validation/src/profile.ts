@@ -117,15 +117,15 @@ export const step6VerificationSchema = z
     photoS3Keys: z.array(z.string()).min(1, 'At least 1 profile photo is required').max(6, 'Maximum 6 photos allowed'),
     photoPrivacy: photoPrivacySchema.default('blurred'),
     verificationMethod: z.enum(['selfie', 'govt_id']),
-    selfieS3Key: z.string().optional(),
-    govtIdType: govtIdTypeSchema.optional(),
-    govtIdS3Key: z.string().optional(),
-    horoscopeS3Key: z.string().optional(),
-    horoscopeFileName: z.string().optional(),
-    horoscopeFileSizeBytes: z.number().optional(),
+    selfieS3Key: z.string().optional().nullable().or(z.literal('')),
+    govtIdType: govtIdTypeSchema.optional().nullable().or(z.literal('')),
+    govtIdS3Key: z.string().optional().nullable().or(z.literal('')),
+    horoscopeS3Key: z.string().optional().nullable().or(z.literal('')),
+    horoscopeFileName: z.string().optional().nullable().or(z.literal('')),
+    horoscopeFileSizeBytes: z.number().optional().nullable(),
   })
   .superRefine((data, ctx) => {
-    if (data.verificationMethod === 'selfie' && !data.selfieS3Key) {
+    if (data.verificationMethod === 'selfie' && (!data.selfieS3Key || data.selfieS3Key.trim() === '')) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['selfieS3Key'],
@@ -133,14 +133,14 @@ export const step6VerificationSchema = z
       });
     }
     if (data.verificationMethod === 'govt_id') {
-      if (!data.govtIdType) {
+      if (!data.govtIdType || data.govtIdType.trim() === '') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['govtIdType'],
           message: 'Government ID type is required',
         });
       }
-      if (!data.govtIdS3Key) {
+      if (!data.govtIdS3Key || data.govtIdS3Key.trim() === '') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['govtIdS3Key'],

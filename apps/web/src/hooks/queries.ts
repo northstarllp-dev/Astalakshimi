@@ -110,12 +110,21 @@ export function useSaveProfileMutation() {
         photoS3Keys: data.photoS3Keys || [],
         photoPrivacy: (data.photoPrivacy as any) || 'blurred',
         verificationMethod: (data.verificationMethod as any) || 'selfie',
-        selfieS3Key: data.selfieS3Key,
-        govtIdType: data.govtIdType as any,
-        govtIdS3Key: data.govtIdS3Key,
-        horoscopeS3Key: data.horoscopeS3Key,
-        horoscopeFileName: data.horoscopeName,
-        horoscopeFileSizeBytes: data.horoscopeSize,
+        selfieS3Key:
+          data.verificationMethod === 'selfie'
+            ? data.selfieS3Key || (data.selfiePhoto ? `verifications/${Date.now()}_selfie.jpg` : undefined)
+            : undefined,
+        govtIdType:
+          data.verificationMethod === 'govt_id' && data.govtIdType && data.govtIdType.trim() !== ''
+            ? (data.govtIdType as any)
+            : undefined,
+        govtIdS3Key:
+          data.verificationMethod === 'govt_id'
+            ? data.govtIdS3Key || (data.govtIdPhoto ? `verifications/${Date.now()}_govt_id.jpg` : undefined)
+            : undefined,
+        horoscopeS3Key: data.horoscopeS3Key || undefined,
+        horoscopeFileName: data.horoscopeName || undefined,
+        horoscopeFileSizeBytes: data.horoscopeSize || undefined,
       }
 
       // 3. Authenticate with backend if token is missing
