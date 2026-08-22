@@ -1,15 +1,14 @@
 "use client"
 
-import * as React from "react"
-import Link from "next/link"
+import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
-import { RequireFullPortal } from "@/components/layout/require-full-portal"
-import { MATCHES, type MatchProfile } from "@/lib/matches"
-import { sendInterest } from "@/lib/user-activity"
-import { useMatchesQuery, useSkipMatchMutation, useSkippedQuery } from "@/hooks/queries"
+import * as React from "react"
+import Link from "next/link"
+import { useMatchesQuery, useSkipMatchMutation, useSkippedQuery, useSendInterestMutation } from "@/hooks/queries"
 import { searchFiltersSchema, type SearchFiltersValues } from "@/lib/validation"
 import { Filter, SlidersHorizontal, X } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -29,8 +28,8 @@ const emptyFilters = (): Filters => ({
   hasHoroscope: false,
 })
 
-function applyFilters(matches: MatchProfile[], f: Filters, skipped: string[]) {
-  return matches.filter((m) => {
+function applyFilters(matches: any[], f: Filters, skipped: string[]) {
+  return matches.filter((m: any) => {
     if (skipped.includes(m.id)) return false
     if (m.age < f.ageMin || m.age > f.ageMax) return false
     if (f.photoVerified && !m.photoVerified) return false
@@ -57,9 +56,10 @@ export default function SearchPage() {
 }
 
 function SearchPageInner() {
-  const { data: matches = MATCHES } = useMatchesQuery()
+  const { data: matches = ([] as any[]) } = useMatchesQuery()
   const { data: skipped = [] } = useSkippedQuery()
   const skipMutation = useSkipMatchMutation()
+  const connectMutation = useSendInterestMutation()
   const [filters, setFilters] = React.useState<Filters>(emptyFilters)
   const [draft, setDraft] = React.useState<Filters>(emptyFilters)
   const [open, setOpen] = React.useState(false)
@@ -103,20 +103,20 @@ function SearchPageInner() {
         <input
           type="search"
           value={filters.q}
-          onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
+          onChange={(e: any) => setFilters((f) => ({ ...f, q: e.target.value }))}
           placeholder="City, community, profession…"
           className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
         />
       </label>
 
       <div className="space-y-3">
-        {results.map((match, index) => (
+        {results.map((match: any, index: any) => (
           <MatchListCard
             key={match.id}
             match={match}
             priority={index === 0}
-            onSkip={(id) => skipMutation.mutate(id)}
-            onConnect={(id) => sendInterest(id)}
+            onSkip={(id: any) => skipMutation.mutate(id)}
+            onConnect={(id: any) => connectMutation.mutate(id)}
           />
         ))}
         {results.length === 0 && (
@@ -143,36 +143,36 @@ function SearchPageInner() {
 
             <div className="space-y-4">
               <Field label="City">
-                <Input value={draft.city} onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))} />
+                <Input value={draft.city} onChange={(e: any) => setDraft((d) => ({ ...d, city: e.target.value }))} />
               </Field>
               <Field label="Community">
-                <Input value={draft.community} onChange={(e) => setDraft((d) => ({ ...d, community: e.target.value }))} />
+                <Input value={draft.community} onChange={(e: any) => setDraft((d) => ({ ...d, community: e.target.value }))} />
               </Field>
               <Field label="Mother tongue">
                 <Input
                   value={draft.motherTongue}
-                  onChange={(e) => setDraft((d) => ({ ...d, motherTongue: e.target.value }))}
+                  onChange={(e: any) => setDraft((d) => ({ ...d, motherTongue: e.target.value }))}
                 />
               </Field>
               <Field label="Education">
-                <Input value={draft.education} onChange={(e) => setDraft((d) => ({ ...d, education: e.target.value }))} />
+                <Input value={draft.education} onChange={(e: any) => setDraft((d) => ({ ...d, education: e.target.value }))} />
               </Field>
               <Field label="Income contains">
-                <Input value={draft.income} onChange={(e) => setDraft((d) => ({ ...d, income: e.target.value }))} />
+                <Input value={draft.income} onChange={(e: any) => setDraft((d) => ({ ...d, income: e.target.value }))} />
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Min age">
                   <Input
                     type="number"
                     value={draft.ageMin}
-                    onChange={(e) => setDraft((d) => ({ ...d, ageMin: Number(e.target.value) || 18 }))}
+                    onChange={(e: any) => setDraft((d) => ({ ...d, ageMin: Number(e.target.value) || 18 }))}
                   />
                 </Field>
                 <Field label="Max age">
                   <Input
                     type="number"
                     value={draft.ageMax}
-                    onChange={(e) => setDraft((d) => ({ ...d, ageMax: Number(e.target.value) || 50 }))}
+                    onChange={(e: any) => setDraft((d) => ({ ...d, ageMax: Number(e.target.value) || 50 }))}
                   />
                 </Field>
               </div>

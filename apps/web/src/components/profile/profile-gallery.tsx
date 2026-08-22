@@ -3,7 +3,7 @@
 import * as React from "react"
 import Image from "next/image"
 import { BadgeCheck, ChevronLeft, ChevronRight, FileText, MapPin, ShieldCheck, X } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, getMediaUrl } from "@/lib/utils"
 
 type ProfileGalleryProps = {
   name: string
@@ -15,6 +15,7 @@ type ProfileGalleryProps = {
   photoVerified?: boolean
   verified?: boolean
   hasHoroscope?: boolean
+  blurPhoto?: boolean
 }
 
 type BadgeKey = "photo" | "screened" | "horoscope"
@@ -44,6 +45,7 @@ export function ProfileGallery({
   photoVerified,
   verified,
   hasHoroscope,
+  blurPhoto,
 }: ProfileGalleryProps) {
   const [activeIndex, setActiveIndex] = React.useState(0)
   const [lightboxOpen, setLightboxOpen] = React.useState(false)
@@ -88,11 +90,14 @@ export function ProfileGallery({
       <div className="flex h-full flex-col">
         <div className="group relative h-full min-h-0 w-full overflow-hidden bg-muted">
           <Image
-            src={hero}
+            src={getMediaUrl(hero)}
             alt={`${name}, ${age}`}
             fill
             priority
-            className="object-cover object-[center_12%] transition-transform duration-300 group-hover:scale-[1.02]"
+            className={cn(
+              "object-cover object-[center_12%] transition-transform duration-300 group-hover:scale-[1.02]",
+              blurPhoto ? "blur-xl scale-110" : ""
+            )}
             sizes="(max-width: 1024px) 90vw, 40vw"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/15" />
@@ -198,11 +203,12 @@ export function ProfileGallery({
                       }}
                       className={cn(
                         "relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border-2 transition-all sm:h-12 sm:w-12 md:h-14 md:w-14",
-                        activeIndex === i + 1 ? "border-secondary" : "border-white/40 hover:border-white"
+                        activeIndex === i + 1 ? "border-secondary" : "border-white/40 hover:border-white",
+                        blurPhoto ? "blur-md" : ""
                       )}
                       aria-label={`Open photo ${i + 2}`}
                     >
-                      <Image src={photo} alt="" fill className="object-cover" sizes="56px" />
+                      <Image src={getMediaUrl(photo)} alt="" fill className="object-cover" sizes="56px" />
                     </button>
                   ))}
                 </div>
@@ -288,10 +294,10 @@ export function ProfileGallery({
 
           <div className="relative h-full w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
             <Image
-              src={photos[activeIndex]}
+              src={getMediaUrl(photos[activeIndex])}
               alt={`${name} photo ${activeIndex + 1}`}
               fill
-              className="object-contain"
+              className={cn("object-contain", blurPhoto ? "blur-2xl scale-105" : "")}
               sizes="100vw"
             />
           </div>

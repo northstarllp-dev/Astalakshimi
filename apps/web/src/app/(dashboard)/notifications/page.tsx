@@ -1,15 +1,9 @@
 "use client"
 
-import * as React from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import {
-  resolveNotificationHref,
-  type NotificationCategory,
-  type NotificationItem,
-  type NotificationKind,
-} from "@/lib/user-activity"
+import * as React from "react"
+import Link from "next/link"
 import { useNotificationMutations, useNotificationsQuery, usePaidQuery } from "@/hooks/queries"
 import { cn } from "@/lib/utils"
 import {
@@ -49,6 +43,12 @@ const kindIcon: Record<NotificationKind, React.ComponentType<{ className?: strin
   verification_reminder: ShieldCheck,
 }
 
+
+type NotificationCategory = any;
+type NotificationKind = any;
+type NotificationItem = any;
+const resolveNotificationHref = (item: any, paid?: boolean) => item?.href || '#';
+
 export default function NotificationsPage() {
   const router = useRouter()
   const { data: items = [] } = useNotificationsQuery()
@@ -58,17 +58,25 @@ export default function NotificationsPage() {
   const [confirmClear, setConfirmClear] = React.useState(false)
 
   const visible = React.useMemo(() => {
-    const list = filter === "all" ? items : items.filter((n) => n.category === filter)
+    const list = filter === "all" ? items : items.filter((n: any) => n?.category === filter)
     return [...list].sort((a, b) => b.createdAt - a.createdAt)
   }, [items, filter])
 
-  const unreadCount = items.filter((n) => n.unread).length
+  const unreadCount = items.filter((n: any) => n?.unread).length
+
+  // Automatically mark notifications as read when viewed on page
+  React.useEffect(() => {
+    if (unreadCount > 0) {
+      markAllRead.mutate()
+    }
+  }, [unreadCount])
 
   const openItem = (item: NotificationItem) => {
     const href = resolveNotificationHref(item, paid)
     markRead.mutate(item.id)
     router.push(href)
   }
+
 
   return (
     <main className="mx-auto max-w-3xl space-y-4 px-3 py-5 sm:px-4 md:py-8">
@@ -125,7 +133,7 @@ export default function NotificationsPage() {
       </div>
 
       <ul className="space-y-2">
-        {visible.map((item) => {
+        {visible.map((item: any) => {
           const Icon = kindIcon[item.kind]
           const locked = Boolean(item.paidOnly) && !paid
           const displayTitle = locked

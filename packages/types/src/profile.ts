@@ -101,6 +101,7 @@ export interface FullProfileView {
     displayOrder: number;
   }[];
   verificationStatus: 'idle' | 'pending' | 'verified' | 'rejected';
+  blurPhoto?: boolean;
 }
 
 // Complete registration submission payload (Steps 1–6)

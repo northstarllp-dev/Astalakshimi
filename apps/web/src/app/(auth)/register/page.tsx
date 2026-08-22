@@ -74,6 +74,17 @@ function SignupPageInner() {
 
   const finishVerification = async (enteredOtp?: string) => {
     const otpToUse = enteredOtp || data.otp || '123456'
+    
+    // First verify OTP and get token
+    try {
+      const auth = await apiClient.auth.verifyOtp({ phone: data.phone, otp: otpToUse })
+      if (auth.accessToken) {
+        apiClient.setToken(auth.accessToken)
+      }
+    } catch (err: any) {
+      throw new Error(err.message || "Invalid OTP. Please check and try again.")
+    }
+
     const payload: SignupData = {
       ...data,
       otp: otpToUse,
@@ -200,12 +211,6 @@ function Step1AccountCreation({
     updateData({ profileFor: values.profileFor, phone: values.phone })
     try {
       await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true })
-      try {
-        const auth = await apiClient.auth.verifyOtp({ phone: values.phone, otp: '123456' })
-        if (auth.accessToken) {
-          apiClient.setToken(auth.accessToken)
-        }
-      } catch {}
     } catch (err) {
       console.warn("sendOtp error:", err)
     } finally {
@@ -645,7 +650,7 @@ function Step3Community({
                 <SelectValue placeholder="Select family status" />
               </SelectTrigger>
               <SelectContent>
-                {FAMILY_STATUS.map((s) => (
+                {FAMILY_STATUS.map((s: any) => (
                   <SelectItem key={s} value={s}>
                     {s}
                   </SelectItem>
@@ -668,7 +673,7 @@ function Step3Community({
                     <SelectValue placeholder="Brothers" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SIBLING_COUNTS.map((n) => (
+                    {SIBLING_COUNTS.map((n: any) => (
                       <SelectItem key={n} value={String(n)}>
                         {n === 5 ? "5+" : String(n)}
                       </SelectItem>
@@ -686,7 +691,7 @@ function Step3Community({
                     <SelectValue placeholder="Sisters" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SIBLING_COUNTS.map((n) => (
+                    {SIBLING_COUNTS.map((n: any) => (
                       <SelectItem key={n} value={String(n)}>
                         {n === 5 ? "5+" : String(n)}
                       </SelectItem>
@@ -733,9 +738,17 @@ function Step5OTP({
 
   React.useEffect(() => {
     if (!otpSent || seconds <= 0) return
-    const id = window.setInterval(() => setSeconds((s) => s - 1), 1000)
+    const id = window.setInterval(() => {
+      setSeconds((s: any) => {
+        if (s <= 1) {
+          window.clearInterval(id)
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
     return () => window.clearInterval(id)
-  }, [otpSent, seconds])
+  }, [otpSent])
 
   const resend = async () => {
     setError("")

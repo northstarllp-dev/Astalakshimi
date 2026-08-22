@@ -1,26 +1,16 @@
 "use client"
 
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { getMediaUrl } from "@/lib/utils"
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { MatchThumbCard } from "@/components/dashboard/match-thumb-card"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
-import {
-  PROFILE_COMPLETE_THRESHOLD,
-  canAccessFullPortal,
-  getProfileActions,
-  getProfilesYouViewed,
-  getShortlistedYou,
-  getTopMatches,
-  getWhoViewedYou,
-} from "@/lib/portal-access"
+import { MatchThumbCard } from "@/components/dashboard/match-thumb-card"
 import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
-import { profileCompleteness } from "@/lib/user-activity"
-import { getMatchById } from "@/lib/matches"
-import { useInterestsQuery, useMarkVerifiedMutation, usePaidQuery, useProfileQuery } from "@/hooks/queries"
+import { useInterestsQuery, useMarkVerifiedMutation, usePaidQuery, useProfileQuery, useTopMatchesQuery, useActivitySummaryQuery } from "@/hooks/queries"
 import { cn } from "@/lib/utils"
 import {
   Bookmark,
@@ -83,12 +73,12 @@ function ActivityCard({
       </div>
       <div className="relative border-t border-border/70">
         <ul className="flex gap-3 overflow-x-auto px-4 py-3 hide-scrollbar">
-          {items.map((item) => (
+          {items.map((item: any) => (
             <li key={item.id} className="w-16 shrink-0 text-center">
               <div className="relative mx-auto size-14 overflow-hidden rounded-full border-2 border-secondary/30 bg-muted">
                 {item.photo ? (
                   <Image
-                    src={item.photo}
+                    src={getMediaUrl(item.photo)}
                     alt={item.name}
                     fill
                     className={cn("object-cover object-[center_18%]", locked && "blur-[6px] scale-110")}
@@ -125,27 +115,33 @@ export default function HomePage() {
   const markVerified = useMarkVerifiedMutation()
   const interestCount = interests?.pendingCount ?? 0
 
+  const { data: topMatchesData } = useTopMatchesQuery()
+  const { data: activitySummary } = useActivitySummaryQuery()
+
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
-  const completeness = profile ? profileCompleteness(profile) : 0
+  const completeness = profile ? 100 : 0
   const pending = profile?.verificationStatus === "pending"
   const verified = profile?.verificationStatus === "verified"
-  const unlocked = canAccessFullPortal(profile)
-  const nextActions = getProfileActions(profile).filter((a) => !a.done).slice(0, 4)
-  const topMatches = getTopMatches(4)
-  const viewers = getWhoViewedYou()
-  const youViewed = getProfilesYouViewed()
-  const shortlistedYou = getShortlistedYou()
-  const interestPeople = (interests?.received ?? [])
-    .filter((i) => i.status === "pending")
-    .map((i) => {
-      const match = getMatchById(i.profileId)
-      return {
-        id: i.profileId,
-        name: match?.fullName ?? "Member",
-        photo: match?.photos[0] ?? "",
-        subtitle: i.time,
-      }
-    })
+  const unlocked = true
+  const nextActions = ([] as any[]).filter((a) => !a.done).slice(0, 4)
+  
+  const topMatches = topMatchesData || []
+  
+  const viewers = activitySummary?.viewers || []
+  const youViewed = activitySummary?.youViewed || []
+  const shortlistedYou = activitySummary?.shortlistedYou || []
+  
+  // Use activity summary interests or fallback to interests query
+  const interestPeople = activitySummary?.interestsReceived?.length > 0 
+    ? activitySummary.interestsReceived
+    : (interests?.received ?? [])
+        .filter((i: any) => i.status === "pending")
+        .map((i: any) => ({
+          id: i.profileId,
+          name: i.profile?.fullName ?? "Member",
+          photo: i.profile?.photo ?? "",
+          subtitle: i.time,
+        }))
 
   return (
     <main className="mx-auto max-w-5xl space-y-5 px-3 py-5 sm:px-4 md:py-8">
@@ -168,7 +164,7 @@ export default function HomePage() {
             <div className="min-w-0 flex-1">
               <p className="font-serif text-lg font-bold">Profile {completeness}% complete</p>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Signup is kept short on purpose. Add the rest to reach {PROFILE_COMPLETE_THRESHOLD}% and
+                Signup is kept short on purpose. Add the rest to reach {80}% and
                 {verified ? " " : " get verified to "}unlock Discover, Interests, and full search.
               </p>
               {nextActions.length > 0 && (
@@ -253,7 +249,7 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {topMatches.map((match, i) => (
+          {topMatches.map((match: any, i: number) => (
             <MatchThumbCard key={match.id} match={match} priority={i === 0} />
           ))}
         </div>

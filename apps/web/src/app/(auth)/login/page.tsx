@@ -38,9 +38,17 @@ export default function LoginPage() {
 
   React.useEffect(() => {
     if (!otpSent || seconds <= 0) return
-    const id = window.setInterval(() => setSeconds((s) => s - 1), 1000)
+    const id = window.setInterval(() => {
+      setSeconds((s: any) => {
+        if (s <= 1) {
+          window.clearInterval(id)
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
     return () => window.clearInterval(id)
-  }, [otpSent, seconds])
+  }, [otpSent])
 
   const handleSendOtp = async (values: LoginPhoneValues) => {
     setError("")
@@ -62,9 +70,6 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const auth = await apiClient.auth.verifyOtp({ phone: phoneForm.getValues("phone"), otp: values.otp })
-      if (auth.accessToken) {
-        apiClient.setToken(auth.accessToken)
-      }
       if (auth.hasProfile) {
         router.push("/home")
       } else {

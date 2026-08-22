@@ -9,8 +9,10 @@ import {
   partnerPreferences,
   profilePhotos,
   verifications,
+  userSettings,
+  interests,
 } from '@astalakshimi/database';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, and, or } from 'drizzle-orm';
 import type { CompleteRegistrationPayload, FullProfileView } from '@astalakshimi/types';
 
 @Injectable()
@@ -266,6 +268,165 @@ export class ProfilesService {
     });
   }
 
+  async updateMyProfile(userId: string, payload: Partial<CompleteRegistrationPayload>) {
+    const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    if (!profile) throw new NotFoundException('Profile not found');
+    const profileId = profile.id;
+
+    return this.db.transaction(async (tx) => {
+      // Check if any fields belong to profiles
+      const profilesUpdate: any = {};
+      if (payload.profileFor !== undefined) profilesUpdate.profileFor = payload.profileFor;
+      if (payload.fullName !== undefined) profilesUpdate.fullName = payload.fullName;
+      if (payload.gender !== undefined) profilesUpdate.gender = payload.gender;
+      if (payload.maritalStatus !== undefined) profilesUpdate.maritalStatus = payload.maritalStatus;
+      if (payload.hasChildren !== undefined) profilesUpdate.hasChildren = payload.hasChildren;
+      if (payload.childrenCount !== undefined) profilesUpdate.childrenCount = payload.childrenCount;
+      if (payload.childrenLivingWithMe !== undefined) profilesUpdate.childrenLivingWithMe = payload.childrenLivingWithMe;
+      if (payload.heightCm !== undefined) profilesUpdate.heightCm = payload.heightCm;
+      if (payload.aboutMe !== undefined) profilesUpdate.aboutMe = payload.aboutMe;
+      if (payload.city !== undefined) profilesUpdate.city = payload.city;
+      if (payload.state !== undefined) profilesUpdate.state = payload.state;
+      if (payload.country !== undefined) profilesUpdate.country = payload.country;
+      if (payload.religion !== undefined) profilesUpdate.religion = payload.religion;
+      if (payload.caste !== undefined) profilesUpdate.caste = payload.caste;
+      if (payload.subcaste !== undefined) profilesUpdate.subcaste = payload.subcaste;
+      if (payload.gotra !== undefined) profilesUpdate.gotra = payload.gotra;
+      if (payload.motherTongue !== undefined) profilesUpdate.motherTongue = payload.motherTongue;
+      if (payload.educationLevel !== undefined) profilesUpdate.educationLevel = payload.educationLevel;
+      if (payload.degree !== undefined) profilesUpdate.degree = payload.degree;
+      if (payload.collegeName !== undefined) profilesUpdate.collegeName = payload.collegeName;
+      if (payload.employmentStatus !== undefined) profilesUpdate.employmentStatus = payload.employmentStatus;
+      if (payload.profession !== undefined) profilesUpdate.profession = payload.profession;
+      if (payload.companyName !== undefined) profilesUpdate.companyName = payload.companyName;
+      if (payload.companySector !== undefined) profilesUpdate.companySector = payload.companySector;
+      if (payload.annualIncome !== undefined) profilesUpdate.annualIncome = payload.annualIncome;
+      if (payload.photoPrivacy !== undefined) profilesUpdate.photoPrivacy = payload.photoPrivacy;
+      // Special handling for DOB
+      if (payload.dobYear !== undefined && payload.dobMonth !== undefined && payload.dobDay !== undefined) {
+        profilesUpdate.dob = `${payload.dobYear}-${payload.dobMonth.padStart(2, '0')}-${payload.dobDay.padStart(2, '0')}`;
+      }
+      if (Object.keys(profilesUpdate).length > 0) {
+        profilesUpdate.updatedAt = new Date();
+        await tx.update(profiles).set(profilesUpdate).where(eq(profiles.id, profileId));
+      }
+
+      // Check if any fields belong to familyDetails
+      const familyDetailsUpdate: any = {};
+      if (payload.familyValues !== undefined) familyDetailsUpdate.familyValues = payload.familyValues;
+      if (payload.familyType !== undefined) familyDetailsUpdate.familyType = payload.familyType;
+      if (payload.fatherOccupation !== undefined) familyDetailsUpdate.fatherOccupation = payload.fatherOccupation;
+      if (payload.motherOccupation !== undefined) familyDetailsUpdate.motherOccupation = payload.motherOccupation;
+      if (payload.brothersCount !== undefined) familyDetailsUpdate.brothersCount = payload.brothersCount;
+      if (payload.sistersCount !== undefined) familyDetailsUpdate.sistersCount = payload.sistersCount;
+      if (Object.keys(familyDetailsUpdate).length > 0) {
+        familyDetailsUpdate.updatedAt = new Date();
+        await tx.update(familyDetails).set(familyDetailsUpdate).where(eq(familyDetails.profileId, profileId));
+      }
+
+      // Check if any fields belong to lifestyleInterests
+      const lifestyleInterestsUpdate: any = {};
+      if (payload.diet !== undefined) lifestyleInterestsUpdate.diet = payload.diet;
+      if (payload.smoking !== undefined) lifestyleInterestsUpdate.smoking = payload.smoking;
+      if (payload.alcohol !== undefined) lifestyleInterestsUpdate.alcohol = payload.alcohol;
+      if (payload.interests !== undefined) lifestyleInterestsUpdate.interests = payload.interests;
+      if (Object.keys(lifestyleInterestsUpdate).length > 0) {
+        lifestyleInterestsUpdate.updatedAt = new Date();
+        await tx.update(lifestyleInterests).set(lifestyleInterestsUpdate).where(eq(lifestyleInterests.profileId, profileId));
+      }
+
+      // Check if any fields belong to horoscopes
+      const horoscopesUpdate: any = {};
+      if (payload.birthTime !== undefined) horoscopesUpdate.birthTime = payload.birthTime;
+      if (payload.birthPlace !== undefined) horoscopesUpdate.birthPlace = payload.birthPlace;
+      if (payload.manglik !== undefined) horoscopesUpdate.manglik = payload.manglik;
+      if (payload.rashi !== undefined) horoscopesUpdate.rashi = payload.rashi;
+      if (payload.nakshatra !== undefined) horoscopesUpdate.nakshatra = payload.nakshatra;
+      if (payload.horoscopeS3Key !== undefined) horoscopesUpdate.horoscopeS3Key = payload.horoscopeS3Key;
+      if (payload.horoscopeFileName !== undefined) horoscopesUpdate.horoscopeFileName = payload.horoscopeFileName;
+      if (payload.horoscopeFileSizeBytes !== undefined) horoscopesUpdate.horoscopeFileSizeBytes = payload.horoscopeFileSizeBytes;
+      if (Object.keys(horoscopesUpdate).length > 0) {
+        horoscopesUpdate.updatedAt = new Date();
+        await tx.update(horoscopes).set(horoscopesUpdate).where(eq(horoscopes.profileId, profileId));
+      }
+
+      // Check if any fields belong to partnerPreferences
+      const partnerPreferencesUpdate: any = {};
+      if (payload.prefAgeMin !== undefined) partnerPreferencesUpdate.prefAgeMin = payload.prefAgeMin;
+      if (payload.prefAgeMax !== undefined) partnerPreferencesUpdate.prefAgeMax = payload.prefAgeMax;
+      if (payload.prefHeightMinCm !== undefined) partnerPreferencesUpdate.prefHeightMinCm = payload.prefHeightMinCm;
+      if (payload.prefHeightMaxCm !== undefined) partnerPreferencesUpdate.prefHeightMaxCm = payload.prefHeightMaxCm;
+      if (payload.prefMaritalStatuses !== undefined) partnerPreferencesUpdate.prefMaritalStatuses = payload.prefMaritalStatuses;
+      if (payload.prefReligions !== undefined) partnerPreferencesUpdate.prefReligions = payload.prefReligions;
+      if (payload.prefCastes !== undefined) partnerPreferencesUpdate.prefCastes = payload.prefCastes;
+      if (payload.prefMotherTongues !== undefined) partnerPreferencesUpdate.prefMotherTongues = payload.prefMotherTongues;
+      if (payload.prefMinEducation !== undefined) partnerPreferencesUpdate.prefMinEducation = payload.prefMinEducation;
+      if (payload.prefAcceptableIncomes !== undefined) partnerPreferencesUpdate.prefAcceptableIncomes = payload.prefAcceptableIncomes;
+      if (payload.prefLocations !== undefined) partnerPreferencesUpdate.prefLocations = payload.prefLocations;
+      if (Object.keys(partnerPreferencesUpdate).length > 0) {
+        partnerPreferencesUpdate.updatedAt = new Date();
+        await tx.update(partnerPreferences).set(partnerPreferencesUpdate).where(eq(partnerPreferences.profileId, profileId));
+      }
+
+      return this.getMyProfile(userId);
+    });
+  }
+
+  async addPhoto(userId: string, s3Key: string) {
+    const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    if (!profile) throw new NotFoundException('Profile not found');
+    const profileId = profile.id;
+
+    const existingPhotos = await this.db.select().from(profilePhotos).where(eq(profilePhotos.profileId, profileId)).orderBy(asc(profilePhotos.displayOrder));
+    const isPrimary = existingPhotos.length === 0;
+    const maxOrder = existingPhotos.length > 0 ? existingPhotos[existingPhotos.length - 1].displayOrder + 1 : 0;
+
+    await this.db.insert(profilePhotos).values({
+      profileId,
+      s3Key,
+      isPrimary,
+      displayOrder: maxOrder,
+      status: 'pending' as const,
+    });
+
+    return this.getMyProfile(userId);
+  }
+
+  async deletePhoto(userId: string, photoId: string) {
+    const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    if (!profile) throw new NotFoundException('Profile not found');
+    
+    const [photo] = await this.db.select().from(profilePhotos).where(eq(profilePhotos.id, photoId)).limit(1);
+    if (!photo || photo.profileId !== profile.id) {
+      throw new NotFoundException('Photo not found');
+    }
+
+    await this.db.delete(profilePhotos).where(eq(profilePhotos.id, photoId));
+    
+    if (photo.isPrimary) {
+      const remainingPhotos = await this.db.select().from(profilePhotos).where(eq(profilePhotos.profileId, profile.id)).orderBy(asc(profilePhotos.displayOrder));
+      if (remainingPhotos.length > 0) {
+        await this.db.update(profilePhotos).set({ isPrimary: true }).where(eq(profilePhotos.id, remainingPhotos[0].id));
+      }
+    }
+
+    return { success: true };
+  }
+
+  async reorderPhotos(userId: string, photoIds: string[]) {
+    const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    if (!profile) throw new NotFoundException('Profile not found');
+
+    return this.db.transaction(async (tx) => {
+      for (let i = 0; i < photoIds.length; i++) {
+        await tx.update(profilePhotos)
+          .set({ displayOrder: i, isPrimary: i === 0 })
+          .where(eq(profilePhotos.id, photoIds[i]));
+      }
+      return this.getMyProfile(userId);
+    });
+  }
+
   async getMyProfile(userId: string): Promise<FullProfileView> {
     const [profile] = await this.db
       .select()
@@ -322,7 +483,7 @@ export class ProfilesService {
     };
   }
 
-  async getProfileById(profileId: string): Promise<FullProfileView> {
+  async getProfileById(profileId: string, viewerUserId?: string): Promise<FullProfileView> {
     const [profile] = await this.db
       .select()
       .from(profiles)
@@ -331,6 +492,25 @@ export class ProfilesService {
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
+    }
+
+    if (viewerUserId) {
+      // Find viewer's profile id
+      const [viewerProfile] = await this.db
+        .select({ id: profiles.id })
+        .from(profiles)
+        .where(eq(profiles.userId, viewerUserId))
+        .limit(1);
+
+      // Don't log if viewing own profile
+      if (viewerProfile && viewerProfile.id !== profile.id) {
+        // Use a dynamic import or require for profileViews to avoid changing too many imports at top
+        const { profileViews } = require('@astalakshimi/database');
+        await this.db.insert(profileViews).values({
+          viewerProfileId: viewerProfile.id,
+          targetProfileId: profile.id,
+        }).onConflictDoNothing(); // If we only want unique views per day, we can tweak this, but unique index handles it.
+      }
     }
 
     const [family] = await this.db
@@ -368,6 +548,45 @@ export class ProfilesService {
       .where(eq(profilePhotos.profileId, profile.id))
       .orderBy(asc(profilePhotos.displayOrder));
 
+    let blurPhoto = false;
+    
+    // Only fetch blur settings and compute connection if viewer is not the profile owner
+    if (viewerUserId && viewerUserId !== profile.userId) {
+      const [setting] = await this.db
+        .select()
+        .from(userSettings)
+        .where(eq(userSettings.userId, profile.userId))
+        .limit(1);
+
+      const photoBlurSetting = setting?.photoBlur || 'always';
+      
+      if (photoBlurSetting !== 'never') {
+        const [viewerProfile] = await this.db
+          .select({ id: profiles.id })
+          .from(profiles)
+          .where(eq(profiles.userId, viewerUserId))
+          .limit(1);
+
+        let isAccepted = false;
+        if (viewerProfile) {
+          const connections = await this.db
+            .select()
+            .from(interests)
+            .where(
+              and(
+                or(eq(interests.senderProfileId, viewerProfile.id), eq(interests.receiverProfileId, viewerProfile.id)),
+                or(eq(interests.senderProfileId, profile.id), eq(interests.receiverProfileId, profile.id)),
+                eq(interests.status, 'accepted')
+              )
+            )
+            .limit(1);
+          isAccepted = connections.length > 0;
+        }
+        
+        blurPhoto = !isAccepted;
+      }
+    }
+
     return {
       profile: profile as any,
       family: (family as any) || null,
@@ -375,6 +594,31 @@ export class ProfilesService {
       horoscope: (horoscope as any) || null,
       photos,
       verificationStatus: verification?.status || 'idle',
+      blurPhoto,
     };
+  }
+
+  async recordVisit(profileId: string, viewerUserId: string): Promise<void> {
+    const [profile] = await this.db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(eq(profiles.id, profileId))
+      .limit(1);
+
+    if (!profile) return;
+
+    const [viewerProfile] = await this.db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(eq(profiles.userId, viewerUserId))
+      .limit(1);
+
+    if (viewerProfile && viewerProfile.id !== profile.id) {
+      const { profileViews } = require('@astalakshimi/database');
+      await this.db.insert(profileViews).values({
+        viewerProfileId: viewerProfile.id,
+        targetProfileId: profile.id,
+      }).onConflictDoNothing();
+    }
   }
 }

@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation"
-import type { ReactNode } from "react"
-import { getAllMatchIds, getMatchById } from "@/lib/matches"
+import { apiClient } from "@/lib/api-client"
 import {
   Briefcase,
   CheckCircle2,
@@ -14,18 +13,20 @@ import {
 } from "lucide-react"
 import { ProfileActionBar } from "@/components/profile/profile-action-bar"
 import { ProfileGallery } from "@/components/profile/profile-gallery"
+import { ProfileVisitTracker } from "@/components/profile/profile-visit-tracker"
 
-export function generateStaticParams() {
-  return getAllMatchIds().map((profileId) => ({ profileId }))
-}
+
+import { ReactNode } from "react"
 
 export async function generateMetadata({ params }: { params: Promise<{ profileId: string }> }) {
   const { profileId } = await params
-  const profile = getMatchById(profileId)
-  if (!profile) return { title: "Profile | Astalakshimi" }
+  const rawProfile = await apiClient.profiles.getProfileById(profileId).catch(() => null)
+  if (!rawProfile) return { title: "Profile | Astalakshimi" }
+  
+  const age = Math.floor((new Date().getTime() - new Date(rawProfile.profile.dob).getTime()) / 31557600000)
   return {
-    title: `${profile.fullName}, ${profile.age} | Astalakshimi`,
-    description: `${profile.education} · ${profile.city} · ${profile.community}`,
+    title: `${rawProfile.profile.fullName}, ${age} | Astalakshimi`,
+    description: `${rawProfile.profile.educationLevel} · ${rawProfile.profile.city} · ${rawProfile.profile.caste}`,
   }
 }
 
@@ -58,10 +59,70 @@ function Section({
   )
 }
 
-export default async function MatchProfilePage({ params }: { params: Promise<{ profileId: string }> }) {
+export default async function anyPage({ params }: { params: Promise<{ profileId: string }> }) {
   const { profileId } = await params
-  const profile = getMatchById(profileId)
-  if (!profile) notFound()
+  
+  if (profileId === 'me' || profileId === 'undefined') {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-bold">Redirecting...</h2>
+          <script dangerouslySetInnerHTML={{ __html: 'window.location.href = "/profile";' }} />
+        </div>
+      </div>
+    );
+  }
+
+  const data = await apiClient.profiles.getProfileById(profileId).catch(() => null)
+  if (!data) notFound()
+
+  const profile = {
+    id: data.profile.id,
+    fullName: data.profile.fullName,
+    age: Math.floor((new Date().getTime() - new Date(data.profile.dob).getTime()) / 31557600000),
+    city: data.profile.city,
+    state: data.profile.state,
+    lastActive: "Recently",
+    photos: data.photos.map(p => p.s3Key),
+    photoVerified: data.verificationStatus === 'verified',
+    verified: data.verificationStatus === 'verified',
+    hasHoroscope: !!data.horoscope?.horoscopeS3Key,
+    blurPhoto: data.blurPhoto,
+    matchPercent: 90,
+    height: `${data.profile.heightCm} cm`,
+    education: data.profile.educationLevel,
+    occupation: data.profile.profession,
+    community: data.profile.caste,
+    about: data.profile.aboutMe || "No details provided.",
+    gender: data.profile.gender,
+    maritalStatus: data.profile.maritalStatus,
+    religion: data.profile.religion,
+    motherTongue: data.profile.motherTongue,
+    college: data.profile.collegeName || "Not specified",
+    company: data.profile.companyName || "Not specified",
+    income: data.profile.annualIncome,
+    lifestyle: {
+      drinking: data.lifestyle?.alcohol || "Never",
+      smoking: data.lifestyle?.smoking || "Never",
+      diet: data.lifestyle?.diet || "Vegetarian",
+    },
+    family: {
+      type: data.family?.familyType || "Nuclear",
+      values: data.family?.familyValues || "Traditional",
+      father: data.family?.fatherOccupation || "Employed",
+      mother: data.family?.motherOccupation || "Homemaker",
+      siblings: `${(data.family?.brothersCount || 0) + (data.family?.sistersCount || 0)}`,
+    },
+    preferences: {
+      ageRange: "25 - 32 yrs",
+      heightRange: "160 - 180 cm",
+      maritalStatus: "Never Married",
+      religion: data.profile.religion,
+      community: data.profile.caste,
+      education: "Bachelors",
+      location: "India"
+    }
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -79,6 +140,7 @@ export default async function MatchProfilePage({ params }: { params: Promise<{ p
               photoVerified={profile.photoVerified}
               verified={profile.verified}
               hasHoroscope={profile.hasHoroscope}
+              blurPhoto={profile.blurPhoto}
             />
 
             <span className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-1 text-[11px] font-bold text-white shadow backdrop-blur">
@@ -167,6 +229,7 @@ export default async function MatchProfilePage({ params }: { params: Promise<{ p
         </div>
       </div>
 
+      <ProfileVisitTracker profileId={profile.id} />
       <ProfileActionBar profileId={profile.id} />
     </div>
   )

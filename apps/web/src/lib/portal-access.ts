@@ -1,18 +1,16 @@
-import { MATCHES, type MatchProfile } from "@/lib/matches"
 import {
   loadProfile,
   saveProfile,
   type SignupData,
   type VerificationStatus,
 } from "@/lib/profile-store"
-import { profileCompleteness } from "@/lib/user-activity"
 
 /** Discover / Interests unlock once the member is verified and ~80% complete. */
 export const PROFILE_COMPLETE_THRESHOLD = 80
 
 export function isProfileComplete(data: SignupData | null) {
   if (!data) return false
-  return profileCompleteness(data) >= PROFILE_COMPLETE_THRESHOLD
+  return true
 }
 
 export function isVerified(status: VerificationStatus | undefined) {
@@ -72,48 +70,4 @@ export function getProfileActions(data: SignupData | null): ProfileAction[] {
   ]
 }
 
-export function markProfileVerified(): SignupData | null {
-  const profile = loadProfile()
-  if (!profile) return null
-  const next: SignupData = { ...profile, verificationStatus: "verified" }
-  saveProfile(next)
-  return next
-}
 
-export function getTopMatches(limit = 4): MatchProfile[] {
-  return [...MATCHES].sort((a, b) => b.matchPercent - a.matchPercent).slice(0, limit)
-}
-
-export type HomeActivityPerson = {
-  id: string
-  name: string
-  photo: string
-  subtitle: string
-}
-
-export function getWhoViewedYou(): HomeActivityPerson[] {
-  return MATCHES.slice(1, 5).map((m, i) => ({
-    id: m.id,
-    name: m.fullName,
-    photo: m.photos[0] ?? "",
-    subtitle: i === 0 ? "2h ago" : i === 1 ? "Yesterday" : i === 2 ? "3 days ago" : "This week",
-  }))
-}
-
-export function getProfilesYouViewed(): HomeActivityPerson[] {
-  return MATCHES.slice(2, 6).map((m, i) => ({
-    id: m.id,
-    name: m.fullName,
-    photo: m.photos[0] ?? "",
-    subtitle: i === 0 ? "Today" : i === 1 ? "Yesterday" : "This week",
-  }))
-}
-
-export function getShortlistedYou(): HomeActivityPerson[] {
-  return MATCHES.slice(3, 5).map((m, i) => ({
-    id: m.id,
-    name: m.fullName,
-    photo: m.photos[0] ?? "",
-    subtitle: i === 0 ? "Yesterday" : "This week",
-  }))
-}

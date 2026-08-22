@@ -2,7 +2,9 @@ export type VerificationMethod = "selfie" | "govt_id" | ""
 export type VerificationStatus = "idle" | "pending" | "verified"
 
 export type SignupData = {
+  id?: string
   phone: string
+
   otp: string
   consentAccepted: boolean
   referredBy?: string
@@ -66,6 +68,7 @@ export type SignupData = {
   prefLocations?: string[]
   photos: string[]
   photoS3Keys: string[]
+  photoObjects?: any[]
   photoPrivacy: string
   verificationMethod: VerificationMethod
   selfiePhoto: string

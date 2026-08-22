@@ -238,7 +238,7 @@ export default function LandingPage() {
                 { icon: BriefcaseBusiness, label: "Portal for brokers" },
                 { icon: Gift, label: "Referral system" },
                 { icon: IndianRupee, label: "Lower subscription cost" },
-              ].map((item) => (
+              ].map((item: any) => (
                 <li key={item.label} className="flex flex-col items-center gap-2 text-center sm:items-start sm:text-left">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-primary sm:h-12 sm:w-12">
                     <item.icon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -482,7 +482,7 @@ export default function LandingPage() {
                 title: "Control over privacy",
                 body: "Hide contact details, blur photos, and decide who can connect  just like the platforms you trust.",
               },
-            ].map((item) => (
+            ].map((item: any) => (
               <article key={item.title} className="royal-card p-7">
                 <div className="mb-5 flex h-13 w-13 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 text-primary border border-secondary/20">
                   <item.icon className="h-6 w-6" />
@@ -588,7 +588,7 @@ export default function LandingPage() {
               Browse by mother tongue, caste, city and profession. Horoscope matching is optional. Your photos stay private until they are verified.
             </p>
             <div className="flex flex-wrap gap-2">
-              {communities.map((c) => (
+              {communities.map((c: any) => (
                 <span key={c} className="rounded-full border border-secondary/25 bg-muted px-3 py-1 text-xs font-medium text-foreground/80">
                   {c}
                 </span>

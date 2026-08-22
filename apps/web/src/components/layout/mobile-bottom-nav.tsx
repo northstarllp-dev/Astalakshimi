@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils"
 const items = [
   { href: "/home", label: "Home", icon: Home, match: (p: string) => p === "/home" },
   { href: "/dashboard", label: "Discover", icon: Compass, match: (p: string) => p === "/dashboard" || p.startsWith("/search") },
-  { href: "/interests", label: "Interests", icon: Heart, match: (p: string) => p.startsWith("/interests") },
+  { href: "/interests", label: "Interests", icon: Heart, match: (p: string) => p.startsWith("/interests") || p.startsWith("/inbox") },
+
   { href: "/plans", label: "Premium", icon: Sparkles, match: (p: string) => p.startsWith("/plans") || p.startsWith("/checkout") },
   { href: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") || p.startsWith("/shortlist") },
 ]
@@ -19,7 +20,7 @@ export function MobileBottomNav() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-xl md:hidden safe-bottom">
       <ul className="mx-auto grid max-w-lg grid-cols-5 px-0.5 pt-1">
-        {items.map((item) => {
+        {items.map((item: any) => {
           const active = item.match(pathname)
           const Icon = item.icon
           return (

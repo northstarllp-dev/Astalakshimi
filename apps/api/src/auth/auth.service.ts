@@ -3,22 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { users, profiles } from '@astalakshimi/database';
-import { eq } from 'drizzle-orm';
+import { users, profiles, otpAttempts } from '@astalakshimi/database';
+import { eq, desc } from 'drizzle-orm';
 import type { SendOtpInput, VerifyOtpInput } from '@astalakshimi/validation';
 import type { AuthResponse, User } from '@astalakshimi/types';
-
-interface PendingOtp {
-  otp: string;
-  expiresAt: number;
-  consentAccepted: boolean;
-  referredBy?: string;
-}
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly otpCache = new Map<string, PendingOtp>();
 
   constructor(
     @Inject(DB_CLIENT) private readonly db: Database,
@@ -34,12 +26,14 @@ export class AuthService {
 
     // Generate 6 digit OTP (mock or random)
     const otp = mockEnabled ? defaultMockOtp : Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + ttlSeconds * 1000;
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
-    this.otpCache.set(formattedPhone, {
-      otp,
+    // Save to PostgreSQL (TODO: add proper hashing for otpHash)
+    await this.db.insert(otpAttempts).values({
+      phone: formattedPhone,
+      otpHash: otp, 
       expiresAt,
-      consentAccepted: input.consentAccepted,
+      consentAccepted: input.consentAccepted ?? false,
       referredBy: input.referredBy,
     });
 
@@ -53,23 +47,38 @@ export class AuthService {
 
   async verifyOtp(input: VerifyOtpInput): Promise<AuthResponse> {
     const formattedPhone = input.phone.replace(/\s+/g, '');
-    const pending = this.otpCache.get(formattedPhone);
+    const [pending] = await this.db
+      .select()
+      .from(otpAttempts)
+      .where(eq(otpAttempts.phone, formattedPhone))
+      .orderBy(desc(otpAttempts.createdAt))
+      .limit(1);
 
     if (!pending) {
       throw new BadRequestException('No pending OTP request found for this mobile number. Please request a new OTP.');
     }
 
-    if (Date.now() > pending.expiresAt) {
-      this.otpCache.delete(formattedPhone);
-      throw new BadRequestException('OTP has expired. Please request a new OTP.');
+    if (new Date() > pending.expiresAt || pending.verified) {
+      throw new BadRequestException('OTP has expired or already used. Please request a new OTP.');
     }
 
-    if (pending.otp !== input.otp) {
+    if (pending.attempts >= 5) {
+      throw new BadRequestException('Maximum attempts reached. Please request a new OTP.');
+    }
+
+    if (pending.otpHash !== input.otp) {
+      // Increment attempts
+      await this.db.update(otpAttempts)
+        .set({ attempts: pending.attempts + 1 })
+        .where(eq(otpAttempts.id, pending.id));
+        
       throw new BadRequestException('Invalid OTP. Please check and try again.');
     }
 
-    // OTP is valid - clear cache
-    this.otpCache.delete(formattedPhone);
+    // OTP is valid - mark as verified
+    await this.db.update(otpAttempts)
+      .set({ verified: true })
+      .where(eq(otpAttempts.id, pending.id));
 
     // Look up or create user
     const [existingUser] = await this.db

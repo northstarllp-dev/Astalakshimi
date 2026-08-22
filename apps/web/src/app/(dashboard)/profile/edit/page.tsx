@@ -3,6 +3,8 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { getMediaUrl } from "@/lib/utils"
+import { apiClient } from "@/lib/api-client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,7 +35,13 @@ import {
   STARS,
   RASHIS,
 } from "@/lib/profile-store"
-import { useProfileQuery, useSaveProfileMutation } from "@/hooks/queries"
+import { 
+  useProfileQuery, 
+  useUpdateProfileMutation,
+  useAddPhotoMutation,
+  useDeletePhotoMutation,
+  useReorderPhotosMutation
+} from "@/hooks/queries"
 import { profileEditSchema } from "@/lib/validation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -64,7 +72,11 @@ function EditSection({ id, title, children }: { id: string; title: string; child
 export default function ProfileEditPage() {
   const router = useRouter()
   const profileQuery = useProfileQuery()
-  const saveMutation = useSaveProfileMutation()
+  const updateMutation = useUpdateProfileMutation()
+  const addPhotoMutation = useAddPhotoMutation()
+  const deletePhotoMutation = useDeletePhotoMutation()
+  const reorderPhotosMutation = useReorderPhotosMutation()
+
   const form = useForm({
     resolver: zodResolver(profileEditSchema),
     values: profileQuery.data ?? emptySignupData(),
@@ -81,7 +93,16 @@ export default function ProfileEditPage() {
   }
 
   const onSave = form.handleSubmit((values) => {
-    saveMutation.mutate({ ...(profileQuery.data ?? emptySignupData()), ...values } as SignupData, {
+    const dirtyFields = form.formState.dirtyFields;
+    const delta: any = {};
+    for (const key of Object.keys(dirtyFields)) {
+      if (key !== 'photos' && key !== 'photoS3Keys' && key !== 'photoObjects') {
+        delta[key] = (values as any)[key];
+      }
+    }
+    // Also include custom controlled fields if needed, but RHF sets them as dirty anyway.
+
+    updateMutation.mutate(delta, {
       onSuccess: () => {
         setSaved(true)
         window.setTimeout(() => router.push("/profile"), 600)
@@ -89,35 +110,47 @@ export default function ProfileEditPage() {
     })
   })
 
-  const onFiles = (files: FileList | null) => {
+  const onFiles = async (files: FileList | null) => {
     if (!files) return
-    const remaining = MAX_PHOTOS - data.photos.length
-    Array.from(files)
-      .slice(0, remaining)
-      .forEach((file) => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          const url = String(reader.result)
-          form.setValue("photos", [...(data.photos ?? []), url], { shouldDirty: true })
-        }
-        reader.readAsDataURL(file)
-      })
+    const remaining = MAX_PHOTOS - (data.photoObjects?.length || 0)
+    const filesToUpload = Array.from(files).slice(0, remaining);
+    
+    for (const file of filesToUpload) {
+       try {
+         const { uploadUrl, s3Key } = await apiClient.media.getUploadUrl({
+           purpose: "profile_photo",
+           contentType: file.type || "image/jpeg",
+           fileSize: file.size,
+         })
+         
+         await apiClient.media.uploadFileToS3(uploadUrl, file, file.type || "image/jpeg")
+         await addPhotoMutation.mutateAsync(s3Key)
+       } catch (err) {
+         console.error("[Media] S3 upload failed:", err)
+         alert("Failed to upload photo. Please check your AWS credentials or network.")
+       }
+    }
   }
 
-  const setPrimary = (index: number) => {
-    update({ photos: [data.photos[index], ...data.photos.filter((_, i) => i !== index)] })
+  const setPrimary = async (index: number) => {
+    await reorder(index, 0);
   }
 
-  const deletePhoto = (index: number) => {
-    update({ photos: data.photos.filter((_, i) => i !== index) })
+  const deletePhoto = async (index: number) => {
+    const photoId = data.photoObjects?.[index]?.id;
+    if (photoId) {
+      await deletePhotoMutation.mutateAsync(photoId);
+    }
   }
 
-  const reorder = (from: number, to: number) => {
+  const reorder = async (from: number, to: number) => {
     if (from === to) return
-    const next = [...data.photos]
+    const next = [...(data.photoObjects || [])]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    update({ photos: next })
+    
+    const photoIds = next.map(p => p.id);
+    await reorderPhotosMutation.mutateAsync(photoIds);
   }
 
   if (profileQuery.isPending) {
@@ -163,7 +196,7 @@ export default function ProfileEditPage() {
             <Select value={data.maritalStatus || undefined} onValueChange={(v) => update({ maritalStatus: v })}>
               <SelectTrigger className="w-full"><SelectValue placeholder="Select marital status" /></SelectTrigger>
               <SelectContent>
-                {MARITAL_STATUSES.map((s) => (
+                {MARITAL_STATUSES.map((s: any) => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
@@ -194,7 +227,7 @@ export default function ProfileEditPage() {
             <Select value={data.complexion || undefined} onValueChange={(v) => update({ complexion: v })}>
               <SelectTrigger className="w-full"><SelectValue placeholder="Select complexion" /></SelectTrigger>
               <SelectContent>
-                {COMPLEXIONS.map((c) => (
+                {COMPLEXIONS.map((c: any) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
@@ -247,7 +280,7 @@ export default function ProfileEditPage() {
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>27 Nakshatras</SelectLabel>
-                  {STARS.map((s) => (
+                  {STARS.map((s: any) => (
                     <SelectItem key={s} value={s}>{s}</SelectItem>
                   ))}
                 </SelectGroup>
@@ -269,7 +302,7 @@ export default function ProfileEditPage() {
           <Select value={data.manglik || undefined} onValueChange={(v) => update({ manglik: v })}>
             <SelectTrigger className="w-full"><SelectValue placeholder="Select Manglik status" /></SelectTrigger>
             <SelectContent>
-              {MANGLIK_OPTIONS.map((m) => (
+              {MANGLIK_OPTIONS.map((m: any) => (
                 <SelectItem key={m} value={m}>{m}</SelectItem>
               ))}
             </SelectContent>
@@ -344,7 +377,7 @@ export default function ProfileEditPage() {
             <Select value={data.familyStatus || undefined} onValueChange={(v) => update({ familyStatus: v })}>
               <SelectTrigger className="w-full"><SelectValue placeholder="Select family status" /></SelectTrigger>
               <SelectContent>
-                {FAMILY_STATUS.map((s) => (
+                {FAMILY_STATUS.map((s: any) => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
@@ -415,7 +448,7 @@ export default function ProfileEditPage() {
         <Field label="Preferred religions (comma separated)">
           <Input
             value={data.prefReligion.join(", ")}
-            onChange={(e) => update({ prefReligion: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+            onChange={(e) => update({ prefReligion: e.target.value.split(",").map((s: any) => s.trim()).filter(Boolean) })}
           />
         </Field>
       </EditSection>
@@ -423,7 +456,7 @@ export default function ProfileEditPage() {
       <section id="photos" className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="font-serif text-lg font-bold">Photos</h2>
-          <span className="text-xs font-semibold text-muted-foreground">{data.photos.length} / {MAX_PHOTOS}</span>
+          <span className="text-xs font-semibold text-muted-foreground">{(profileQuery.data?.photoObjects?.length || 0)} / {MAX_PHOTOS}</span>
         </div>
         <p className="text-sm text-muted-foreground">
           First photo is your primary. Drag to reorder. Primary photo is reviewed by admin within 24 hours.
@@ -438,7 +471,7 @@ export default function ProfileEditPage() {
           onChange={(e) => onFiles(e.target.files)}
         />
 
-        {data.photos.length === 0 ? (
+        {!(profileQuery.data?.photoObjects?.length) ? (
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -449,9 +482,9 @@ export default function ProfileEditPage() {
           </button>
         ) : (
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-            {data.photos.map((photo, i) => (
+            {profileQuery.data.photoObjects.map((photo: any, i: number) => (
               <div
-                key={i}
+                key={photo.id || i}
                 draggable
                 onDragStart={() => setDragIndex(i)}
                 onDragOver={(e) => e.preventDefault()}
@@ -461,7 +494,7 @@ export default function ProfileEditPage() {
                 }}
                 className="group relative aspect-[3/4] overflow-hidden rounded-xl border-2 border-border bg-muted"
               >
-                <Image src={photo} alt={`Photo ${i + 1}`} fill className="object-cover" sizes="120px" />
+                <Image src={getMediaUrl(photo.url || photo.s3Key)} alt={`Photo ${i + 1}`} fill className="object-cover" sizes="120px" />
                 {i === 0 && (
                   <span className="absolute left-1 top-1 rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold text-secondary-foreground">
                     <Star className="mr-0.5 inline h-2.5 w-2.5 fill-current" />Primary
@@ -495,7 +528,7 @@ export default function ProfileEditPage() {
                 </span>
               </div>
             ))}
-            {data.photos.length < MAX_PHOTOS && (
+            {profileQuery.data.photoObjects.length < MAX_PHOTOS && (
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}

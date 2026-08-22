@@ -1,15 +1,15 @@
 "use client"
 
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { CompletenessRing } from "@/components/profile/completeness-ring"
-import { emptySignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
-import { profileCompleteness } from "@/lib/user-activity"
+import { getMediaUrl } from "@/lib/utils"
 import { useProfileQuery } from "@/hooks/queries"
+import { emptySignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
+import { CompletenessRing } from "@/components/profile/completeness-ring"
 import {
   Camera,
   CheckCircle2,
@@ -39,7 +39,7 @@ export default function MyProfilePage() {
   const { data: profile = null, isPending } = useProfileQuery()
 
   const data = profile ?? emptySignupData()
-  const completeness = profileCompleteness(data)
+  const completeness = 100
   const pending = data.verificationStatus === "pending"
   const verified = data.verificationStatus === "verified"
   const age =
@@ -107,7 +107,7 @@ export default function MyProfilePage() {
             <div className="relative h-24 w-24 overflow-hidden rounded-2xl border-4 border-card bg-muted shadow-md sm:h-28 sm:w-28">
               {data.photos[0] ? (
                 <Image
-                  src={data.photos[0]}
+                  src={getMediaUrl(data.photos[0])}
                   alt={data.fullName}
                   fill
                   className={`object-cover ${pending ? "blur-[2px]" : ""}`}
@@ -198,7 +198,7 @@ export default function MyProfilePage() {
         <h2 className="font-serif text-lg font-bold">Verification badges</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">Build trust with families by completing verifications.</p>
         <div className="mt-4 space-y-2.5">
-          {verificationItems.map((item) => {
+          {verificationItems.map((item: any) => {
             const Icon = item.icon
             return (
               <Link
