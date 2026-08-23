@@ -164,7 +164,7 @@ Dashboard filter accordion sections **default collapsed** (chevron down), matchi
 | Topic | Detail |
 | --- | --- |
 | Vercel Root Directory | Must be `apps/web` so Next.js is detected |
-| Install on Vercel | Prefer `npm ci` in `apps/web` (avoids pnpm `ERR_INVALID_THIS` on some builders) |
+| Install on Vercel | Automatic `pnpm install` across workspace (pnpm monorepo with `workspace:*` dependencies) |
 | Node | `engines.node: 22.x` in package.json; `.nvmrc` = 22 |
 | GitHub Actions | Do not push `.github/workflows/*` with Cursor OAuth (needs `workflow` scope) |
 | Commit email | Must match a verified GitHub email or Vercel blocks private-repo deploys |
