@@ -7,6 +7,8 @@ import { MEMBERSHIP_PLANS, type PlanId } from "@/lib/plans"
 import { cn } from "@/lib/utils"
 import { Check } from "lucide-react"
 
+const TIER_ORDER: PlanId[] = ["free", "silver", "gold", "platinum", "diamond"]
+
 type PlanCompareProps = {
   currentPlanId: PlanId
   selectedPlanId: PlanId
@@ -171,7 +173,11 @@ export function PlanCompare({ currentPlanId, selectedPlanId, onSelect, onChoose 
                             onChoose(plan.id)
                           }}
                         >
-                          {isGold ? "Choose Gold" : plan.id === "free" ? "Start free" : "Choose Plan"}
+                          {TIER_ORDER.indexOf(plan.id) > TIER_ORDER.indexOf(currentPlanId)
+                            ? `Upgrade to ${plan.name}`
+                            : plan.id === "free"
+                              ? "Start free"
+                              : `Switch to ${plan.name}`}
                         </Button>
                       )}
                     </div>

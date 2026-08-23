@@ -18,7 +18,7 @@ import { EntitlementsModule } from './entitlements/entitlements.module';
 import { MatchesModule } from './matches/matches.module';
 import { ActivityModule } from './activity/activity.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { MessagingModule } from './messaging/messaging.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -44,7 +44,7 @@ import { MessagingModule } from './messaging/messaging.module';
     MatchesModule,
     ActivityModule,
     NotificationsModule,
-    MessagingModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

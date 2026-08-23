@@ -27,7 +27,7 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   logger.log(`🚀 Astalakshimi API server running on: http://localhost:${port}/${apiPrefix}`);
 }
 

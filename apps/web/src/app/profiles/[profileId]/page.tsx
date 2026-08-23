@@ -20,7 +20,14 @@ import { ReactNode } from "react"
 
 export async function generateMetadata({ params }: { params: Promise<{ profileId: string }> }) {
   const { profileId } = await params
-  const rawProfile = await apiClient.profiles.getProfileById(profileId).catch(() => null)
+  
+  if (profileId === 'me' || profileId === 'undefined') return { title: "Profile | Astalakshimi" }
+
+  const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+  const rawProfile = await fetch(`${NEXT_PUBLIC_API_URL}/profiles/${profileId}`)
+    .then(res => res.ok ? res.json() : null)
+    .catch(() => null);
+
   if (!rawProfile) return { title: "Profile | Astalakshimi" }
   
   const age = Math.floor((new Date().getTime() - new Date(rawProfile.profile.dob).getTime()) / 31557600000)
@@ -73,7 +80,18 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
     );
   }
 
-  const data = await apiClient.profiles.getProfileById(profileId).catch(() => null)
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  const token = cookieStore.get('astalakshimi.auth_token')?.value;
+
+  const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+  const data = await fetch(`${NEXT_PUBLIC_API_URL}/profiles/${profileId}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: 'no-store'
+  })
+    .then(res => res.ok ? res.json() : null)
+    .catch(() => null);
+
   if (!data) notFound()
 
   const profile = {
@@ -83,7 +101,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
     city: data.profile.city,
     state: data.profile.state,
     lastActive: "Recently",
-    photos: data.photos.map(p => p.s3Key),
+    photos: (data.photos || []).map((p: { s3Key?: string; url?: string }) => p.s3Key || p.url || ''),
     photoVerified: data.verificationStatus === 'verified',
     verified: data.verificationStatus === 'verified',
     hasHoroscope: !!data.horoscope?.horoscopeS3Key,

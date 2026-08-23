@@ -3,13 +3,14 @@ import { InterestsService } from './interests.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { 
+  sendInterestSchema, 
+  updateInterestStatusSchema, 
+  type SendInterestInput, 
+  type UpdateInterestStatusInput 
+} from '@astalakshimi/validation';
 
-export class SendInterestDto {
-  targetProfileId?: string;
-  profileId?: string;
-  targetUserId?: string;
-  message?: string;
-}
 
 @UseGuards(JwtAuthGuard)
 @Controller('interests')
@@ -19,7 +20,7 @@ export class InterestsController {
   @Post()
   sendInterest(
     @CurrentUser() user: UserSession,
-    @Body() body: SendInterestDto,
+    @Body(new ZodValidationPipe(sendInterestSchema)) body: SendInterestInput,
   ) {
     return this.interestsService.sendInterest(user.userId, body);
   }
@@ -76,7 +77,7 @@ export class InterestsController {
   updateInterestStatus(
     @CurrentUser() user: UserSession,
     @Param('id') interestId: string,
-    @Body() body: { status: 'accepted' | 'declined' | 'withdrawn' },
+    @Body(new ZodValidationPipe(updateInterestStatusSchema)) body: UpdateInterestStatusInput,
   ) {
     return this.interestsService.updateInterestStatus(user.userId, interestId, body.status);
   }
@@ -106,82 +107,4 @@ export class InterestsController {
   }
 }
 
-// Controller alias for interactions/interest and interactions workflow endpoints
-@UseGuards(JwtAuthGuard)
-@Controller('interactions')
-export class InteractionsController {
-  constructor(private readonly interestsService: InterestsService) {}
-
-  @Get('received')
-  getReceivedInterests(
-    @CurrentUser() user: UserSession,
-    @Query('status') status?: string,
-  ) {
-    return this.interestsService.getReceivedInterests(user.userId, status);
-  }
-
-  @Get('sent')
-  getSentInterests(@CurrentUser() user: UserSession) {
-    return this.interestsService.getSentInterests(user.userId);
-  }
-
-  @Get('mutual')
-  getMutualInterests(@CurrentUser() user: UserSession) {
-    return this.interestsService.getMutualInterests(user.userId);
-  }
-
-  @Get('summary')
-  getSummary(@CurrentUser() user: UserSession) {
-    return this.interestsService.getSummary(user.userId);
-  }
-
-  @Post('interest')
-  sendInterest(
-    @CurrentUser() user: UserSession,
-    @Body() body: SendInterestDto,
-  ) {
-    return this.interestsService.sendInterest(user.userId, body);
-  }
-
-  @Post()
-  createInteraction(
-    @CurrentUser() user: UserSession,
-    @Body() body: SendInterestDto,
-  ) {
-    return this.interestsService.sendInterest(user.userId, body);
-  }
-
-  @Patch(':id/accept')
-  acceptInterest(
-    @CurrentUser() user: UserSession,
-    @Param('id') id: string,
-  ) {
-    return this.interestsService.acceptInterest(user.userId, id);
-  }
-
-  @Patch(':id/decline')
-  declineInterest(
-    @CurrentUser() user: UserSession,
-    @Param('id') id: string,
-  ) {
-    return this.interestsService.declineInterest(user.userId, id);
-  }
-
-  @Patch(':id/withdraw')
-  withdrawInterest(
-    @CurrentUser() user: UserSession,
-    @Param('id') id: string,
-  ) {
-    return this.interestsService.withdrawInterest(user.userId, id);
-  }
-
-  @Patch(':id/status')
-  updateInterestStatus(
-    @CurrentUser() user: UserSession,
-    @Param('id') interestId: string,
-    @Body() body: { status: 'accepted' | 'declined' | 'withdrawn' },
-  ) {
-    return this.interestsService.updateInterestStatus(user.userId, interestId, body.status);
-  }
-}
 

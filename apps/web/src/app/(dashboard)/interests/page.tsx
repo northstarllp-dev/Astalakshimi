@@ -877,7 +877,7 @@ function InterestsPageInner() {
 
   const handleAccept = async (profileId: string) => {
     try {
-      await apiClient.interactions.accept(profileId)
+      await apiClient.interests.accept(profileId)
       invalidate()
     } catch (e: any) {
       alert(e?.message || "Failed to accept interest")
@@ -886,7 +886,7 @@ function InterestsPageInner() {
 
   const handleDecline = async (profileId: string) => {
     try {
-      await apiClient.interactions.decline(profileId)
+      await apiClient.interests.decline(profileId)
       invalidate()
     } catch (e: any) {
       alert(e?.message || "Failed to decline interest")
@@ -895,7 +895,7 @@ function InterestsPageInner() {
 
   const handleWithdraw = async (profileId: string) => {
     try {
-      await apiClient.interactions.withdraw(profileId)
+      await apiClient.interests.withdraw(profileId)
       invalidate()
     } catch (e: any) {
       alert(e?.message || "Failed to withdraw interest")

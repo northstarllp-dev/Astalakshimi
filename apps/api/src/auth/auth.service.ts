@@ -133,8 +133,15 @@ export class AuthService {
       role: user.role,
     });
 
+    // Issue JWT Refresh Token
+    const refreshToken = this.jwtService.sign({
+      sub: user.id,
+      type: 'refresh',
+    }, { expiresIn: '7d' });
+
     return {
       accessToken,
+      refreshToken,
       user,
       isNewUser,
       hasProfile,
@@ -162,5 +169,51 @@ export class AuthService {
       user: user as unknown as User,
       hasProfile: Boolean(existingProfile),
     };
+  }
+
+  async refreshToken(token: string): Promise<AuthResponse> {
+    try {
+      const payload = this.jwtService.verify(token);
+      if (payload.type !== 'refresh') {
+        throw new UnauthorizedException('Invalid token type');
+      }
+      
+      const [user] = await this.db
+        .select()
+        .from(users)
+        .where(eq(users.id, payload.sub))
+        .limit(1);
+
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      const [existingProfile] = await this.db
+        .select({ id: profiles.id })
+        .from(profiles)
+        .where(eq(profiles.userId, user.id))
+        .limit(1);
+
+      const accessToken = this.jwtService.sign({
+        sub: user.id,
+        phone: user.phone,
+        role: user.role,
+      });
+
+      const refreshToken = this.jwtService.sign({
+        sub: user.id,
+        type: 'refresh',
+      }, { expiresIn: '7d' });
+
+      return {
+        accessToken,
+        refreshToken,
+        user: user as unknown as User,
+        isNewUser: false,
+        hasProfile: Boolean(existingProfile),
+      };
+    } catch (e) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 }

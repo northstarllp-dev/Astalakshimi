@@ -1,4 +1,5 @@
-import { Controller, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Delete, Body, Param, UseGuards, Get, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { MediaService } from './media.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -50,6 +51,24 @@ export class MediaController {
     @Body(new ZodValidationPipe(confirmHoroscopeSchema)) input: ConfirmHoroscopeInput,
   ) {
     return this.mediaService.confirmHoroscope(user.userId, input);
+  }
+
+  @Get('image')
+  async getMediaImage(
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const s3Key = req.query.key as string;
+    if (!s3Key) {
+      return res.status(400).send('Missing S3 key');
+    }
+    
+    try {
+      const url = await this.mediaService.getSignedMediaUrl(s3Key);
+      return res.redirect(url);
+    } catch (error) {
+      return res.status(500).send('Failed to generate image URL');
+    }
   }
 
   @Delete('photos/:id')

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { sendOtpSchema, verifyOtpSchema, type SendOtpInput, type VerifyOtpInput } from '@astalakshimi/validation';
@@ -18,6 +18,14 @@ export class AuthController {
   @Post('verify-otp')
   async verifyOtp(@Body(new ZodValidationPipe(verifyOtpSchema)) input: VerifyOtpInput) {
     return this.authService.verifyOtp(input);
+  }
+
+  @Post('refresh')
+  async refresh(@Body('refreshToken') token: string) {
+    if (!token) {
+      throw new BadRequestException('Refresh token is required');
+    }
+    return this.authService.refreshToken(token);
   }
 
   @Get('me')

@@ -18,6 +18,7 @@ import { checkoutSchema } from "@/lib/validation"
 import { queryKeys } from "@/hooks/queries"
 import { useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
+import { apiClient } from "@/lib/api-client"
 
 type PayMethod = "upi" | "card" | "netbanking" | "wallet"
 
@@ -56,10 +57,9 @@ function CheckoutInner() {
     plan.priceInPaise === 0
       ? { label: "₹0", paise: 0 }
       : { label: plan.price, paise: plan.priceInPaise }
-  const unlocks = ((_: any) => [])(plan.id)
-  const durationDays = plan.durationDays
+  const unlocks = plan.unlocks || []
 
-  const confirm = () => {
+  const confirm = async () => {
     const parsed = checkoutSchema.safeParse({
       method,
       upiId,
@@ -71,22 +71,41 @@ function CheckoutInner() {
     }
     setError("")
     setPaying(true)
-    window.setTimeout(() => {
-      ((...args: any[]) => null)(plan.id, durationDays)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.paid })
-      if (plan.priceInPaise > 0) {
-        ((...args: any[]) => null)({
-          planId: plan.id,
-          planName: `${plan.name} (${plan.period})`,
-          amount: priced.label,
-          method: PAY_METHODS.find((m: any) => m.id === method)?.label ?? method,
-          status: "paid",
+
+    try {
+      // 1. Frontend sends planId -> Backend loads plan -> Backend determines amount -> Backend creates payment order
+      const order = await apiClient.payments.createOrder(plan.id)
+
+      if (order.freeActivated) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription })
+        await queryClient.invalidateQueries({ queryKey: queryKeys.invoices })
+        await queryClient.invalidateQueries({ queryKey: queryKeys.paid })
+        setPaying(false)
+        setDone(true)
+        window.setTimeout(() => router.push("/plans"), 1400)
+        return
+      }
+
+      // 2. Verify payment on backend
+      if (order.orderId) {
+        await apiClient.payments.verifyPayment({
+          razorpayOrderId: order.orderId,
+          razorpayPaymentId: `pay_${Date.now()}`,
+          razorpaySignature: "demo_signature",
         })
       }
+
+      await queryClient.invalidateQueries({ queryKey: queryKeys.subscription })
+      await queryClient.invalidateQueries({ queryKey: queryKeys.invoices })
+      await queryClient.invalidateQueries({ queryKey: queryKeys.paid })
       setPaying(false)
       setDone(true)
       window.setTimeout(() => router.push("/plans"), 1400)
-    }, 900)
+    } catch (err: any) {
+      console.error("Payment error:", err)
+      setError(err?.message || "Payment processing failed. Please try again.")
+      setPaying(false)
+    }
   }
 
   return (

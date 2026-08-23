@@ -27,6 +27,10 @@ export class MediaService {
     );
   }
 
+  async getSignedMediaUrl(s3Key: string): Promise<string> {
+    return this.s3Provider.getSignedMediaUrl(s3Key);
+  }
+
   async confirmPhoto(userId: string, input: ConfirmPhotoInput) {
     const [profile] = await this.db
       .select({ id: profiles.id })
@@ -79,18 +83,18 @@ export class MediaService {
       .values({
         profileId: profile.id,
         method: input.method,
-        selfieS3Key: input.selfieS3Key ?? null,
-        govtIdType: input.govtIdType ?? null,
-        govtIdS3Key: input.govtIdS3Key ?? null,
+        selfieS3Key: input.selfieS3Key || null,
+        govtIdType: input.govtIdType || null,
+        govtIdS3Key: input.govtIdS3Key || null,
         status: 'pending',
       })
       .onConflictDoUpdate({
         target: verifications.profileId,
         set: {
           method: input.method,
-          selfieS3Key: input.selfieS3Key ?? null,
-          govtIdType: input.govtIdType ?? null,
-          govtIdS3Key: input.govtIdS3Key ?? null,
+          selfieS3Key: input.selfieS3Key || null,
+          govtIdType: input.govtIdType || null,
+          govtIdS3Key: input.govtIdS3Key || null,
           status: 'pending',
           updatedAt: new Date(),
         },

@@ -33,6 +33,7 @@ export interface VerifyOtpRequest {
 
 export interface AuthResponse {
   accessToken: string;
+  refreshToken: string;
   user: User;
   isNewUser: boolean;
   hasProfile: boolean;

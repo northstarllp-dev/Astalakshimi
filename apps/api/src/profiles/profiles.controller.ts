@@ -32,6 +32,51 @@ export class ProfilesController {
     return this.profilesService.updateMyProfile(user.userId, payload);
   }
 
+  @Patch('me/basic')
+  @UseGuards(JwtAuthGuard)
+  async updateBasicDetails(
+    @CurrentUser() user: UserSession,
+    @Body() payload: Partial<CompleteRegistrationPayload>,
+  ) {
+    return this.profilesService.updateMyProfile(user.userId, payload);
+  }
+
+  @Patch('me/education')
+  @UseGuards(JwtAuthGuard)
+  async updateEducationCareer(
+    @CurrentUser() user: UserSession,
+    @Body() payload: Partial<CompleteRegistrationPayload>,
+  ) {
+    return this.profilesService.updateMyProfile(user.userId, payload);
+  }
+
+  @Patch('me/family')
+  @UseGuards(JwtAuthGuard)
+  async updateFamilyDetails(
+    @CurrentUser() user: UserSession,
+    @Body() payload: Partial<CompleteRegistrationPayload>,
+  ) {
+    return this.profilesService.updateMyProfile(user.userId, payload);
+  }
+
+  @Patch('me/lifestyle')
+  @UseGuards(JwtAuthGuard)
+  async updateLifestyleAstrology(
+    @CurrentUser() user: UserSession,
+    @Body() payload: Partial<CompleteRegistrationPayload>,
+  ) {
+    return this.profilesService.updateMyProfile(user.userId, payload);
+  }
+
+  @Patch('me/preferences')
+  @UseGuards(JwtAuthGuard)
+  async updatePartnerPreferences(
+    @CurrentUser() user: UserSession,
+    @Body() payload: Partial<CompleteRegistrationPayload>,
+  ) {
+    return this.profilesService.updateMyProfile(user.userId, payload);
+  }
+
   @Post('me/photos')
   @UseGuards(JwtAuthGuard)
   async addPhoto(

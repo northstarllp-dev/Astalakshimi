@@ -251,9 +251,18 @@ export default function SettingsPage() {
         <Button
           variant="outline"
           className="w-full"
-          onClick={() => {
+          onClick={async () => {
             sessionStorage.clear()
-            router.push("/login")
+            localStorage.clear()
+            
+            // Clear backend cookies
+            try {
+              const { apiClient } = await import("@/lib/api-client")
+              await apiClient.auth.logout()
+            } catch (err) {}
+
+            // Hard reload to destroy React Query cache and application state
+            window.location.href = "/login"
           }}
         >
           <LogOut className="mr-2 h-4 w-4" /> Log out (demo)

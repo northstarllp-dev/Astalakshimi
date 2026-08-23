@@ -28,8 +28,8 @@ export class EntitlementsService {
       // Return free plan rules
       return {
         slug: 'free',
-        interestQuota: 5, // example free quota
-        contactUnlocks: 0,
+        interestQuota: 30, // 30 interests / month
+        contactUnlocks: 3,  // 3 contact unlocks
         hasAdvancedFilters: false,
         hasPriorityListing: false,
       };

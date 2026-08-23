@@ -9,7 +9,7 @@ const SECTION_LABELS: Record<string, string> = {
   "/dashboard": "Discover",
   "/search": "search",
   "/interests": "Interests",
-  "/shortlist": "your shortlist",
+  "/shortlists": "your shortlists",
 }
 
 export function RequireFullPortal({ children }: { children: React.ReactNode }) {

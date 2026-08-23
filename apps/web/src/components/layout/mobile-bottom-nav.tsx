@@ -11,7 +11,7 @@ const items = [
   { href: "/interests", label: "Interests", icon: Heart, match: (p: string) => p.startsWith("/interests") || p.startsWith("/inbox") },
 
   { href: "/plans", label: "Premium", icon: Sparkles, match: (p: string) => p.startsWith("/plans") || p.startsWith("/checkout") },
-  { href: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") || p.startsWith("/shortlist") },
+  { href: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") || p.startsWith("/shortlists") },
 ]
 
 export function MobileBottomNav() {

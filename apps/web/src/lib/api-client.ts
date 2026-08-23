@@ -10,8 +10,8 @@ import type {
 } from '@astalakshimi/types';
 import type { PartnerPreferencesInput } from '@astalakshimi/validation';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-const TOKEN_KEY = 'astalakshimi.auth_token';
+// Use Next.js BFF Proxy for all client API requests
+const API_BASE_URL = '/api/proxy';
 
 class ApiClient {
   private baseUrl: string;
@@ -22,31 +22,33 @@ class ApiClient {
 
   getToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem('is_authenticated') === 'true' ? 'dummy_token' : null;
   }
 
-  setToken(token: string): void {
+  setToken(token?: string): void {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem('is_authenticated', 'true');
   }
 
   clearToken(): void {
     if (typeof window === 'undefined') return;
-    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('is_authenticated');
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = this.getToken();
+    // The Next.js proxy will attach the HTTP-only cookie automatically
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
     };
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    // If endpoint starts with /api/auth, we bypass the proxy base URL
+    // since we hit the Next.js auth routes directly.
+    const url = endpoint.startsWith('/api/auth') 
+      ? endpoint 
+      : `${this.baseUrl}${endpoint}`;
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    const response = await fetch(url, {
       ...options,
       headers,
     });
@@ -78,20 +80,19 @@ class ApiClient {
       }),
 
     verifyOtp: async (data: VerifyOtpRequest): Promise<AuthResponse> => {
-      const response = await this.request<AuthResponse>('/auth/verify-otp', {
+      // Hit the Next.js auth API route which sets the HTTP-only cookie
+      const res = await this.request<AuthResponse>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(data),
       });
-      if (response.accessToken) {
-        this.setToken(response.accessToken);
-      }
-      return response;
+      this.setToken();
+      return res;
     },
 
     getMe: () => this.request<{ user: User; hasProfile: boolean }>('/auth/me'),
 
-    logout: () => {
-      this.clearToken();
+    logout: async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
     },
   };
 
@@ -155,11 +156,18 @@ class ApiClient {
   // --- Search APIs ---
   search = {
     searchProfiles: (query: any) => {
-      // Remove empty values from query
-      const cleanQuery = Object.fromEntries(
-        Object.entries(query).filter(([_, v]) => v != null && v !== '')
-      );
-      const params = new URLSearchParams(cleanQuery as Record<string, string>).toString();
+      // Remove empty values from query and handle nested advanced objects
+      const cleanQuery: Record<string, string> = {};
+      for (const [k, v] of Object.entries(query)) {
+        if (v != null && v !== '') {
+          if (typeof v === 'object') {
+            cleanQuery[k] = JSON.stringify(v);
+          } else {
+            cleanQuery[k] = String(v);
+          }
+        }
+      }
+      const params = new URLSearchParams(cleanQuery).toString();
       return this.request<any>(`/search?${params}`);
     },
   };
@@ -217,46 +225,6 @@ class ApiClient {
     getSummary: () => this.request<any>('/activity/summary'),
   };
 
-  // --- Interactions APIs ---
-  interactions = {
-    getReceived: (status?: string) => {
-      const qs = status ? `?status=${encodeURIComponent(status)}` : '';
-      return this.request<any[]>(`/interactions/received${qs}`);
-    },
-
-    getSent: () => this.request<any[]>('/interactions/sent'),
-
-    getMutual: () => this.request<any[]>('/interactions/mutual'),
-
-    getSummary: () => this.request<any>('/interactions/summary'),
-
-    sendInterest: (targetProfileId: string, message?: string) =>
-      this.request<any>('/interactions/interest', {
-        method: 'POST',
-        body: JSON.stringify({ targetProfileId, profileId: targetProfileId, message }),
-      }),
-
-    accept: (idOrProfileId: string) =>
-      this.request<any>(`/interactions/${idOrProfileId}/accept`, {
-        method: 'PATCH',
-      }),
-
-    decline: (idOrProfileId: string) =>
-      this.request<any>(`/interactions/${idOrProfileId}/decline`, {
-        method: 'PATCH',
-      }),
-
-    withdraw: (idOrProfileId: string) =>
-      this.request<any>(`/interactions/${idOrProfileId}/withdraw`, {
-        method: 'PATCH',
-      }),
-
-    updateStatus: (interestId: string, status: 'accepted' | 'declined' | 'withdrawn') =>
-      this.request<any>(`/interactions/${interestId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      }),
-  };
 
   // --- Interests APIs ---
   interests = {
@@ -321,18 +289,15 @@ class ApiClient {
 
   // --- Shortlists APIs ---
   shortlists = {
-    getAll: () => this.request<any[]>('/shortlist'),
-
-    getIds: () => this.request<string[]>('/shortlist/ids'),
-
+    getAll: () => this.request<any[]>('/shortlists'),
+    getIds: () => this.request<string[]>('/shortlists/ids'),
     add: (targetProfileId: string) =>
-      this.request<any>('/shortlist', {
+      this.request<any>('/shortlists', {
         method: 'POST',
-        body: JSON.stringify({ targetProfileId, profileId: targetProfileId }),
+        body: JSON.stringify({ targetProfileId }),
       }),
-
     remove: (targetProfileId: string) =>
-      this.request<any>(`/shortlist/${targetProfileId}`, {
+      this.request<any>(`/shortlists/${targetProfileId}`, {
         method: 'DELETE',
       }),
   };
@@ -354,6 +319,43 @@ class ApiClient {
       this.request<any>(`/chat/${threadId}/read`, {
         method: 'PATCH',
       }),
+  };
+
+  // --- Plans APIs ---
+  plans = {
+    getActive: () => this.request<any[]>('/plans'),
+  };
+
+  // --- Payments APIs ---
+  payments = {
+    createOrder: (planId: string) =>
+      this.request<{
+        orderId?: string;
+        amount?: number;
+        currency?: string;
+        keyId?: string;
+        planId?: string;
+        planSlug?: string;
+        planName?: string;
+        freeActivated?: boolean;
+      }>('/payments/orders', {
+        method: 'POST',
+        body: JSON.stringify({ planId }),
+      }),
+
+    verifyPayment: (data: {
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+    }) =>
+      this.request<{ success: boolean; planName?: string; planSlug?: string }>('/payments/verify', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    getSubscription: () => this.request<any>('/payments/subscription'),
+
+    getInvoices: () => this.request<any[]>('/payments/invoices'),
   };
 }
 

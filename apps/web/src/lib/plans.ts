@@ -229,7 +229,9 @@ export const DURATION_ADDONS = [
 ] as const
 
 export function getPlanById(id: string) {
-  return MEMBERSHIP_PLANS.find((p) => p.id === id) ?? null
+  if (!id) return null
+  const normalized = id.toString().trim().toLowerCase()
+  return MEMBERSHIP_PLANS.find((p) => p.id === normalized) ?? null
 }
 
 export function featureCell(value: PlanFeatureValue) {

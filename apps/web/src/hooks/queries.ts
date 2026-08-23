@@ -10,7 +10,7 @@ export const queryKeys = {
   invoices: ["membership", "invoices"] as const,
   notifications: ["activity", "notifications"] as const,
   unread: ["activity", "notifications", "unread"] as const,
-  shortlist: ["activity", "shortlist"] as const,
+  shortlists: ["activity", "shortlists"] as const,
   skipped: ["activity", "skipped"] as const,
   interests: ["activity", "interests"] as const,
   settings: ["activity", "settings"] as const,
@@ -183,9 +183,7 @@ export function useSaveProfileMutation() {
           phone: data.phone,
           otp: data.otp || '123456',
         })
-        if (auth.accessToken) {
-          apiClient.setToken(auth.accessToken)
-        }
+        apiClient.setToken()
       }
 
       // 4. Submit complete registration transaction to RDS
@@ -285,22 +283,44 @@ export function useMatchesQuery() {
 export function usePaidQuery() {
   return useQuery({
     queryKey: queryKeys.paid,
-    queryFn: async () => false,
-  })
+    queryFn: async () => {
+      if (!apiClient.getToken()) return false;
+      try {
+        const sub = await apiClient.payments.getSubscription();
+        return sub && sub.planSlug && sub.planSlug !== 'free';
+      } catch {
+        return false;
+      }
+    },
+  });
 }
 
 export function useSubscriptionQuery() {
   return useQuery({
     queryKey: queryKeys.subscription,
-    queryFn: async () => (null as any),
-  })
+    queryFn: async () => {
+      if (!apiClient.getToken()) return null;
+      try {
+        return await apiClient.payments.getSubscription();
+      } catch {
+        return null;
+      }
+    },
+  });
 }
 
 export function useInvoicesQuery() {
   return useQuery({
     queryKey: queryKeys.invoices,
-    queryFn: async () => ([] as any[]),
-  })
+    queryFn: async () => {
+      if (!apiClient.getToken()) return [];
+      try {
+        return await apiClient.payments.getInvoices();
+      } catch {
+        return [];
+      }
+    },
+  });
 }
 
 export function useNotificationsQuery() {
@@ -349,7 +369,7 @@ export function useNotificationMutations() {
 
 export function useShortlistQuery() {
   return useQuery({
-    queryKey: queryKeys.shortlist,
+    queryKey: queryKeys.shortlists,
     queryFn: async () => {
       if (!apiClient.getToken()) return [];
       return apiClient.shortlists.getAll();
@@ -359,7 +379,7 @@ export function useShortlistQuery() {
 
 export function useShortlistIdsQuery() {
   return useQuery({
-    queryKey: [...queryKeys.shortlist, "ids"],
+    queryKey: [...queryKeys.shortlists, "ids"],
     queryFn: async () => {
       if (!apiClient.getToken()) return [];
       const res = await apiClient.shortlists.getIds().catch(async () => {
@@ -375,6 +395,7 @@ export function useSkippedQuery() {
   return useQuery({
     queryKey: queryKeys.skipped,
     queryFn: async () => ([] as string[]),
+    staleTime: Infinity,
   })
 }
 
@@ -382,7 +403,7 @@ export function useToggleShortlistMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (profileId: string) => {
-      const current = (queryClient.getQueryData<any[]>(queryKeys.shortlist) || []);
+      const current = (queryClient.getQueryData<any[]>(queryKeys.shortlists) || []);
       const isShortlisted = current.some((item: any) => 
         typeof item === "string" ? item === profileId : (item.id === profileId || item.profileId === profileId)
       );
@@ -398,8 +419,8 @@ export function useToggleShortlistMutation() {
       }
     },
     onSuccess: (updated) => {
-      queryClient.setQueryData(queryKeys.shortlist, updated)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.shortlist })
+      queryClient.setQueryData(queryKeys.shortlists, updated)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.shortlists })
       void queryClient.invalidateQueries({ queryKey: queryKeys.interests })
       void queryClient.invalidateQueries({ queryKey: ["activity"] })
     },
@@ -425,7 +446,7 @@ export function useSendInterestMutation() {
     mutationFn: async (payload: string | { targetProfileId: string; message?: string }) => {
       const profileId = typeof payload === 'string' ? payload : payload.targetProfileId;
       const message = typeof payload === 'object' ? payload.message : undefined;
-      return apiClient.interactions.sendInterest(profileId, message);
+      return apiClient.interests.sendInterest(profileId, message);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.interests })
@@ -439,7 +460,7 @@ export function useAcceptInterestMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (idOrProfileId: string) => {
-      return apiClient.interactions.accept(idOrProfileId);
+      return apiClient.interests.accept(idOrProfileId);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.interests })
@@ -453,7 +474,7 @@ export function useDeclineInterestMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (idOrProfileId: string) => {
-      return apiClient.interactions.decline(idOrProfileId);
+      return apiClient.interests.decline(idOrProfileId);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.interests })
@@ -492,7 +513,7 @@ export function useInvalidateInterests() {
   const queryClient = useQueryClient()
   return () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.interests })
-    void queryClient.invalidateQueries({ queryKey: queryKeys.shortlist })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.shortlists })
     void queryClient.invalidateQueries({ queryKey: ["activity"] })
   }
 }

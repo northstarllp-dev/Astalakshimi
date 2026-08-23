@@ -126,6 +126,19 @@ export class S3Provider {
     return getSignedUrl(this.s3Client, command, { expiresIn: 900 }); // 15 minutes
   }
 
+  async getSignedMediaUrl(s3Key: string): Promise<string> {
+    if (!this.isConfigured) {
+      return `https://${this.mediaBucket}.s3.amazonaws.com/${s3Key}?mock-view-token=valid`;
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: this.mediaBucket,
+      Key: s3Key,
+    });
+
+    return getSignedUrl(this.s3Client, command, { expiresIn: 3600 }); // 1 hour for standard media
+  }
+
   async deleteObject(s3Key: string, isVault = false): Promise<void> {
     if (!this.isConfigured) return;
 

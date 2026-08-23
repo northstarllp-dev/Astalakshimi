@@ -18,7 +18,7 @@ const desktopLinks = [
   { href: "/inbox", label: "Inbox", match: (p: string) => p.startsWith("/inbox") },
   { href: "/interests", label: "Interests", match: (p: string) => p.startsWith("/interests") },
   { href: "/plans", label: "Premium", match: (p: string) => p.startsWith("/plans") || p.startsWith("/checkout") },
-  { href: "/profile", label: "Profile", match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") || p.startsWith("/shortlist") },
+  { href: "/profile", label: "Profile", match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") || p.startsWith("/shortlists") },
 ]
 
 

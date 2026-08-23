@@ -129,7 +129,7 @@ function DiscoverPage() {
   const userCity = profile?.city || "Chennai"
 
   const { data: searchResult, isLoading: isSearchLoading } = useSearchQuery({ ...query, page, limit: 10 })
-  const visibleMatches = searchResult?.profiles || []
+  const visibleMatches = (searchResult?.profiles || []).filter((profile: any) => !skipped.includes(profile.id))
   const totalCount = searchResult?.totalCount || 0
 
   const setQuick = (patch: Partial<DiscoverQuery>) => {

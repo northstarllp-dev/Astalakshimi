@@ -57,7 +57,7 @@ export function ProfileActionBar({ profileId }: { profileId: string }) {
     setIsAccepting(true)
     setErrorMsg(null)
     try {
-      await apiClient.interactions.accept(profileId)
+      await apiClient.interests.accept(profileId)
       invalidateInterests()
     } catch (err: any) {
       setErrorMsg(err?.message || "Failed to accept interest.")

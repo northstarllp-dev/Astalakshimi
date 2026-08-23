@@ -16,6 +16,6 @@ export function getMediaUrl(path: string | undefined | null): string {
     return `${base}${path}`;
   }
 
-  // Direct S3 bucket URL fallback
-  return `https://astalakshimi-media-dev.s3.ap-south-1.amazonaws.com/${path}`;
+  // Fallback to secure API proxy for on-the-fly presigned URL generation
+  return `/api/proxy/media/image?key=${encodeURIComponent(path)}`;
 }
