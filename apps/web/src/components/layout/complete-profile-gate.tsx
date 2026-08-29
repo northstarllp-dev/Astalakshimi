@@ -3,8 +3,13 @@
 import Link from "next/link"
 import { useProfileQuery } from "@/hooks/queries"
 import { ChevronRight, Lock } from "lucide-react"
-import { calculateProfileCompleteness } from "@/lib/utils"
-import { isProfileComplete } from "@/lib/portal-access"
+import {
+  PROFILE_COMPLETE_THRESHOLD,
+  getProfileActions,
+  getProfileCompleteness,
+  isProfileComplete,
+  isVerified,
+} from "@/lib/portal-access"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,16 +20,18 @@ export function CompleteProfileGate({
   section?: string
 }) {
   const { data: profile = null } = useProfileQuery()
-  const completeness = calculateProfileCompleteness(profile)
-  const verified = profile?.verificationStatus === "verified"
+  const completeness = getProfileCompleteness(profile)
+  const verified = isVerified(profile?.verificationStatus)
+  const rejected = profile?.verificationStatus === "rejected"
   const complete = isProfileComplete(profile)
-  const nextActions = ([] as any[]).filter((a) => !a.done).slice(0, 4)
+  const nextActions = getProfileActions(profile).filter((a) => !a.done).slice(0, 4)
 
-  const reason =
-    !complete && !verified
+  const reason = rejected
+    ? `Verification was rejected. Re-upload your selfie or ID, then finish your profile to open ${section}.`
+    : !complete && !verified
       ? `Finish your profile and get verified to open ${section}.`
       : !complete
-        ? `Reach ${80}% complete to open ${section}.`
+        ? `Reach ${PROFILE_COMPLETE_THRESHOLD}% complete to open ${section}.`
         : `Verification is still pending — ${section} opens after approval.`
 
   return (
@@ -52,9 +59,10 @@ export function CompleteProfileGate({
         </ul>
       )}
 
-      <Link href="/profile/edit" className="mt-6">
+      <Link href={rejected ? "/profile/verify" : "/profile/edit"} className="mt-6">
         <Button>
-          Complete profile <ChevronRight className="ml-1 h-4 w-4" />
+          {rejected ? "Re-upload verification" : "Complete profile"}{" "}
+          <ChevronRight className="ml-1 h-4 w-4" />
         </Button>
       </Link>
       <Link href="/home" className="mt-3 text-sm font-semibold text-primary hover:underline">

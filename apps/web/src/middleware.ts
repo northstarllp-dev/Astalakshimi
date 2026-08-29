@@ -15,7 +15,10 @@ export default auth((req) => {
   // API auth routes must always be accessible
   const isApiAuthRoute = pathname.startsWith("/api/auth")
 
-  if (isApiAuthRoute) {
+  // Staff console has its own session (not member NextAuth)
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
+
+  if (isApiAuthRoute || isAdminRoute) {
     return NextResponse.next()
   }
 
@@ -38,7 +41,9 @@ export default auth((req) => {
   return NextResponse.next()
 })
 
-// Optionally, don't invoke Middleware on some paths
+// Skip auth for Next internals, API, and static public assets (images, icons, manifest)
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|manifest.webmanifest|images/|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|woff2?)$).*)",
+  ],
 }

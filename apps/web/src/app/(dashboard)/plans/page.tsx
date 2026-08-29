@@ -32,7 +32,7 @@ const daysRemaining = (date: any) => {
 }
 
 const formatExpiry = (date: any) => {
-  if (!date) return "—"
+  if (!date) return ""
   return new Date(date).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -126,7 +126,7 @@ export default function PlansPage() {
       try {
         await navigator.share({
           title: "Astalakshimi Matrimony",
-          text: "Join Astalakshimi — use my link and we both benefit. You get started free; I get 1 month Silver.",
+          text: "Join Astalakshimi  use my link and we both benefit. You get started free; I get 1 month Silver.",
           url: referralLink,
         })
         return
@@ -172,7 +172,7 @@ export default function PlansPage() {
                     ? current.period
                     : sub
                       ? formatExpiry(sub.expiresAt)
-                      : "—"
+                      : ""
                 }
               />
               <Stat label="Days remaining" value={`${remaining} day${remaining === 1 ? "" : "s"}`} />
@@ -425,7 +425,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function downloadInvoice(inv: InvoiceRecord) {
   const lines = [
-    "Astalakshimi Matrimony — Tax Invoice (demo)",
+    "Astalakshimi Matrimony  Tax Invoice (demo)",
     `Invoice: ${inv?.id}`,
     `Plan: ${inv?.planName}`,
     `Amount: ${inv?.amount}`,

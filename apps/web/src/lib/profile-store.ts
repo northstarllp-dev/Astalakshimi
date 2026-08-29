@@ -1,5 +1,7 @@
 export type VerificationMethod = "selfie" | "govt_id" | ""
-export type VerificationStatus = "idle" | "pending" | "verified"
+export type VerificationStatus = "idle" | "pending" | "verified" | "rejected"
+
+export const DEMO_REJECTION_REASON = "Selfie does not match profile photos."
 
 export type SignupData = {
   id?: string
@@ -82,6 +84,7 @@ export type SignupData = {
   birthTime: string
   birthPlace: string
   verificationStatus: VerificationStatus
+  rejectionReason?: string
   submittedAt: string
 }
 
@@ -165,6 +168,7 @@ export const emptySignupData = (): SignupData => ({
   birthTime: "",
   birthPlace: "",
   verificationStatus: "idle",
+  rejectionReason: undefined,
   submittedAt: "",
 })
 

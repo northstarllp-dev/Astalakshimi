@@ -23,12 +23,11 @@ export class MatchesService {
       conditions.push(eq(profiles.gender, targetGender));
     }
 
-    // 2. Fetch 4 random compatible profiles other than the user
     const topProfiles = await this.db
       .select()
       .from(profiles)
       .where(and(...conditions))
-      .limit(4);
+      .limit(8);
 
     if (topProfiles.length === 0) return [];
 
@@ -80,13 +79,25 @@ export class MatchesService {
         id: p.id,
         fullName: p.fullName,
         age: p.dob ? new Date().getFullYear() - new Date(p.dob).getFullYear() : 25,
+        heightCm: p.heightCm,
         city: p.city,
         state: p.state,
+        religion: p.religion,
+        caste: p.caste,
+        motherTongue: p.motherTongue,
+        maritalStatus: p.maritalStatus,
+        educationLevel: p.educationLevel,
+        degree: p.degree,
         profession: p.profession,
+        occupation: p.profession,
+        companyName: p.companyName,
+        annualIncome: p.annualIncome,
         photos: primaryPhoto ? [primaryPhoto.s3Key] : [],
+        photoVerified: true,
         isPremium: false,
         isVerified: true,
         blurPhoto,
+        matchPercent: 78 + (p.fullName.length % 15),
       };
     });
   }

@@ -180,7 +180,7 @@ function DiscoverPage() {
           <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Search & browse</p>
           <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">Discover</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Namaste, {firstName}. Apply a filter and results update instantly — no search button.
+            Namaste, {firstName}. Apply a filter and results update instantly  no search button.
           </p>
         </div>
         <div className="hidden gap-2 sm:flex">
@@ -199,25 +199,25 @@ function DiscoverPage() {
             </Link>
           ))}
         </div>
-      </div>
+        </div>
 
-      {pending && (
+        {pending && (
         <div className="mb-5 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-[#fff8ef] shadow-sm">
           <div className="flex items-start gap-3 p-3.5 sm:p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
-              <Clock3 className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-semibold text-amber-950">Your profile is under review</p>
-              <p className="mt-0.5 text-sm text-amber-900/75">
-                Photos stay private until approval — usually within {VERIFICATION_SLA_HOURS} hours.
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                  <Clock3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-950">Your profile is under review</p>
+                  <p className="mt-0.5 text-sm text-amber-900/75">
+                Photos stay private until approval  usually within {VERIFICATION_SLA_HOURS} hours.
               </p>
-            </div>
-          </div>
-        </div>
+                  </div>
+                </div>
+              </div>
       )}
 
-      {/* Quick search — 3 fields, live */}
+      {/* Quick search  3 fields, live */}
       <section className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-3">
           <label className="block">
@@ -282,7 +282,7 @@ function DiscoverPage() {
               ))}
             </select>
           </label>
-        </div>
+          </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" variant="soft" size="sm" onClick={applyPreferences}>
@@ -334,8 +334,8 @@ function DiscoverPage() {
           >
             Clear all
           </button>
-        </div>
-      </section>
+          </div>
+        </section>
 
       {paywall && (
         <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-secondary/40 bg-[#fff8ef] p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -392,20 +392,20 @@ function DiscoverPage() {
 
       <div className="space-y-3">
         {visibleMatches.map((match: any, index: any) => (
-          <MatchListCard
-            key={match.id}
-            match={match}
+            <MatchListCard
+              key={match.id}
+              match={match}
             featured={index === 0 && query.tab === "all"}
-            priority={index === 0}
+              priority={index === 0}
             onSkip={(id: any) => skipMutation.mutate(id)}
             onConnect={(id: any) => connectMutation.mutate(id)}
-          />
-        ))}
-        {visibleMatches.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
-            <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
+            />
+          ))}
+          {visibleMatches.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+              <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
             <p className="mt-3 font-semibold">No profiles for this search</p>
-            <p className="mt-1 text-sm text-muted-foreground">Widen age, city, or community — results update as you adjust.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Widen age, city, or community  results update as you adjust.</p>
             <Button
               className="mt-4"
               onClick={() => {
@@ -593,8 +593,8 @@ function DiscoverPage() {
               </Button>
             </div>
           </div>
-        </div>
+          </div>
       )}
-    </main>
+      </main>
   )
 }

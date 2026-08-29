@@ -365,7 +365,7 @@ export function Step6Verify({
     <div className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8 pb-8">
       <StepHeading
         title="Photos & verification"
-        subtitle="Add clear photos, verify with a live selfie or government ID, and optionally upload your horoscope. Photos stay hidden until our team approves them — usually within 12 hours."
+        subtitle="Add clear photos, verify with a live selfie or government ID, and optionally upload your horoscope. Photos stay hidden until our team approves them  usually within 12 hours."
       />
 
       {/* Profile Photos */}

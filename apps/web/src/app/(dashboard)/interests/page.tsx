@@ -615,7 +615,7 @@ function ShortlistedTab({
   return (
     <div>
       <p className="mb-3 text-xs text-muted-foreground">
-        <span className="font-semibold text-foreground">{items.length}</span> saved {items.length === 1 ? "profile" : "profiles"} · Private — members are not notified
+        <span className="font-semibold text-foreground">{items.length}</span> saved {items.length === 1 ? "profile" : "profiles"} · Private  members are not notified
       </p>
       <div className="space-y-3">
         {items.map((item) => (
@@ -819,7 +819,7 @@ function InterestsPageInner() {
         <p className="royal-label">Your relationship CRM</p>
         <h1 className="mt-0.5 font-serif text-3xl font-bold tracking-tight">Interests</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Track every connection — received, sent, matched, and saved.
+          Track every connection  received, sent, matched, and saved.
         </p>
       </div>
 

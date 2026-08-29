@@ -30,6 +30,14 @@ export const metadata: Metadata = {
   description:
     "India's trusted matrimony for families across every community and mother tongue. Verified photos, screened profiles, and matches rooted in tradition.",
   applicationName: "Astalakshimi",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Asta Admin",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 }
 
 export const viewport: Viewport = {
@@ -37,7 +45,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: "cover",
-  themeColor: "#8b1e3f",
+  themeColor: "#7c1535",
 }
 
 export default function RootLayout({

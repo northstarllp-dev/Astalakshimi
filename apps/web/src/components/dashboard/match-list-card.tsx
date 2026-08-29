@@ -91,7 +91,7 @@ export function MatchListCard({
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-black/20" />
 
 
-            {/* Photo badges — match % + verified only, stacked */}
+            {/* Photo badges  match % + verified only, stacked */}
             <div className="absolute left-2.5 top-2.5 flex flex-col items-start gap-1.5">
               <Badge className="border-transparent bg-emerald-500 text-[11px] font-bold text-white">
                 <Star className="fill-current" /> {match.matchPercent}%

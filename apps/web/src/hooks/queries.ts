@@ -1,6 +1,6 @@
 type UserSettings = any;
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { loadProfile, saveProfile, emptySignupData, type SignupData } from "@/lib/profile-store"
+import { loadProfile, saveProfile, emptySignupData, DEMO_REJECTION_REASON, type SignupData } from "@/lib/profile-store"
 import { apiClient } from "@/lib/api-client"
 export const queryKeys = {
   profile: ["profile"] as const,
@@ -262,10 +262,62 @@ export function useReorderPhotosMutation() {
   })
 }
 
+/** Demo: pending → verified (clears rejectionReason). */
 export function useMarkVerifiedMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async () => null,
+    mutationFn: async () => {
+      const current = loadProfile()
+      if (!current) return null
+      const next: SignupData = {
+        ...current,
+        verificationStatus: "verified",
+        rejectionReason: undefined,
+      }
+      saveProfile(next)
+      return next
+    },
+    onSuccess: (data) => {
+      if (data) queryClient.setQueryData(queryKeys.profile, data)
+    },
+  })
+}
+
+/** Demo: pending → rejected with a sample reason. */
+export function useRejectVerificationMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (reason?: string) => {
+      const current = loadProfile()
+      if (!current) return null
+      const next: SignupData = {
+        ...current,
+        verificationStatus: "rejected",
+        rejectionReason: reason || DEMO_REJECTION_REASON,
+      }
+      saveProfile(next)
+      return next
+    },
+    onSuccess: (data) => {
+      if (data) queryClient.setQueryData(queryKeys.profile, data)
+    },
+  })
+}
+
+/** Resubmit selfie/ID after rejection (or first-time verify) → pending. */
+export function useResubmitVerificationMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: SignupData) => {
+      const next: SignupData = {
+        ...data,
+        verificationStatus: "pending",
+        rejectionReason: undefined,
+        submittedAt: data.submittedAt || new Date().toISOString(),
+      }
+      saveProfile(next)
+      return next
+    },
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.profile, data)
     },

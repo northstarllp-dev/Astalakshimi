@@ -83,7 +83,7 @@ export default function SettingsPage() {
             ))}
           </div>
           {settings.profileVisibility === "hidden" && (
-            <p className="text-xs text-amber-600">Your profile is paused — it won't appear in any search results.</p>
+            <p className="text-xs text-amber-600">Your profile is paused  it won't appear in any search results.</p>
           )}
         </div>
       </section>
@@ -113,7 +113,7 @@ export default function SettingsPage() {
           {!paid && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
         </div>
         {!paid && (
-          <p className="text-xs text-muted-foreground">Premium feature — enter a profile ID to hide your profile from that person.</p>
+          <p className="text-xs text-muted-foreground">Premium feature  enter a profile ID to hide your profile from that person.</p>
         )}
         {paid ? (
           <div className="space-y-3">
@@ -171,7 +171,7 @@ export default function SettingsPage() {
           {!paid && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
         </div>
         {!paid && (
-          <p className="text-xs text-muted-foreground">Premium feature — hide your profile from members in a specific city.</p>
+          <p className="text-xs text-muted-foreground">Premium feature  hide your profile from members in a specific city.</p>
         )}
         {paid ? (
           <div className="space-y-3">

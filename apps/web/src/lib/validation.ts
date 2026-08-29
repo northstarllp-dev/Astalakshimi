@@ -150,6 +150,43 @@ export const settingsListsSchema = z.object({
   hideFromCities: z.array(z.string()),
 })
 
+export const adminLoginSchema = z.object({
+  email: z.string().email("Enter a valid staff email."),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+})
+
+export const adminRejectSchema = z.object({
+  rejectionReason: z
+    .string()
+    .trim()
+    .min(10, "Provide a clear rejection reason (at least 10 characters)."),
+})
+
+export const adminCreateProfileSchema = z
+  .object({
+    profileFor: z.string().min(1, "Choose who this profile is for."),
+    phone: phoneSchema,
+    fullName: z.string().trim().min(3, "Name must be at least 3 characters."),
+    gender: z.string().min(1, "Select gender."),
+    dobDay: z.string().regex(/^\d{2}$/, "Enter a valid day."),
+    dobMonth: z.string().regex(/^\d{2}$/, "Enter a valid month."),
+    dobYear: z.string().regex(/^\d{4}$/, "Enter a valid year."),
+    maritalStatus: z.string().min(1, "Select marital status."),
+    city: z.string().trim().min(2, "Enter city."),
+    religion: z.string().min(1, "Select religion."),
+    caste: z.string().trim().min(2, "Enter caste or community."),
+    motherTongue: z.string().min(1, "Select mother tongue."),
+    brothersCount: z.number().int().min(0).max(5),
+    sistersCount: z.number().int().min(0).max(5),
+    markVerified: z.boolean(),
+  })
+  .superRefine((value, ctx) => {
+    const age = dobAge(value.dobDay, value.dobMonth, value.dobYear, value.gender)
+    if (!age.ok) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: age.message, path: ["dobYear"] })
+    }
+  })
+
 export type LoginPhoneValues = z.infer<typeof loginPhoneSchema>
 export type LoginOtpValues = z.infer<typeof loginOtpSchema>
 export type HeroRegisterValues = z.infer<typeof heroRegisterSchema>
@@ -157,3 +194,6 @@ export type SignupStep1Values = z.infer<typeof signupStep1Schema>
 export type SearchFiltersValues = z.infer<typeof searchFiltersSchema>
 export type CheckoutValues = z.infer<typeof checkoutSchema>
 export type PlanSelectValues = z.infer<typeof planSelectSchema>
+export type AdminLoginValues = z.infer<typeof adminLoginSchema>
+export type AdminRejectValues = z.infer<typeof adminRejectSchema>
+export type AdminCreateProfileValues = z.infer<typeof adminCreateProfileSchema>

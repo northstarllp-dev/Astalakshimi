@@ -43,6 +43,7 @@ export default function MyProfilePage() {
   const completeness = calculateProfileCompleteness(data)
   const pending = data.verificationStatus === "pending"
   const verified = data.verificationStatus === "verified"
+  const rejected = data.verificationStatus === "rejected"
   const age =
     data.dobYear && data.dobMonth && data.dobDay
       ? Math.max(
@@ -66,14 +67,17 @@ export default function MyProfilePage() {
       label: "Govt ID",
       done: verified,
       pending: pending && data.verificationMethod === "govt_id",
-      href: "/profile/edit#verification",
-      note: data.govtIdType || "Upload ID",
+      rejected,
+      href: verified ? "/home" : "/profile/verify",
+      note: rejected
+        ? data.rejectionReason || "Re-upload selfie or government ID"
+        : data.govtIdType || "Upload ID",
     },
     {
       icon: Users,
       label: "Family",
       done: false,
-      href: "/profile/edit#verification",
+      href: "/profile/edit",
       note: "Not verified",
     },
   ]
@@ -185,6 +189,11 @@ export default function MyProfilePage() {
                   <ShieldCheck className="mr-1 h-3 w-3" /> Verified
                 </Badge>
               )}
+              {rejected && (
+                <Badge className="border-transparent bg-destructive/10 text-destructive">
+                  <XCircle className="mr-1 h-3 w-3" /> Rejected — re-upload
+                </Badge>
+              )}
               {data.horoscopeName && (
                 <Badge variant="outline" className="bg-background">
                   <FileText className="mr-1 h-3 w-3" /> Horoscope
@@ -231,6 +240,8 @@ export default function MyProfilePage() {
                   </div>
                   {item.done ? (
                     <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  ) : item.rejected ? (
+                    <XCircle className="h-4 w-4 text-destructive shrink-0" />
                   ) : item.pending ? (
                     <Clock3 className="h-4 w-4 text-amber-500 shrink-0" />
                   ) : (

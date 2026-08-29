@@ -27,7 +27,7 @@ const BADGE_POPUPS: Record<BadgeKey, { title: string; body: string }> = {
   },
   screened: {
     title: "Profile screened",
-    body: "This profile has been screened for authenticity — identity checks and basic details were reviewed before it went live.",
+    body: "This profile has been screened for authenticity  identity checks and basic details were reviewed before it went live.",
   },
   horoscope: {
     title: "Horoscope available",

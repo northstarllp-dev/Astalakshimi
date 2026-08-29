@@ -171,7 +171,7 @@ function CheckoutInner() {
             <>
               <h3 className="font-semibold">Pay with Razorpay</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                UPI, cards, netbanking, and wallets — demo checkout only.
+                UPI, cards, netbanking, and wallets  demo checkout only.
               </p>
 
               <div className="mt-4 grid grid-cols-2 gap-2">
@@ -232,7 +232,7 @@ function CheckoutInner() {
                     : `Pay ${priced.label}`}
               </Button>
               <p className="mt-3 text-center text-[11px] text-muted-foreground">
-                One-tap upgrade. Live Razorpay keys plug in later — this saves plan + invoice on this device.
+                One-tap upgrade. Live Razorpay keys plug in later  this saves plan + invoice on this device.
               </p>
             </>
           )}
