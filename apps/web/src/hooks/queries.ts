@@ -287,13 +287,13 @@ export function useMarkVerifiedMutation() {
 export function useRejectVerificationMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (reason?: string) => {
+    mutationFn: async () => {
       const current = loadProfile()
       if (!current) return null
       const next: SignupData = {
         ...current,
         verificationStatus: "rejected",
-        rejectionReason: reason || DEMO_REJECTION_REASON,
+        rejectionReason: DEMO_REJECTION_REASON,
       }
       saveProfile(next)
       return next

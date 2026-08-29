@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@astalakshimi/types", "@astalakshimi/validation"],
   // Windows + Turbopack file-cache restore has panicked this repo
   // ("Restore of All for task failed"), which kills `next dev` and
   // surfaces in the browser as TypeError: Failed to fetch on navigation.

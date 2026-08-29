@@ -15,7 +15,9 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@astalakshimi/types": ["../../packages/types/src/index.ts"],
+      "@astalakshimi/validation": ["../../packages/validation/src/index.ts"]
     }
   },
   "include": [
