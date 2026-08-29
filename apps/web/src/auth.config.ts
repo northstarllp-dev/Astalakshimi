@@ -50,8 +50,8 @@ export const authConfig = {
     async jwt({ token, user }) {
       // If user object is available (on sign in), save the tokens to the JWT
       if (user) {
-        token.accessToken = user.accessToken
-        token.refreshToken = user.refreshToken
+        token.accessToken = (user as any).accessToken
+        token.refreshToken = (user as any).refreshToken
         token.user = user
       }
       return token
