@@ -11,14 +11,15 @@ import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
 import { useProfileQuery, useUnreadCountQuery } from "@/hooks/queries"
 import { cn } from "@/lib/utils"
 import { Bell, Search } from "lucide-react"
+import { ContactUnlockModal } from "./contact-unlock-modal"
 
 const desktopLinks = [
   { href: "/home", label: "Home", match: (p: string) => p === "/home" },
   { href: "/dashboard", label: "Discover", match: (p: string) => p === "/dashboard" || p.startsWith("/search") },
   { href: "/inbox", label: "Inbox", match: (p: string) => p.startsWith("/inbox") },
+  { href: "/matches", label: "Matches", match: (p: string) => p.startsWith("/matches") },
   { href: "/interests", label: "Interests", match: (p: string) => p.startsWith("/interests") },
   { href: "/plans", label: "Premium", match: (p: string) => p.startsWith("/plans") || p.startsWith("/checkout") },
-  { href: "/profile", label: "Profile", match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") || p.startsWith("/shortlists") },
 ]
 
 
@@ -106,6 +107,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       <div className={cn("flex-1", isany && "min-h-0 overflow-hidden")}>{children}</div>
       {isany ? null : <MobileBottomNav />}
+      <ContactUnlockModal />
     </div>
   )
 }

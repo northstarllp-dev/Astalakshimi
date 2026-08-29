@@ -73,7 +73,6 @@ type PrivateNotes = Record<string, string>
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "received", label: "Received", icon: Inbox },
   { id: "sent", label: "Sent", icon: Send },
-  { id: "mutual", label: "Matches", icon: HeartHandshake },
   { id: "shortlisted", label: "Shortlisted", icon: Star },
   { id: "blocked", label: "Blocked", icon: Ban },
 ]
@@ -560,128 +559,6 @@ function SentTab({
 }
 
 // ──────────────────────────────────────────────
-// Mutual Tab
-// ──────────────────────────────────────────────
-function MutualTab({
-  items,
-  notes,
-  onNoteOpen,
-}: {
-  items: InterestItem[]
-  notes: PrivateNotes
-  onNoteOpen: (profileId: string) => void
-}) {
-  const [celebrated, setCelebrated] = React.useState(false)
-
-  React.useEffect(() => {
-    if (items.length > 0) {
-      const timer = setTimeout(() => setCelebrated(true), 100)
-      return () => clearTimeout(timer)
-    }
-  }, [items.length])
-
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        icon={HeartHandshake}
-        title="No mutual matches yet"
-        body="When both of you accept each other's interest, a mutual match is created and chat is unlocked."
-        cta={{ label: "Browse profiles", href: "/dashboard" }}
-      />
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/90 to-primary px-5 py-6 text-center text-white shadow-lg">
-        <ConfettiBurst active={celebrated} />
-        <div className="relative z-10">
-          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30">
-            <HeartHandshake className="h-7 w-7 text-white" />
-          </div>
-          <p className="text-xs font-bold uppercase tracking-widest text-white/80">It&apos;s a Match!</p>
-          <h2 className="mt-0.5 font-serif text-2xl font-bold">
-            {items.length} Mutual Connection{items.length !== 1 ? "s" : ""}
-          </h2>
-          <p className="mt-1 text-sm text-white/90">Chat is now unlocked. Start the conversation.</p>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {items.map((item) => (
-          <article
-            key={item.id}
-            className="relative overflow-hidden rounded-2xl border-2 border-emerald-200 bg-card p-3.5 sm:p-4 shadow-sm"
-          >
-            <div className="flex gap-3">
-              <Link href={`/profiles/${item.profileId}`} className="shrink-0">
-                <div className="relative">
-                  <ProfileAvatar profile={item.profile} size={64} />
-                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-white">
-                    <Heart className="h-2.5 w-2.5 fill-white text-white" />
-                  </span>
-                </div>
-              </Link>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-serif text-base font-bold sm:text-lg">
-                        {item.profile?.fullName || "Member"}, {item.profile?.age || 25}
-                      </h3>
-                      <Badge className="shrink-0 bg-emerald-500 text-[10px] font-bold text-white border-transparent">
-                        <Sparkles className="h-2.5 w-2.5 mr-0.5" /> Match
-                      </Badge>
-                    </div>
-                    <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3 shrink-0" />
-                      {item.profile?.city || "Tamil Nadu"} · {item.profile?.caste || "Community"}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{item.time}</span>
-                </div>
-
-                {notes[item.profileId] && (
-                  <button
-                    type="button"
-                    onClick={() => onNoteOpen(item.profileId)}
-                    className="mt-1.5 flex items-center gap-1 rounded-md bg-secondary/10 px-2 py-1 text-[10px] font-semibold text-secondary hover:bg-secondary/20"
-                  >
-                    <NotebookPen className="h-3 w-3" />
-                    {notes[item.profileId].length > 40 ? notes[item.profileId].slice(0, 40) + "…" : notes[item.profileId]}
-                  </button>
-                )}
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link href="/inbox">
-                    <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 px-3 text-xs hover:bg-emerald-700 text-white">
-                      <MessageSquarePlus className="h-3.5 w-3.5" /> Start chat
-                    </Button>
-                  </Link>
-                  <Link href={`/profiles/${item.profileId}`}>
-                    <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
-                      View profile
-                    </Button>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => onNoteOpen(item.profileId)}
-                    className="h-8 rounded-lg px-3 text-xs font-semibold text-muted-foreground hover:bg-muted"
-                  >
-                    <NotebookPen className="mr-1 inline h-3 w-3" />
-                    {notes[item.profileId] ? "Edit note" : "Add note"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ──────────────────────────────────────────────
 // Shortlisted Tab
 // ──────────────────────────────────────────────
 function ShortlistedTab({
@@ -796,13 +673,13 @@ function ShortlistedTab({
 // Blocked Tab
 // ──────────────────────────────────────────────
 function BlockedTab({
-  ids,
+  items,
   onUnblock,
 }: {
-  ids: string[]
+  items: any[]
   onUnblock: (id: string) => void
 }) {
-  if (ids.length === 0) {
+  if (items.length === 0) {
     return (
       <EmptyState
         icon={ShieldOff}
@@ -818,22 +695,22 @@ function BlockedTab({
         Blocked members cannot see your profile, send interests, or message you.
       </p>
       <div className="space-y-3">
-        {ids.map((profileId) => (
-          <article key={profileId} className="royal-card p-3.5 sm:p-4 opacity-75">
+        {items.map((item) => (
+          <article key={item.blockedId} className="royal-card p-3.5 sm:p-4 opacity-75">
             <div className="flex gap-3">
               <div className="relative shrink-0">
-                <ProfileAvatar size={48} />
+                <ProfileAvatar profile={item as any} size={48} />
                 <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive ring-2 ring-card">
                   <Ban className="h-2.5 w-2.5 text-white" />
                 </span>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-foreground">
-                  Blocked Profile ({profileId.slice(0, 8)})
+                  {item.fullName || `Blocked Profile (${item.profileId.slice(0, 8)})`}
                 </p>
                 <button
                   type="button"
-                  onClick={() => onUnblock(profileId)}
+                  onClick={() => onUnblock(item.profileId)}
                   className="mt-2 flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Unblock
@@ -867,13 +744,11 @@ function InterestsPageInner() {
 
   const received = (data?.received ?? []) as InterestItem[]
   const sent = (data?.sent ?? []) as InterestItem[]
-  const mutual = (data?.mutual ?? []) as InterestItem[]
+  const blocked = (data?.blocked ?? []) as any[]
   const [notes, setNotes] = React.useState<PrivateNotes>({})
-  const [blocked, setBlocked] = React.useState<string[]>([])
   const [noteTarget, setNoteTarget] = React.useState<string | null>(null)
 
   const pendingReceived = received.filter((i) => i.status === "pending").length
-  const mutualCount = mutual.length
 
   const handleAccept = async (profileId: string) => {
     try {
@@ -908,12 +783,22 @@ function InterestsPageInner() {
     invalidate()
   }
 
-  const handleBlock = (profileId: string) => {
-    setBlocked((prev) => [...prev, profileId])
+  const handleBlock = async (profileId: string) => {
+    try {
+      await apiClient.blocks.block(profileId)
+      invalidate()
+    } catch (e: any) {
+      alert(e?.message || "Failed to block profile")
+    }
   }
 
-  const handleUnblock = (profileId: string) => {
-    setBlocked((prev) => prev.filter((id) => id !== profileId))
+  const handleUnblock = async (profileId: string) => {
+    try {
+      await apiClient.blocks.unblock(profileId)
+      invalidate()
+    } catch (e: any) {
+      alert(e?.message || "Failed to unblock profile")
+    }
   }
 
   const handleRemoveShortlist = (profileId: string) => {
@@ -971,9 +856,7 @@ function InterestsPageInner() {
                     "absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold",
                     isActive
                       ? "bg-white text-primary"
-                      : tab.id === "mutual"
-                        ? "bg-emerald-500 text-white"
-                        : "bg-primary text-white"
+                      : "bg-primary text-white"
                   )}
                 >
                   {badge > 9 ? "9+" : badge}
@@ -1009,13 +892,6 @@ function InterestsPageInner() {
               onNoteOpen={setNoteTarget}
             />
           )}
-          {activeTab === "mutual" && (
-            <MutualTab
-              items={mutual}
-              notes={notes}
-              onNoteOpen={setNoteTarget}
-            />
-          )}
           {activeTab === "shortlisted" && (
             <ShortlistedTab
               ids={shortlist}
@@ -1026,7 +902,7 @@ function InterestsPageInner() {
           )}
           {activeTab === "blocked" && (
             <BlockedTab
-              ids={blocked}
+              items={blocked}
               onUnblock={handleUnblock}
             />
           )}

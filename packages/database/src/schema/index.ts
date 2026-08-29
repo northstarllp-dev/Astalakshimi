@@ -16,4 +16,6 @@ export * from './notifications';
 export * from './otp-attempts';
 export * from './profile-views';
 export * from './messages';
-
+export * from './chat-sessions';
+export * from './unlocked-contacts';
+export * from './blocked-profiles';

@@ -2,9 +2,11 @@ import { Injectable, Inject, NotFoundException, BadRequestException, ForbiddenEx
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { interests, profiles, profilePhotos } from '@astalakshimi/database';
-import { eq, or, and, sql, desc, inArray } from 'drizzle-orm';
+import { eq, or, and, sql, desc, inArray, ne } from 'drizzle-orm';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { NotificationsService } from '../notifications/notifications.service';
+
+import { BlocksService } from '../blocks/blocks.service';
 
 @Injectable()
 export class InterestsService {
@@ -12,6 +14,7 @@ export class InterestsService {
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly entitlementsService: EntitlementsService,
     private readonly notificationsService: NotificationsService,
+    private readonly blocksService: BlocksService,
   ) {}
 
   private async getSenderProfile(userId: string) {
@@ -62,6 +65,11 @@ export class InterestsService {
 
     if (sender.id === target.id) {
       throw new BadRequestException('Cannot send interest to yourself');
+    }
+
+    const isBlocked = await this.blocksService.isBlocked(sender.id, target.id);
+    if (isBlocked) {
+      throw new ForbiddenException('Cannot send interest to this profile.');
     }
 
     // 1. Verify Plan & Quota Limits
@@ -247,6 +255,8 @@ export class InterestsService {
       if (['pending', 'accepted', 'declined', 'withdrawn'].includes(normStatus)) {
         conditions.push(eq(interests.status, normStatus as any));
       }
+    } else {
+      conditions.push(ne(interests.status, 'withdrawn'));
     }
 
     const rows = await this.db
@@ -351,10 +361,11 @@ export class InterestsService {
   }
 
   async getSummary(userId: string) {
-    const [received, sent, mutual] = await Promise.all([
+    const [received, sent, mutual, blocked] = await Promise.all([
       this.getReceivedInterests(userId),
       this.getSentInterests(userId),
       this.getMutualInterests(userId),
+      this.blocksService.getBlockedProfiles(userId),
     ]);
 
     const pendingCount = received.filter((i) => i.status === 'pending').length;
@@ -365,7 +376,7 @@ export class InterestsService {
       mutual,
       pendingCount,
       shortlisted: [],
-      blocked: [],
+      blocked,
       notes: {},
     };
   }
@@ -387,13 +398,23 @@ export class InterestsService {
       throw new NotFoundException('Interest not found');
     }
 
+    if (interest.status === status) {
+      throw new BadRequestException(`Interest is already ${status}`);
+    }
+
     if (status === 'withdrawn') {
       if (interest.senderProfileId !== profile.id) {
         throw new BadRequestException('Only sender can withdraw interest');
       }
+      if (interest.status !== 'pending') {
+        throw new BadRequestException('Can only withdraw pending interests');
+      }
     } else {
       if (interest.receiverProfileId !== profile.id) {
         throw new BadRequestException('Only receiver can accept/decline interest');
+      }
+      if (interest.status !== 'pending') {
+        throw new BadRequestException(`Cannot ${status} an interest that is currently ${interest.status}`);
       }
     }
 

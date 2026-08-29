@@ -2,16 +2,16 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Compass, Heart, Home, Sparkles, UserRound } from "lucide-react"
+import { Compass, Heart, Home, Sparkles, HeartHandshake } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const items = [
   { href: "/home", label: "Home", icon: Home, match: (p: string) => p === "/home" },
   { href: "/dashboard", label: "Discover", icon: Compass, match: (p: string) => p === "/dashboard" || p.startsWith("/search") },
+  { href: "/matches", label: "Matches", icon: HeartHandshake, match: (p: string) => p.startsWith("/matches") },
   { href: "/interests", label: "Interests", icon: Heart, match: (p: string) => p.startsWith("/interests") || p.startsWith("/inbox") },
 
   { href: "/plans", label: "Premium", icon: Sparkles, match: (p: string) => p.startsWith("/plans") || p.startsWith("/checkout") },
-  { href: "/profile", label: "Profile", icon: UserRound, match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") || p.startsWith("/shortlists") },
 ]
 
 export function MobileBottomNav() {

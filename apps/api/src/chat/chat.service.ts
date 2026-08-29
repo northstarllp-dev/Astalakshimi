@@ -4,6 +4,9 @@ import type { Database } from '@astalakshimi/database';
 import { messages, profiles, profilePhotos, interests } from '@astalakshimi/database';
 import { eq, or, and, desc, asc, inArray, sql } from 'drizzle-orm';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ContactGuardService } from './guard/contact-guard.service';
+import { EntitlementsService } from '../entitlements/entitlements.service';
+import { BlocksService } from '../blocks/blocks.service';
 import type { SendMessageInput } from '@astalakshimi/validation';
 
 @Injectable()
@@ -11,6 +14,9 @@ export class ChatService {
   constructor(
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly notificationsService: NotificationsService,
+    private readonly contactGuard: ContactGuardService,
+    private readonly entitlementsService: EntitlementsService,
+    private readonly blocksService: BlocksService,
   ) {}
 
   private async getProfileByUserId(userId: string) {
@@ -177,6 +183,27 @@ export class ChatService {
 
     if (targetProfile.userId === userId || targetProfile.id === senderProfile.id) {
       throw new BadRequestException('Cannot send message to yourself');
+    }
+
+    const profile1Id = senderProfile.id < targetProfile.id ? senderProfile.id : targetProfile.id;
+    const profile2Id = senderProfile.id > targetProfile.id ? senderProfile.id : targetProfile.id;
+
+    // Check if chat session is blocked
+    const isSessionBlocked = await this.entitlementsService.isChatBlocked(profile1Id, profile2Id);
+    if (isSessionBlocked) {
+      throw new BadRequestException('Chat is permanently blocked for these users.');
+    }
+
+    // Check if profile is manually blocked
+    const isUserBlocked = await this.blocksService.isBlocked(profile1Id, profile2Id);
+    if (isUserBlocked) {
+      throw new BadRequestException('Cannot send message. You or the other user have blocked each other.');
+    }
+
+    // Pass through Contact Guard
+    const guardResult = await this.contactGuard.checkMessage(dto.text);
+    if (guardResult.status === 'BLOCKED') {
+      return guardResult; // return structured response so frontend can show paywall
     }
 
     // 1. Insert message into database ALWAYS linking both sender and recipient

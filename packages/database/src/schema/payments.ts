@@ -25,7 +25,6 @@ export const payments = pgTable('payments', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   planId: uuid('plan_id')
-    .notNull()
     .references(() => plans.id, { onDelete: 'cascade' }),
   amountPaise: integer('amount_paise').notNull(),
   currency: varchar('currency', { length: 3 }).default('INR').notNull(),

@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { profiles, users, profilePhotos, userSettings, interests } from '@astalakshimi/database';
-import { eq, and, ne, inArray, gte, lte, or, desc, sql } from 'drizzle-orm';
+import { eq, and, ne, inArray, gte, lte, or, desc, sql, isNotNull } from 'drizzle-orm';
 
 @Injectable()
 export class SearchService {
@@ -38,6 +38,9 @@ export class SearchService {
     if (filters.community) {
       conditions.push(eq(profiles.caste, filters.community));
     }
+    // profile completeness requirement (roughly >= 80%)
+    conditions.push(isNotNull(profiles.aboutMe));
+    conditions.push(sql`EXISTS (SELECT 1 FROM profile_photos WHERE profile_photos.profile_id = profiles.id AND profile_photos.is_primary = true)`);
     
     // advanced filters
     if (filters.advanced) {
@@ -82,6 +85,10 @@ export class SearchService {
         heightCm: profiles.heightCm,
         educationLevel: profiles.educationLevel,
         profession: profiles.profession,
+        companyName: profiles.companyName,
+        annualIncome: profiles.annualIncome,
+        motherTongue: profiles.motherTongue,
+        aboutMe: profiles.aboutMe,
         city: profiles.city,
         state: profiles.state,
         country: profiles.country,
@@ -162,6 +169,15 @@ export class SearchService {
         age: profile.dob ? new Date().getFullYear() - new Date(profile.dob).getFullYear() : 25,
         photos: primaryPhoto ? [primaryPhoto.s3Key] : [], 
         blurPhoto,
+        education: profile.educationLevel || 'Not specified',
+        occupation: profile.profession || 'Not specified',
+        company: profile.companyName || 'Not specified',
+        income: profile.annualIncome || 'Not specified',
+        motherTongue: profile.motherTongue || 'Not specified',
+        about: profile.aboutMe || '',
+        lastActive: 'Online now',
+        community: profile.caste || 'Unknown',
+        height: profile.heightCm ? `${profile.heightCm} cm` : 'Unknown',
       };
     });
 

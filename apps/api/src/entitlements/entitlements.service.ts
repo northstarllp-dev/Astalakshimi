@@ -3,7 +3,7 @@ import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { subscriptions, plans } from '@astalakshimi/database';
 import { eq, and, gt } from 'drizzle-orm';
-
+import { unlockedContacts, chatSessions } from '@astalakshimi/database';
 @Injectable()
 export class EntitlementsService {
   constructor(@Inject(DB_CLIENT) private readonly db: Database) {}
@@ -51,5 +51,36 @@ export class EntitlementsService {
       default:
         return false;
     }
+  }
+
+  async isContactUnlocked(unlockerProfileId: string, unlockedProfileId: string): Promise<boolean> {
+    const records = await this.db
+      .select()
+      .from(unlockedContacts)
+      .where(
+        and(
+          eq(unlockedContacts.unlockerProfileId, unlockerProfileId),
+          eq(unlockedContacts.unlockedProfileId, unlockedProfileId)
+        )
+      )
+      .limit(1);
+    
+    return records.length > 0;
+  }
+
+  async isChatBlocked(profile1Id: string, profile2Id: string): Promise<boolean> {
+    const sessions = await this.db
+      .select()
+      .from(chatSessions)
+      .where(
+        and(
+          eq(chatSessions.profile1Id, profile1Id),
+          eq(chatSessions.profile2Id, profile2Id)
+        )
+      )
+      .limit(1);
+
+    if (sessions.length === 0) return false;
+    return sessions[0].isBlocked;
   }
 }

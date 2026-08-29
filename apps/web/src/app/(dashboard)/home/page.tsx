@@ -11,6 +11,7 @@ import { CompletenessRing } from "@/components/profile/completeness-ring"
 import { MatchThumbCard } from "@/components/dashboard/match-thumb-card"
 import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import { useInterestsQuery, useMarkVerifiedMutation, usePaidQuery, useProfileQuery, useTopMatchesQuery, useActivitySummaryQuery } from "@/hooks/queries"
+import { calculateProfileCompleteness } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 import {
   Bookmark,
@@ -119,7 +120,7 @@ export default function HomePage() {
   const { data: activitySummary } = useActivitySummaryQuery()
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
-  const completeness = profile ? 100 : 0
+  const completeness = calculateProfileCompleteness(profile)
   const pending = profile?.verificationStatus === "pending"
   const verified = profile?.verificationStatus === "verified"
   const unlocked = true

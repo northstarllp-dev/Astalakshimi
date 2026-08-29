@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
+import { BlocksService } from '../blocks/blocks.service';
 import {
   profiles,
   familyDetails,
@@ -17,7 +18,10 @@ import type { CompleteRegistrationPayload, FullProfileView } from '@astalakshimi
 
 @Injectable()
 export class ProfilesService {
-  constructor(@Inject(DB_CLIENT) private readonly db: Database) {}
+  constructor(
+    @Inject(DB_CLIENT) private readonly db: Database,
+    private readonly blocksService: BlocksService,
+  ) {}
 
   async completeRegistration(userId: string, payload: CompleteRegistrationPayload) {
     return this.db.transaction(async (tx) => {
@@ -501,6 +505,13 @@ export class ProfilesService {
         .from(profiles)
         .where(eq(profiles.userId, viewerUserId))
         .limit(1);
+
+      if (viewerProfile) {
+        const isBlocked = await this.blocksService.isBlocked(viewerProfile.id, profile.id);
+        if (isBlocked) {
+          throw new ForbiddenException('Profile not found or unavailable');
+        }
+      }
 
       // Don't log if viewing own profile
       if (viewerProfile && viewerProfile.id !== profile.id) {

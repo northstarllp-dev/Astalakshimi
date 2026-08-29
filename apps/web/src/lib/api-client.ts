@@ -302,6 +302,19 @@ class ApiClient {
       }),
   };
 
+  // --- Blocks APIs ---
+  blocks = {
+    getAll: () => this.request<any[]>('/blocks'),
+    block: (targetProfileId: string) =>
+      this.request<any>(`/blocks/${targetProfileId}`, {
+        method: 'POST',
+      }),
+    unblock: (targetProfileId: string) =>
+      this.request<any>(`/blocks/${targetProfileId}`, {
+        method: 'DELETE',
+      }),
+  };
+
   // --- Chat / Messaging APIs ---
   chat = {
     getThreads: () => this.request<any[]>('/chat/threads'),

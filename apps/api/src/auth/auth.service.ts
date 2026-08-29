@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { Injectable, BadRequestException, UnauthorizedException, Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -27,11 +28,11 @@ export class AuthService {
     // Generate 6 digit OTP (mock or random)
     const otp = mockEnabled ? defaultMockOtp : Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
 
-    // Save to PostgreSQL (TODO: add proper hashing for otpHash)
     await this.db.insert(otpAttempts).values({
       phone: formattedPhone,
-      otpHash: otp, 
+      otpHash: hashedOtp, 
       expiresAt,
       consentAccepted: input.consentAccepted ?? false,
       referredBy: input.referredBy,
@@ -66,7 +67,9 @@ export class AuthService {
       throw new BadRequestException('Maximum attempts reached. Please request a new OTP.');
     }
 
-    if (pending.otpHash !== input.otp) {
+    const hashedInput = crypto.createHash('sha256').update(input.otp).digest('hex');
+
+    if (pending.otpHash !== hashedInput) {
       // Increment attempts
       await this.db.update(otpAttempts)
         .set({ attempts: pending.attempts + 1 })

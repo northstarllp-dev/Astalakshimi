@@ -2,7 +2,7 @@ import { Injectable, Inject, InternalServerErrorException, NotFoundException, Ba
 import { ConfigService } from '@nestjs/config';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { payments, subscriptions, plans, profiles } from '@astalakshimi/database';
+import { payments, subscriptions, plans, profiles, unlockedContacts, chatSessions } from '@astalakshimi/database';
 import { eq, and, gt, desc } from 'drizzle-orm';
 import Razorpay = require('razorpay');
 import * as crypto from 'crypto';
@@ -86,12 +86,8 @@ export class PaymentsService {
       try {
         order = await this.razorpay.orders.create(options);
       } catch (rError) {
-        // Fallback simulated order if test/unreachable Razorpay key
-        order = {
-          id: `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-          amount: amountPaise,
-          currency: 'INR',
-        };
+        console.error('Razorpay order creation failed:', rError);
+        throw new InternalServerErrorException('Failed to create payment order with provider');
       }
 
       // Create Payment Record
@@ -134,10 +130,7 @@ export class PaymentsService {
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
-    const isValidSignature =
-      generatedSignature === razorpaySignature ||
-      razorpaySignature === 'demo_signature' ||
-      secret === 'test_secret';
+    const isValidSignature = generatedSignature === razorpaySignature;
 
     if (!isValidSignature) {
       throw new BadRequestException('Invalid payment signature');
@@ -169,7 +162,7 @@ export class PaymentsService {
       .where(eq(payments.id, payment.id));
 
     // Get plan details for subscription
-    const [plan] = await this.db.select().from(plans).where(eq(plans.id, payment.planId)).limit(1);
+    const [plan] = await this.db.select().from(plans).where(eq(plans.id, payment.planId!)).limit(1);
     if (!plan) throw new NotFoundException('Plan not found');
     
     // Create or update subscription
@@ -274,5 +267,122 @@ export class PaymentsService {
       status: 'paid',
       paidAt: r.createdAt.toISOString(),
     }));
+  }
+
+  async createContactUnlockOrder(userId: string, targetProfileId: string) {
+    const [profile] = await this.db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    if (!profile) throw new NotFoundException('Profile not found');
+
+    const amountPaise = 4900; // 49 INR
+    
+    try {
+      const options = {
+        amount: amountPaise,
+        currency: 'INR',
+        receipt: `rcpt_cu_${profile.id.substring(0, 8)}_${Date.now()}`,
+        notes: {
+          userId,
+          type: 'contact_unlock',
+          targetProfileId,
+        },
+      };
+      
+      const order = await this.razorpay.orders.create(options);
+
+      await this.db.insert(payments).values({
+        userId,
+        amountPaise,
+        currency: 'INR',
+        provider: 'razorpay',
+        providerOrderId: order.id,
+        status: 'created',
+      });
+
+      return {
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: this.configService.get<string>('RAZORPAY_KEY_ID') || 'test_key',
+        targetProfileId,
+      };
+    } catch (err) {
+      console.error('Error creating contact unlock order:', err);
+      throw new InternalServerErrorException('Failed to create payment order');
+    }
+  }
+
+  async verifyContactUnlockPayment(
+    userId: string,
+    targetProfileId: string,
+    razorpayOrderId: string,
+    razorpayPaymentId: string,
+    razorpaySignature: string,
+  ) {
+    const secret = this.configService.get<string>('RAZORPAY_KEY_SECRET') || 'test_secret';
+    
+    const generatedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest('hex');
+
+    if (generatedSignature !== razorpaySignature) {
+      throw new BadRequestException('Invalid payment signature');
+    }
+
+    const [payment] = await this.db
+      .select()
+      .from(payments)
+      .where(eq(payments.providerOrderId, razorpayOrderId))
+      .limit(1);
+
+    if (!payment) throw new NotFoundException('Payment record not found');
+    if (payment.status === 'captured') return { success: true };
+
+    const [profile] = await this.db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    if (!profile) throw new NotFoundException('Profile not found');
+
+    await this.db
+      .update(payments)
+      .set({
+        status: 'captured',
+        providerPaymentId: razorpayPaymentId,
+        providerSignature: razorpaySignature,
+      })
+      .where(eq(payments.id, payment.id));
+
+    // Record unlocked contact
+    await this.db.insert(unlockedContacts).values({
+      unlockerProfileId: profile.id,
+      unlockedProfileId: targetProfileId,
+      paymentId: payment.id,
+    });
+
+    // Block the chat session
+    const [existingSession] = await this.db
+      .select()
+      .from(chatSessions)
+      .where(
+        and(
+          eq(chatSessions.profile1Id, profile.id),
+          eq(chatSessions.profile2Id, targetProfileId)
+        )
+      )
+      .limit(1);
+
+    if (existingSession) {
+      await this.db
+        .update(chatSessions)
+        .set({ isBlocked: true, blockedReason: 'contact_unlocked' })
+        .where(eq(chatSessions.id, existingSession.id));
+    } else {
+      await this.db.insert(chatSessions).values({
+        profile1Id: profile.id,
+        profile2Id: targetProfileId,
+        isBlocked: true,
+        blockedReason: 'contact_unlocked',
+      });
+    }
+
+    return { success: true };
   }
 }

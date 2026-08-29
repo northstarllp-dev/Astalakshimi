@@ -625,7 +625,11 @@ export function useSendMessageMutation(threadId?: string | null) {
   return useMutation({
     mutationFn: async ({ text, receiverProfileId }: { text: string; receiverProfileId?: string }) => {
       if (!threadId) throw new Error("No active thread");
-      return apiClient.chat.sendMessage(threadId, text, receiverProfileId);
+      const res = await apiClient.chat.sendMessage(threadId, text, receiverProfileId);
+      if (res && res.status === 'BLOCKED') {
+        throw new Error(JSON.stringify(res));
+      }
+      return res;
     },
     onMutate: async ({ text }) => {
       if (!threadId) return;
@@ -649,6 +653,21 @@ export function useSendMessageMutation(threadId?: string | null) {
     onError: (err, variables, context) => {
       if (threadId && context?.previousMessages) {
         queryClient.setQueryData(queryKeys.chat(threadId), context.previousMessages);
+      }
+      try {
+        const errorData = JSON.parse(err.message);
+        if (errorData.status === 'BLOCKED') {
+          // Trigger the contact paywall modal
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('TRIGGER_CONTACT_PAYWALL', { 
+                detail: { targetProfileId: variables.receiverProfileId || threadId } 
+              })
+            );
+          }
+        }
+      } catch {
+        // generic network error
       }
     },
     onSettled: () => {

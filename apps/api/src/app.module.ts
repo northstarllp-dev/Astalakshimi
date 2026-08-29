@@ -19,6 +19,7 @@ import { MatchesModule } from './matches/matches.module';
 import { ActivityModule } from './activity/activity.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
+import { BlocksModule } from './blocks/blocks.module';
 
 @Module({
   imports: [
@@ -45,7 +46,7 @@ import { ChatModule } from './chat/chat.module';
     ActivityModule,
     NotificationsModule,
     ChatModule,
+    BlocksModule,
   ],
 })
 export class AppModule {}
-

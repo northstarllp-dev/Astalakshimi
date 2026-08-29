@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useProfileQuery } from "@/hooks/queries"
 import { ChevronRight, Lock } from "lucide-react"
+import { calculateProfileCompleteness } from "@/lib/utils"
 import { isProfileComplete } from "@/lib/portal-access"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
 import { Badge } from "@/components/ui/badge"
@@ -14,7 +15,7 @@ export function CompleteProfileGate({
   section?: string
 }) {
   const { data: profile = null } = useProfileQuery()
-  const completeness = profile ? 100 : 0
+  const completeness = calculateProfileCompleteness(profile)
   const verified = profile?.verificationStatus === "verified"
   const complete = isProfileComplete(profile)
   const nextActions = ([] as any[]).filter((a) => !a.done).slice(0, 4)
