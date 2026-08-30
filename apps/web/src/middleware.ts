@@ -5,7 +5,8 @@ import { NextResponse } from "next/server"
 const { auth } = NextAuth(authConfig)
 
 export default auth((req) => {
-  const isLoggedIn = !!req.auth
+  const token = req.cookies.get("astalakshimi.auth_token")?.value
+  const isLoggedIn = !!req.auth || !!token
   const { pathname } = req.nextUrl
 
   // List of public routes that don't require authentication
@@ -22,10 +23,14 @@ export default auth((req) => {
     return NextResponse.next()
   }
 
-  if (isPublicRoute) {
+  if (pathname === "/login" || pathname === "/") {
     if (isLoggedIn) {
-      return NextResponse.redirect(new URL("/dashboard", req.nextUrl))
+      return NextResponse.redirect(new URL("/home", req.nextUrl))
     }
+    return NextResponse.next()
+  }
+
+  if (pathname === "/register") {
     return NextResponse.next()
   }
 

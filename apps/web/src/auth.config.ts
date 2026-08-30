@@ -16,7 +16,7 @@ export const authConfig = {
         if (!credentials?.phone || !credentials?.otp) return null
 
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api"
           // Call the NestJS backend to verify the OTP
           const res = await fetch(`${apiUrl}/auth/verify-otp`, {
             method: 'POST',

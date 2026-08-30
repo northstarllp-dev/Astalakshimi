@@ -47,10 +47,14 @@ export default function LoginPage() {
     setError("")
     setLoading(true)
     try {
-      await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true })
+      const res = await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true })
       setOtpSent(true)
       setSeconds(30)
-      otpForm.reset({ otp: "" })
+      if (res.mockOtp) {
+        otpForm.setValue("otp", res.mockOtp)
+      } else {
+        otpForm.reset({ otp: "" })
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to send OTP. Please check the mobile number.")
     } finally {
