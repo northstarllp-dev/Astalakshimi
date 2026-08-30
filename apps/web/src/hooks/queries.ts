@@ -309,6 +309,19 @@ export function useResubmitVerificationMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: SignupData) => {
+      if (apiClient.getToken()) {
+        try {
+          await apiClient.media.confirmVerification({
+            method: data.verificationMethod as "selfie" | "govt_id",
+            selfieS3Key: data.selfieS3Key,
+            govtIdType: data.govtIdType,
+            govtIdS3Key: data.govtIdS3Key,
+          });
+        } catch (e) {
+          console.error("Failed to resubmit verification to backend:", e)
+        }
+      }
+
       const next: SignupData = {
         ...data,
         verificationStatus: "pending",

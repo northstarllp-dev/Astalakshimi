@@ -41,6 +41,7 @@ const kindIcon: Record<NotificationKind, React.ComponentType<{ className?: strin
   profile_incomplete: UserRound,
   subscription_expiry: Crown,
   verification_reminder: ShieldCheck,
+  verification: ShieldCheck,
 }
 
 
@@ -134,7 +135,7 @@ export default function NotificationsPage() {
 
       <ul className="space-y-2">
         {visible.map((item: any) => {
-          const Icon = kindIcon[item.kind]
+          const Icon = kindIcon[item.kind] || Bell
           const locked = Boolean(item.paidOnly) && !paid
           const displayTitle = locked
             ? item.kind === "profile_viewed"

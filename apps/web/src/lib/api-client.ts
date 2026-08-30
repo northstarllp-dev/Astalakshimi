@@ -124,6 +124,12 @@ class ApiClient {
         throw new Error(`Failed to upload file to S3: ${response.statusText}`);
       }
     },
+
+    confirmVerification: (data: { method: 'selfie' | 'govt_id'; selfieS3Key?: string; govtIdType?: string; govtIdS3Key?: string }) =>
+      this.request<{ success: boolean; verification: any }>('/media/confirm-verification', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   };
 
   // --- Profiles APIs ---
@@ -369,6 +375,21 @@ class ApiClient {
     getSubscription: () => this.request<any>('/payments/subscription'),
 
     getInvoices: () => this.request<any[]>('/payments/invoices'),
+  };
+
+  // --- Admin APIs ---
+  admin = {
+    getStats: () => this.request<any>('/admin/stats'),
+
+    getPendingVerifications: () => this.request<any[]>('/admin/verifications/pending'),
+
+    getProfile: (profileId: string) => this.request<any>(`/admin/profiles/${profileId}`),
+
+    updateVerificationStatus: (profileId: string, status: 'verified' | 'rejected', rejectionReason?: string) =>
+      this.request<any>(`/admin/verifications/${profileId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status, rejectionReason }),
+      }),
   };
 }
 
