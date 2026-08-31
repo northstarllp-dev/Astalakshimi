@@ -210,7 +210,7 @@ function Step1AccountCreation({
     setLoading(true)
     updateData({ profileFor: values.profileFor, phone: values.phone })
     try {
-      const res = await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true })
+      const res = await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true, type: "register" })
       if (res.mockOtp) {
         updateData({ otp: res.mockOtp })
       }
@@ -756,7 +756,7 @@ function Step5OTP({
   const resend = async () => {
     setError("")
     try {
-      const res = await apiClient.auth.sendOtp({ phone: data.phone, consentAccepted: true })
+      const res = await apiClient.auth.sendOtp({ phone: data.phone, consentAccepted: true, type: "register" })
       setSeconds(30)
       setOtpSent(true)
       if (res.mockOtp) {

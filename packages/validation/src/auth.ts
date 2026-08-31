@@ -14,6 +14,7 @@ export const sendOtpSchema = z.object({
     message: 'You must agree to the Terms of Service & Privacy Policy to continue',
   }),
   referredBy: z.string().optional(),
+  type: z.enum(['login', 'register']).optional(),
 });
 
 export const verifyOtpSchema = z.object({

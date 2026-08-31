@@ -21,6 +21,16 @@ export class AuthService {
 
   async sendOtp(input: SendOtpInput): Promise<{ message: string; mockOtp?: string }> {
     const formattedPhone = input.phone.replace(/\s+/g, '');
+    
+    const [existingUser] = await this.db.select().from(users).where(eq(users.phone, formattedPhone)).limit(1);
+    
+    if (input.type === 'register' && existingUser) {
+      const [existingProfile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, existingUser.id)).limit(1);
+      if (existingProfile) {
+        throw new BadRequestException('This mobile number is already registered. Please log in instead.');
+      }
+    }
+    
     const mockEnabled = this.configService.get<boolean>('auth.mockOtpEnabled');
     const defaultMockOtp = this.configService.get<string>('auth.defaultMockOtp') || '123456';
     const ttlSeconds = this.configService.get<number>('auth.otpTtlSeconds') || 300;
