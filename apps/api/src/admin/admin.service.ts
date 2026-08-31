@@ -273,6 +273,7 @@ export class AdminService {
       }),
       createdBy: 'self' as const,
       accountStatus: u.status,
+      verificationStatus,
       submittedAt: v?.updatedAt || p.createdAt,
       activeSubscription: activeSub.length > 0,
     };
