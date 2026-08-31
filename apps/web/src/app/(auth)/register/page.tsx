@@ -206,6 +206,7 @@ function Step1AccountCreation({
     { id: "Relative", icon: "👥" },
   ]
 
+  const router = useRouter()
   const onStep1Submit = async (values: any) => {
     setLoading(true)
     updateData({ profileFor: values.profileFor, phone: values.phone })
@@ -214,11 +215,16 @@ function Step1AccountCreation({
       if (res.mockOtp) {
         updateData({ otp: res.mockOtp })
       }
+      nextStep()
     } catch (err: any) {
       console.warn("sendOtp error:", err)
+      if (err.message && err.message.toLowerCase().includes("already registered")) {
+        router.push("/login")
+      } else {
+        form.setError("phone", { message: err.message || "Failed to send OTP. Please try again." })
+      }
     } finally {
       setLoading(false)
-      nextStep()
     }
   }
 
