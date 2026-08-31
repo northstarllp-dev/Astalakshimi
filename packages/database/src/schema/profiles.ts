@@ -41,14 +41,14 @@ export const profiles = pgTable('profiles', {
   motherTongue: varchar('mother_tongue', { length: 50 }).notNull(),
 
   // Education & Career Details
-  educationLevel: educationLevelEnum('education_level').notNull(), // Bachelors, Masters, etc.
-  degree: varchar('degree', { length: 150 }).notNull(), // e.g. B.Tech Computer Science
-  collegeName: varchar('college_name', { length: 200 }), // Predictive autocomplete
-  employmentStatus: employmentStatusEnum('employment_status').notNull(), // Employed, Business Owner, etc.
-  profession: varchar('profession', { length: 150 }).notNull(), // Job title from autocomplete
+  educationLevel: educationLevelEnum('education_level'),
+  degree: varchar('degree', { length: 150 }),
+  collegeName: varchar('college_name', { length: 200 }),
+  employmentStatus: employmentStatusEnum('employment_status'),
+  profession: varchar('profession', { length: 150 }),
   companyName: varchar('company_name', { length: 150 }),
-  companySector: companySectorEnum('company_sector'), // Private, Govt, MNC, Startup
-  annualIncome: varchar('annual_income', { length: 50 }).notNull(), // Income bracket dropdown
+  companySector: companySectorEnum('company_sector'),
+  annualIncome: varchar('annual_income', { length: 50 }),
 
   // Privacy Settings
   photoPrivacy: photoPrivacyEnum('photo_privacy').default('blurred').notNull(),

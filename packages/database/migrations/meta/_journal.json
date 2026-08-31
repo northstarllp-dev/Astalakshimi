@@ -29,6 +29,13 @@
       "when": 1787938748934,
       "tag": "0003_absurd_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788170753980,
+      "tag": "0004_make_career_fields_optional",
+      "breakpoints": true
     }
   ]
 }

@@ -35,14 +35,14 @@ export interface Profile {
   subcaste?: string | null;
   gotra?: string | null;
   motherTongue: string;
-  educationLevel: EducationLevel;
-  degree: string;
+  educationLevel?: EducationLevel | null;
+  degree?: string | null;
   collegeName?: string | null;
-  employmentStatus: EmploymentStatus;
-  profession: string;
+  employmentStatus?: EmploymentStatus | null;
+  profession?: string | null;
   companyName?: string | null;
   companySector?: CompanySector | null;
-  annualIncome: string;
+  annualIncome?: string | null;
   photoPrivacy: PhotoPrivacy;
   createdAt: string;
   updatedAt: string;
@@ -154,14 +154,14 @@ export interface CompleteRegistrationPayload {
   motherTongue: string;
 
   // Step 4: Education & Career
-  educationLevel: EducationLevel;
-  degree: string;
+  educationLevel?: EducationLevel;
+  degree?: string;
   collegeName?: string;
-  employmentStatus: EmploymentStatus;
-  profession: string;
+  employmentStatus?: EmploymentStatus;
+  profession?: string;
   companyName?: string;
   companySector?: CompanySector;
-  annualIncome: string;
+  annualIncome?: string;
 
   // Step 4: Family Details
   familyValues: FamilyValues;
