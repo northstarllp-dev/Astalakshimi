@@ -104,7 +104,23 @@ export function useAdminStatsQuery() {
 export function useAdminProfilesQuery() {
   return useQuery({
     queryKey: adminQueryKeys.profiles,
-    queryFn: async () => loadAdminProfiles(),
+    queryFn: async () => {
+      try {
+        const actualProfiles = await apiClient.admin.getAllProfiles()
+        return actualProfiles.map((p: any) => ({
+          ...p,
+          id: p.id,
+          fullName: p.fullName || "Unknown",
+          city: p.city || "Unknown",
+          phone: p.phone || "Unknown",
+          verificationStatus: p.verificationStatus || "pending",
+          submittedAt: p.submittedAt,
+        }))
+      } catch (err) {
+        console.error("Failed to fetch admin profiles from backend, falling back to mock:", err)
+        return loadAdminProfiles()
+      }
+    },
   })
 }
 

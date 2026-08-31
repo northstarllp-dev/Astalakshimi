@@ -81,6 +81,29 @@ export class AdminService {
     return updated;
   }
 
+  async getAllProfiles() {
+    const records = await this.db
+      .select({
+        id: profiles.id,
+        fullName: profiles.fullName,
+        city: profiles.city,
+        phone: users.phone,
+        status: verifications.status,
+        submittedAt: profiles.createdAt,
+      })
+      .from(profiles)
+      .innerJoin(users, eq(profiles.userId, users.id))
+      .leftJoin(verifications, eq(profiles.id, verifications.profileId));
+
+    return records.map(r => ({
+      ...r,
+      verificationStatus: r.status || 'idle',
+      activeSubscription: false,
+      completeness: 80,
+      photos: [],
+    }));
+  }
+
   async getProfile(profileId: string) {
     const profileRecords = await this.db.select().from(profiles).where(eq(profiles.id, profileId));
     if (!profileRecords.length) throw new NotFoundException('Profile not found');

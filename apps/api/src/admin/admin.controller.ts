@@ -28,6 +28,11 @@ export class AdminController {
     return this.adminService.updateVerificationStatus(profileId, body.status, body.rejectionReason);
   }
 
+  @Get('profiles')
+  getAllProfiles() {
+    return this.adminService.getAllProfiles();
+  }
+
   @Get('profiles/:profileId')
   getProfile(@Param('profileId') profileId: string) {
     return this.adminService.getProfile(profileId);

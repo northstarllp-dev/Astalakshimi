@@ -383,6 +383,8 @@ class ApiClient {
 
     getPendingVerifications: () => this.request<any[]>('/admin/verifications/pending'),
 
+    getAllProfiles: () => this.request<any[]>('/admin/profiles'),
+
     getProfile: (profileId: string) => this.request<any>(`/admin/profiles/${profileId}`),
 
     updateVerificationStatus: (profileId: string, status: 'verified' | 'rejected', rejectionReason?: string) =>
