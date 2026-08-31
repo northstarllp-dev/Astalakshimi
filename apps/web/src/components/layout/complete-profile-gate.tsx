@@ -4,11 +4,9 @@ import Link from "next/link"
 import { useProfileQuery } from "@/hooks/queries"
 import { ChevronRight, Lock } from "lucide-react"
 import {
-  PROFILE_COMPLETE_THRESHOLD,
   getProfileActions,
   getProfileCompletenessStats,
   isProfileComplete,
-  isVerified,
 } from "@/lib/portal-access"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
 import { Badge } from "@/components/ui/badge"
@@ -22,18 +20,19 @@ export function CompleteProfileGate({
   const { data: profile = null } = useProfileQuery()
   const completenessStats = getProfileCompletenessStats(profile)
   const completeness = completenessStats.percentage
-  const verified = isVerified(profile?.verificationStatus)
   const rejected = profile?.verificationStatus === "rejected"
   const complete = isProfileComplete(profile)
   const nextActions = getProfileActions(profile).filter((a) => !a.done).slice(0, 4)
+  const missingRequired = completenessStats.missingRequired.slice(0, 6)
+  const editHref = completenessStats.missingRequired.some((f) => f.group === "career")
+    ? "/profile/edit#career"
+    : "/profile/edit"
 
   const reason = rejected
     ? `Verification was rejected. Re-upload your selfie or ID, then finish your profile to open ${section}.`
-    : !complete && !verified
-      ? `Finish your profile and get verified to open ${section}.`
-      : !complete
-        ? `Reach ${PROFILE_COMPLETE_THRESHOLD}% complete to open ${section}.`
-        : `Verification is still pending — ${section} opens after approval.`
+    : !complete
+      ? `Fill every required detail to open ${section}. Specialization and employer are optional.`
+      : `Verification is still pending — ${section} opens after approval.`
 
   return (
     <main className="mx-auto flex max-w-lg flex-col items-center px-4 py-12 text-center sm:py-16">
@@ -48,10 +47,22 @@ export function CompleteProfileGate({
       </div>
       <p className="mt-3 text-sm font-semibold text-foreground">{completeness}% complete</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        {completenessStats.filled} of {completenessStats.total} details filled
+        {completenessStats.requiredFilled} of {completenessStats.requiredTotal} required details filled
       </p>
 
-      {nextActions.length > 0 && (
+      {missingRequired.length > 0 && (
+        <ul className="mt-4 flex flex-wrap justify-center gap-2">
+          {missingRequired.map((field) => (
+            <Link key={field.id} href={editHref}>
+              <Badge variant="outline" className="h-7 font-semibold">
+                {field.label}
+              </Badge>
+            </Link>
+          ))}
+        </ul>
+      )}
+
+      {nextActions.length > 0 && missingRequired.length === 0 && (
         <ul className="mt-5 flex flex-wrap justify-center gap-2">
           {nextActions.map((action) => (
             <Link key={action.id} href={action.href}>
@@ -63,7 +74,7 @@ export function CompleteProfileGate({
         </ul>
       )}
 
-      <Link href={rejected ? "/profile/verify" : "/profile/edit"} className="mt-6">
+      <Link href={rejected ? "/profile/verify" : editHref} className="mt-6">
         <Button>
           {rejected ? "Re-upload verification" : "Complete profile"}{" "}
           <ChevronRight className="ml-1 h-4 w-4" />

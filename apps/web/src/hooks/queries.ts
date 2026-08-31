@@ -53,9 +53,11 @@ export function useProfileQuery() {
               gotra: fullProfile.profile.gotra ?? '',
               motherTongue: fullProfile.profile.motherTongue,
               educationLevel: fullProfile.profile.educationLevel,
+              education: fullProfile.profile.degree || "",
               degree: fullProfile.profile.degree,
               collegeName: fullProfile.profile.collegeName ?? '',
               employmentStatus: fullProfile.profile.employmentStatus,
+              occupation: fullProfile.profile.profession || "",
               profession: fullProfile.profile.profession,
               companyName: fullProfile.profile.companyName ?? '',
               companySector: fullProfile.profile.companySector ?? 'Private',
@@ -209,6 +211,12 @@ export function useUpdateProfileMutation() {
       if (data.height) payload.heightCm = parseInt(data.height, 10);
       if (data.horoscopeName) payload.horoscopeFileName = data.horoscopeName;
       if (data.horoscopeSize) payload.horoscopeFileSizeBytes = data.horoscopeSize;
+      if (data.education !== undefined || data.otherEducation !== undefined || data.degree !== undefined) {
+        payload.degree = data.otherEducation || data.education || data.degree;
+      }
+      if (data.occupation !== undefined || data.otherOccupation !== undefined || data.profession !== undefined) {
+        payload.profession = data.otherOccupation || data.occupation || data.profession;
+      }
       
       const fullProfile = await apiClient.profiles.updateMyProfile(payload);
       

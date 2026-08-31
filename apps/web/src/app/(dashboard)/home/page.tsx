@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { HomeMatchRow } from "@/components/dashboard/home-match-row"
 import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import {
-  PROFILE_COMPLETE_THRESHOLD,
   canAccessFullPortal,
   getProfileActions,
   getProfileCompletenessStats,
@@ -116,7 +115,7 @@ export default function HomePage() {
                   How {lookingFor} appear to you
                 </h1>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  A short preview of three profiles. Complete {PROFILE_COMPLETE_THRESHOLD}% of your profile to see the rest
+                  A short preview of three profiles. Fill required details to see the rest
                   {firstName !== "Member" ? `, ${firstName}` : ""}.
                 </p>
               </div>
@@ -191,7 +190,7 @@ export default function HomePage() {
                   </Link>
                 ) : (
                   <span className="shrink-0 text-xs font-semibold text-muted-foreground">
-                    {completeness}% / {PROFILE_COMPLETE_THRESHOLD}%
+                    {completenessStats.requiredFilled}/{completenessStats.requiredTotal} required
                   </span>
                 )}
               </div>
@@ -234,10 +233,17 @@ export default function HomePage() {
                     <div className="border-t border-border bg-[#fff8ef] px-4 py-4 text-center sm:px-5">
                       <p className="font-serif text-base font-semibold">More {lookingFor} are waiting</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Your profile is {completeness}% complete. Reach {PROFILE_COMPLETE_THRESHOLD}% to unlock Discover
-                        and see every matching profile  not just this preview.
+                        Fill every required detail to unlock Discover and see every matching profile — not just this
+                        preview. Specialization and employer are optional.
                       </p>
-                      <Link href="/profile/edit" className="mt-3 inline-block">
+                      <Link
+                        href={
+                          completenessStats.missingRequired.some((f) => f.group === "career")
+                            ? "/profile/edit#career"
+                            : "/profile/edit"
+                        }
+                        className="mt-3 inline-block"
+                      >
                         <Button size="sm" className="rounded-md">
                           Complete profile to see more
                         </Button>
@@ -300,7 +306,7 @@ export default function HomePage() {
                   <p className="mt-3 text-sm text-muted-foreground">
                     {canSeeMore
                       ? "You can now browse all matching profiles."
-                      : "Add a few more details to reach 80%."}
+                      : "Fill required details to unlock Discover."}
                   </p>
                 )}
                 <Link href="/profile/edit" className="mt-3 block">

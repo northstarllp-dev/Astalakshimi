@@ -130,7 +130,7 @@ export const emptySignupData = (): SignupData => ({
   otherOccupation: "",
   companyName: "",
   companySector: "Private",
-  annualIncome: "₹10 – 15 Lakh",
+  annualIncome: "",
   familyValues: "Moderate",
   familyType: "Nuclear",
   familyStatus: "Middle class",

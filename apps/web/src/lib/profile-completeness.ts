@@ -5,7 +5,8 @@ import { emptySignupData, type SignupData } from "@/lib/profile-store"
  *
  * Specs (`ui-public-auth.md`, `ui-dashboard.md`, `ui-changes.md`):
  * - Short signup should land near 25% (10 of 40 details).
- * - Discover unlocks at 80% (32 of 40) plus verification — verification is not in this score.
+ * - Discover unlocks when every *required* field is filled (signup + education, occupation, income).
+ *   Optional details (employer, specialization, family, horoscope, …) do not block Discover.
  * - Frontend never talks to Postgres; this is computed from SignupData (session cache / API profile).
  *
  * Defaults from `emptySignupData()` (height 165, diet Vegetarian, etc.) do not count
@@ -32,6 +33,8 @@ export type ProfileDetailField = {
   group: ProfileDetailGroup
   /** True if this field is collected on the short 5-step register. */
   signup: boolean
+  /** Must be filled before Discover / extra matches unlock. */
+  required?: boolean
   filled: (d: SignupData) => boolean
 }
 
@@ -61,14 +64,15 @@ function filledSignupSelect(value: string | undefined | null, emptyDefault: stri
 
 export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
   // Signup (~25%): 10 fields
-  { id: "profileFor", label: "Profile for", group: "basics", signup: true, filled: (d) => filledTyped(d.profileFor) },
-  { id: "fullName", label: "Full name", group: "basics", signup: true, filled: (d) => filledTyped(d.fullName) },
-  { id: "gender", label: "Gender", group: "basics", signup: true, filled: (d) => filledTyped(d.gender) },
+  { id: "profileFor", label: "Profile for", group: "basics", signup: true, required: true, filled: (d) => filledTyped(d.profileFor) },
+  { id: "fullName", label: "Full name", group: "basics", signup: true, required: true, filled: (d) => filledTyped(d.fullName) },
+  { id: "gender", label: "Gender", group: "basics", signup: true, required: true, filled: (d) => filledTyped(d.gender) },
   {
     id: "dob",
     label: "Date of birth",
     group: "basics",
     signup: true,
+    required: true,
     filled: (d) => Boolean(d.dobDay && d.dobMonth && d.dobYear),
   },
   {
@@ -76,22 +80,25 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     label: "Marital status",
     group: "basics",
     signup: true,
+    required: true,
     filled: (d) => filledSignupSelect(d.maritalStatus, EMPTY.maritalStatus, d),
   },
-  { id: "city", label: "City", group: "basics", signup: true, filled: (d) => filledTyped(d.city) },
+  { id: "city", label: "City", group: "basics", signup: true, required: true, filled: (d) => filledTyped(d.city) },
   {
     id: "religion",
     label: "Religion",
     group: "community",
     signup: true,
+    required: true,
     filled: (d) => filledSignupSelect(d.religion, EMPTY.religion, d),
   },
-  { id: "caste", label: "Caste / community", group: "community", signup: true, filled: (d) => filledTyped(d.caste) },
+  { id: "caste", label: "Caste / community", group: "community", signup: true, required: true, filled: (d) => filledTyped(d.caste) },
   {
     id: "motherTongue",
     label: "Mother tongue",
     group: "community",
     signup: true,
+    required: true,
     filled: (d) => filledTyped(d.motherTongue),
   },
   {
@@ -99,6 +106,7 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     label: "Profile photo",
     group: "photos",
     signup: true,
+    required: true,
     filled: (d) => (d.photos?.length ?? 0) >= 1 || (d.photoS3Keys?.length ?? 0) >= 1,
   },
 
@@ -137,10 +145,11 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
   },
   {
     id: "education",
-    label: "Education",
+    label: "Highest education",
     group: "career",
     signup: false,
-    filled: (d) => filledTyped(d.education) || filledTyped(d.degree) || filledTyped(d.educationStream),
+    required: true,
+    filled: (d) => filledTyped(d.education) || filledTyped(d.degree) || filledTyped(d.otherEducation),
   },
   { id: "collegeName", label: "College", group: "career", signup: false, filled: (d) => filledTyped(d.collegeName) },
   {
@@ -148,7 +157,8 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     label: "Occupation",
     group: "career",
     signup: false,
-    filled: (d) => filledTyped(d.occupation) || filledTyped(d.profession),
+    required: true,
+    filled: (d) => filledTyped(d.occupation) || filledTyped(d.profession) || filledTyped(d.otherOccupation),
   },
   { id: "companyName", label: "Company", group: "career", signup: false, filled: (d) => filledTyped(d.companyName) },
   {
@@ -156,6 +166,7 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     label: "Annual income",
     group: "career",
     signup: false,
+    required: true,
     filled: (d) => filledCustom(d.annualIncome, EMPTY.annualIncome),
   },
   {
@@ -247,25 +258,30 @@ export type ProfileCompletenessStats = {
   filled: number
   total: number
   percentage: number
+  requiredFilled: number
+  requiredTotal: number
+  requiredComplete: boolean
+  missingRequired: Array<ProfileDetailField & { done: boolean }>
   fields: Array<ProfileDetailField & { done: boolean }>
 }
 
 export function getProfileCompletenessStats(data: SignupData | null): ProfileCompletenessStats {
-  if (!data) {
-    return {
-      filled: 0,
-      total: PROFILE_DETAIL_TOTAL,
-      percentage: 0,
-      fields: PROFILE_DETAIL_FIELDS.map((field) => ({ ...field, done: false })),
-    }
-  }
-
-  const fields = PROFILE_DETAIL_FIELDS.map((field) => ({ ...field, done: field.filled(data) }))
+  const fields = PROFILE_DETAIL_FIELDS.map((field) => ({
+    ...field,
+    done: data ? field.filled(data) : false,
+  }))
   const filled = fields.filter((f) => f.done).length
+  const requiredFields = fields.filter((f) => f.required)
+  const requiredFilled = requiredFields.filter((f) => f.done).length
+  const requiredTotal = requiredFields.length
   return {
     filled,
     total: PROFILE_DETAIL_TOTAL,
     percentage: Math.round((filled / PROFILE_DETAIL_TOTAL) * 100),
+    requiredFilled,
+    requiredTotal,
+    requiredComplete: requiredTotal > 0 && requiredFilled === requiredTotal,
+    missingRequired: requiredFields.filter((f) => !f.done),
     fields,
   }
 }

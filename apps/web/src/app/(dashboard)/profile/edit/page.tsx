@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { DateOfBirthPicker } from "@/components/profile/date-of-birth-picker"
+import { BirthTimeInput, InputWithUnit, WeightInput } from "@/components/profile/input-with-unit"
 import { MultiSelect } from "@/components/profile/multi-select"
 import { SearchableSelect } from "@/components/profile/searchable-select"
 import {
@@ -51,6 +52,7 @@ import {
   useReorderPhotosMutation,
 } from "@/hooks/queries"
 import { profileEditSchema } from "@/lib/validation"
+import { isProfileComplete } from "@/lib/portal-access"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeft, Camera, Check, ExternalLink, Eye, FileText, GripVertical, Star, Trash2, Upload } from "lucide-react"
@@ -143,6 +145,13 @@ export default function ProfileEditPage() {
 
   const pdfPreviewUrl = data.horoscopeS3Key ? getMediaUrl(data.horoscopeS3Key) : null
 
+  React.useEffect(() => {
+    const hash = window.location.hash
+    if (!hash) return
+    const el = document.querySelector(hash)
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [profileQuery.isPending])
+
   const update = (fields: Partial<SignupData>) => {
     for (const [key, value] of Object.entries(fields)) {
       form.setValue(key as keyof SignupData, value as never, { shouldDirty: true, shouldValidate: true })
@@ -158,10 +167,14 @@ export default function ProfileEditPage() {
       }
     }
 
+    const nextProfile = { ...data, ...(values as SignupData) }
+    const unlockingDiscover =
+      !isProfileComplete(profileQuery.data ?? null) && isProfileComplete(nextProfile)
+
     updateMutation.mutate(delta, {
       onSuccess: () => {
         setSaved(true)
-        window.setTimeout(() => router.push("/profile"), 600)
+        window.setTimeout(() => router.push(unlockingDiscover ? "/dashboard" : "/profile"), 600)
       },
     })
   })
@@ -298,10 +311,17 @@ export default function ProfileEditPage() {
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Height">
-            <Input value={data.height} onChange={(e) => update({ height: e.target.value })} placeholder="e.g. 170 cm" />
+            <InputWithUnit
+              value={String(data.height ?? "").replace(/\D/g, "")}
+              onChange={(next) => update({ height: next.replace(/\D/g, "").slice(0, 3) })}
+              placeholder="170"
+              unit="cm"
+              inputMode="numeric"
+              aria-label="Height"
+            />
           </Field>
           <Field label="Weight">
-            <Input value={data.weight} onChange={(e) => update({ weight: e.target.value })} placeholder="e.g. 58 kg" />
+            <WeightInput value={data.weight} onChange={(weight) => update({ weight })} />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -394,10 +414,12 @@ export default function ProfileEditPage() {
 
       <EditSection id="career" title="Education & career">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Highest education">
+          <Field label="Highest education" required error={fieldError(errors, "education")}>
             <Input
-              value={data.otherEducation || data.education}
-              onChange={(e) => update({ education: e.target.value, otherEducation: "" })}
+              value={data.otherEducation || data.education || data.degree || ""}
+              onChange={(e) =>
+                update({ education: e.target.value, otherEducation: "", degree: e.target.value })
+              }
               placeholder="e.g. B.Tech"
             />
           </Field>
@@ -409,10 +431,12 @@ export default function ProfileEditPage() {
             />
           </Field>
         </div>
-        <Field label="Occupation">
+        <Field label="Occupation" required error={fieldError(errors, "occupation")}>
           <Input
-            value={data.otherOccupation || data.occupation}
-            onChange={(e) => update({ occupation: e.target.value, otherOccupation: "" })}
+            value={data.otherOccupation || data.occupation || data.profession || ""}
+            onChange={(e) =>
+              update({ occupation: e.target.value, otherOccupation: "", profession: e.target.value })
+            }
             placeholder="e.g. Software Engineer"
           />
         </Field>
@@ -420,7 +444,7 @@ export default function ProfileEditPage() {
           <Field label="Employer name (optional)">
             <Input value={data.companyName} onChange={(e) => update({ companyName: e.target.value })} placeholder="e.g. Infosys" />
           </Field>
-          <Field label="Annual income">
+          <Field label="Annual income" required error={fieldError(errors, "annualIncome")}>
             <SearchableSelect
               value={data.annualIncome || undefined}
               onValueChange={(v) => update({ annualIncome: v })}
@@ -683,7 +707,7 @@ export default function ProfileEditPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Birth time">
-            <Input value={data.birthTime} onChange={(e) => update({ birthTime: e.target.value })} placeholder="e.g. 08:30 AM" />
+            <BirthTimeInput value={data.birthTime} onChange={(birthTime) => update({ birthTime })} />
           </Field>
           <Field label="Birth place">
             <Input value={data.birthPlace} onChange={(e) => update({ birthPlace: e.target.value })} placeholder="e.g. Chennai, TN" />

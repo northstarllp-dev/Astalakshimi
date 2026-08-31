@@ -6,11 +6,11 @@ import { getProfileCompleteness, getProfileCompletenessStats } from "@/lib/profi
 
 export { getProfileCompleteness, getProfileCompletenessStats }
 
-/** Discover / extra matches unlock once the member is ~80% complete (32 of 40 details). */
+/** Discover / extra matches unlock once every required profile field is filled. */
 export const PROFILE_COMPLETE_THRESHOLD = 80
 
 export function isProfileComplete(data: SignupData | null) {
-  return getProfileCompleteness(data) >= PROFILE_COMPLETE_THRESHOLD
+  return getProfileCompletenessStats(data).requiredComplete
 }
 
 export function canBrowseMatches(data: SignupData | null) {
@@ -46,8 +46,8 @@ export function getProfileActions(data: SignupData | null): ProfileAction[] {
     {
       id: "career",
       label: "Education & career",
-      done: done("education") && done("occupation"),
-      href: "/profile/edit",
+      done: done("education") && done("occupation") && done("annualIncome"),
+      href: "/profile/edit#career",
     },
     {
       id: "about",
