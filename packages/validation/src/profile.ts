@@ -88,14 +88,14 @@ export const step3CommunitySchema = z.object({
 
 // Step 4: Education & Career
 export const step4CareerSchema = z.object({
-  educationLevel: educationLevelSchema,
-  degree: z.string().trim().min(2, 'Degree/qualification is required'),
+  educationLevel: educationLevelSchema.optional(),
+  degree: z.string().trim().optional(),
   collegeName: z.string().trim().optional(),
-  employmentStatus: employmentStatusSchema,
-  profession: z.string().trim().min(2, 'Profession/job title is required'),
+  employmentStatus: employmentStatusSchema.optional(),
+  profession: z.string().trim().optional(),
   companyName: z.string().trim().optional(),
   companySector: companySectorSchema.optional(),
-  annualIncome: z.string().min(1, 'Annual income is required'),
+  annualIncome: z.string().optional(),
 });
 
 // Step 5: Lifestyle, Habits & Astrology
