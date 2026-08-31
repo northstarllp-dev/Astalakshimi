@@ -17,8 +17,6 @@ import {
 import {
   useActivitySummaryQuery,
   useInterestsQuery,
-  useMarkVerifiedMutation,
-  useRejectVerificationMutation,
   usePaidQuery,
   useProfileQuery,
   useTopMatchesQuery,
@@ -61,8 +59,6 @@ export default function HomePage() {
   const { data: profile = null, isLoading: profileLoading } = useProfileQuery()
   const { data: paid = false } = usePaidQuery()
   const { data: interests } = useInterestsQuery()
-  const markVerified = useMarkVerifiedMutation()
-  const rejectVerification = useRejectVerificationMutation()
   const { data: topMatchesData, isLoading: matchesLoading } = useTopMatchesQuery()
   const { data: activitySummary } = useActivitySummaryQuery()
 
@@ -101,16 +97,7 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 md:py-6">
-      {!profile && !profileLoading ? (
-        <section className="border border-dashed border-border bg-card px-4 py-12 text-center">
-          <p className="font-serif text-xl font-semibold">No profile yet</p>
-          <p className="mt-1 text-sm text-muted-foreground">Create a profile to see matches from your community.</p>
-          <Button className="mt-5 rounded-md" onClick={() => router.push("/register")}>
-            Create profile
-          </Button>
-        </section>
-      ) : (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
           <div className="min-w-0 space-y-4">
             <div className="flex items-center gap-3">
               {profile?.photos?.[0] ? (
@@ -143,25 +130,6 @@ export default function HomePage() {
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     Photos stay private until approval — usually within {VERIFICATION_SLA_HOURS} hours.
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 rounded-md"
-                      onClick={() => markVerified.mutate()}
-                    >
-                      <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
-                      Approve now (demo)
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 rounded-md text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => rejectVerification.mutate()}
-                    >
-                      Simulate reject (demo)
-                    </Button>
-                  </div>
                 </div>
               </div>
             ) : null}
@@ -215,10 +183,7 @@ export default function HomePage() {
             <section className="overflow-hidden rounded-md border border-border bg-card">
               <div className="flex items-center justify-between border-b border-border px-3 py-2.5 sm:px-4">
                 <div>
-                  <h2 className="font-serif text-lg font-semibold">Sample {lookingFor}</h2>
-                  <p className="text-xs text-muted-foreground">
-                    This is how a bride or groom card looks  name, community, city, and education.
-                  </p>
+                  <h2 className="font-serif text-lg font-semibold">Your top matches</h2>
                 </div>
                 {canSeeMore ? (
                   <Link href="/dashboard" className="shrink-0 text-sm font-semibold text-primary hover:underline">
@@ -246,9 +211,9 @@ export default function HomePage() {
                 </div>
               ) : previewMatches.length === 0 ? (
                 <div className="px-4 py-10 text-center">
-                  <p className="text-sm font-semibold">No sample profiles yet</p>
+                  <p className="text-sm font-semibold">No profiles found</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Finish a few details so we can show how {lookingFor} will appear here.
+                    Finish a few details so we can show how your matches will appear here.
                   </p>
                   <Link href="/profile/edit" className="mt-4 inline-block">
                     <Button size="sm" className="rounded-md">
@@ -345,32 +310,8 @@ export default function HomePage() {
                 </Link>
               </div>
             </section>
-
-            <Link
-              href="/plans"
-              className="block rounded-md bg-primary px-4 py-4 text-primary-foreground"
-            >
-              <p className="font-serif text-lg font-semibold">See who viewed you</p>
-              <p className="mt-1 text-sm text-primary-foreground/80">
-                Premium members get visitor lists, extra contacts, and priority in search.
-              </p>
-              <span className="mt-3 inline-flex items-center text-sm font-semibold">
-                View plans <ChevronRight className="ml-0.5 h-4 w-4" />
-              </span>
-            </Link>
-
-            <section className="rounded-md border border-border bg-card px-4 py-3">
-              <p className="text-sm font-semibold">Need help?</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Assisted service can call families and introduce a match for you.
-              </p>
-              <Link href="/plans" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
-                Learn more
-              </Link>
-            </section>
           </aside>
         </div>
-      )}
     </main>
   )
 }
