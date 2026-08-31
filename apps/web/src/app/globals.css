@@ -110,6 +110,12 @@
     padding-top: env(safe-area-inset-top);
   }
 
+  /* Stick below the global offer banner; safe-area only when banner is hidden */
+  .sticky-below-offer {
+    top: var(--offer-banner-height, 0px);
+    padding-top: var(--header-safe-top, env(safe-area-inset-top));
+  }
+
   .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;

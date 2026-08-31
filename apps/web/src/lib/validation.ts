@@ -77,7 +77,16 @@ export const profileEditSchema = z
     phone: z.string().refine((value) => value.length === 0 || /^[6-9]\d{9}$/.test(value), {
       message: "Enter a valid 10-digit mobile number.",
     }),
-    fullName: z.string(),
+    fullName: z.string().trim().min(1, "Full name is required."),
+    gender: z.string().min(1, "Gender is required."),
+    dobDay: z.string().regex(/^\d{2}$/, "Date of birth is required."),
+    dobMonth: z.string().regex(/^\d{2}$/, "Date of birth is required."),
+    dobYear: z.string().regex(/^\d{4}$/, "Date of birth is required."),
+    maritalStatus: z.string().min(1, "Marital status is required."),
+    religion: z.string().min(1, "Religion is required."),
+    motherTongue: z.string().min(1, "Mother tongue is required."),
+    city: z.string().trim().min(2, "City is required."),
+    prefReligion: z.array(z.string()).min(1, "Select at least one preferred religion."),
     aboutMe: z.string().max(300, "Keep this under 300 characters."),
     prefAgeMin: z.number().int().min(18).max(80),
     prefAgeMax: z.number().int().min(18).max(80),
@@ -92,6 +101,10 @@ export const profileEditSchema = z
         message: "Minimum age cannot be above maximum age.",
         path: ["prefAgeMin"],
       })
+    }
+    const age = dobAge(value.dobDay, value.dobMonth, value.dobYear, value.gender)
+    if (!age.ok) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: age.message, path: ["dobYear"] })
     }
   })
 

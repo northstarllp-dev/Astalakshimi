@@ -1,18 +1,13 @@
 import {
-  loadProfile,
-  saveProfile,
   type SignupData,
   type VerificationStatus,
 } from "@/lib/profile-store"
+import { getProfileCompleteness, getProfileCompletenessStats } from "@/lib/profile-completeness"
 
-/** Discover / extra matches unlock once the member is ~80% complete. */
+export { getProfileCompleteness, getProfileCompletenessStats }
+
+/** Discover / extra matches unlock once the member is ~80% complete (32 of 40 details). */
 export const PROFILE_COMPLETE_THRESHOLD = 80
-
-export function getProfileCompleteness(data: SignupData | null) {
-  const actions = getProfileActions(data).filter((a) => a.id !== "verify")
-  if (!actions.length) return 0
-  return Math.round((actions.filter((a) => a.done).length / actions.length) * 100)
-}
 
 export function isProfileComplete(data: SignupData | null) {
   return getProfileCompleteness(data) >= PROFILE_COMPLETE_THRESHOLD
@@ -38,38 +33,38 @@ export type ProfileAction = {
 }
 
 export function getProfileActions(data: SignupData | null): ProfileAction[] {
+  const stats = getProfileCompletenessStats(data)
+  const done = (id: string) => stats.fields.some((f) => f.id === id && f.done)
   const d = data
   return [
     {
       id: "photos",
       label: "Add photos",
-      done: (d?.photos.length ?? 0) >= 1 || (d?.photoS3Keys?.length ?? 0) >= 1,
+      done: done("photos"),
       href: "/profile/edit",
     },
     {
       id: "career",
       label: "Education & career",
-      done: Boolean(
-        (d?.education || d?.educationLevel || d?.degree) && (d?.occupation || d?.profession)
-      ),
+      done: done("education") && done("occupation"),
       href: "/profile/edit",
     },
     {
       id: "about",
       label: "Write about yourself",
-      done: Boolean(d?.aboutMe && d.aboutMe.length >= 20),
+      done: done("aboutMe"),
       href: "/profile/edit",
     },
     {
       id: "lifestyle",
       label: "Height & lifestyle",
-      done: Boolean(d?.height && d?.diet),
+      done: done("height") && done("diet"),
       href: "/profile/edit",
     },
     {
       id: "horoscope",
       label: "Horoscope details",
-      done: Boolean(d?.birthTime && d?.birthPlace),
+      done: done("birthTime") && done("birthPlace"),
       href: "/profile/edit",
     },
     {

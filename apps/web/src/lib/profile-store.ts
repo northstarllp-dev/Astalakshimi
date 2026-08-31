@@ -283,6 +283,16 @@ export const STARS = [
   "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati",
 ]
 export const RASHIS = [
-  "Mesha", "Vrishabha", "Mithuna", "Karka", "Simha", "Kanya",
-  "Tula", "Vrishchika", "Dhanu", "Makara", "Kumbha", "Meena",
-]
+  { value: "Mesha", label: "Aries (Mesha)" },
+  { value: "Vrishabha", label: "Taurus (Vrishabha)" },
+  { value: "Mithuna", label: "Gemini (Mithuna)" },
+  { value: "Karka", label: "Cancer (Karka)" },
+  { value: "Simha", label: "Leo (Simha)" },
+  { value: "Kanya", label: "Virgo (Kanya)" },
+  { value: "Tula", label: "Libra (Tula)" },
+  { value: "Vrishchika", label: "Scorpio (Vrishchika)" },
+  { value: "Dhanu", label: "Sagittarius (Dhanu)" },
+  { value: "Makara", label: "Capricorn (Makara)" },
+  { value: "Kumbha", label: "Aquarius (Kumbha)" },
+  { value: "Meena", label: "Pisces (Meena)" },
+] as const

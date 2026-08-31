@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge"
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { getMediaUrl, calculateProfileCompleteness } from "@/lib/utils"
+import { getMediaUrl } from "@/lib/utils"
 import { useProfileQuery } from "@/hooks/queries"
 import { emptySignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
+import { getProfileCompletenessStats } from "@/lib/portal-access"
 import {
   Camera,
   CheckCircle2,
@@ -40,7 +41,8 @@ export default function MyProfilePage() {
   const [activeTab, setActiveTab] = React.useState("basics")
 
   const data = profile ?? emptySignupData()
-  const completeness = calculateProfileCompleteness(data)
+  const completenessStats = getProfileCompletenessStats(data)
+  const completeness = completenessStats.percentage
   const pending = data.verificationStatus === "pending"
   const verified = data.verificationStatus === "verified"
   const rejected = data.verificationStatus === "rejected"
@@ -166,13 +168,14 @@ export default function MyProfilePage() {
               <div className="min-w-0 flex-1">
                 <p className="font-serif text-sm font-bold">Profile completeness</p>
                 <p className="mt-0.5 text-xs text-muted-foreground leading-tight">
+                  {completenessStats.filled} of {completenessStats.total} details filled.
                   {completeness >= 90
-                    ? "Excellent — your profile stands out to families."
+                    ? " Excellent — your profile stands out to families."
                     : completeness >= 80
-                      ? "Profile complete. Discover opens after verification."
+                      ? " Profile complete. Discover opens after verification."
                       : completeness >= 60
-                        ? "Good progress. Reach 80% to unlock Discover."
-                        : "Signup is short — add details to unlock matches."}
+                        ? " Good progress. Reach 80% to unlock Discover."
+                        : " Signup is short — add details to unlock matches."}
                 </p>
               </div>
             </div>

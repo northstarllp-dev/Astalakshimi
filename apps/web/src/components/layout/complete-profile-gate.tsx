@@ -6,7 +6,7 @@ import { ChevronRight, Lock } from "lucide-react"
 import {
   PROFILE_COMPLETE_THRESHOLD,
   getProfileActions,
-  getProfileCompleteness,
+  getProfileCompletenessStats,
   isProfileComplete,
   isVerified,
 } from "@/lib/portal-access"
@@ -20,7 +20,8 @@ export function CompleteProfileGate({
   section?: string
 }) {
   const { data: profile = null } = useProfileQuery()
-  const completeness = getProfileCompleteness(profile)
+  const completenessStats = getProfileCompletenessStats(profile)
+  const completeness = completenessStats.percentage
   const verified = isVerified(profile?.verificationStatus)
   const rejected = profile?.verificationStatus === "rejected"
   const complete = isProfileComplete(profile)
@@ -46,6 +47,9 @@ export function CompleteProfileGate({
         <CompletenessRing percentage={completeness} size={96} strokeWidth={8} />
       </div>
       <p className="mt-3 text-sm font-semibold text-foreground">{completeness}% complete</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {completenessStats.filled} of {completenessStats.total} details filled
+      </p>
 
       {nextActions.length > 0 && (
         <ul className="mt-5 flex flex-wrap justify-center gap-2">

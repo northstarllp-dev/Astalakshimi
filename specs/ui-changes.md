@@ -88,7 +88,7 @@ Running log of product UI shipped in `apps/web` (frontend-only, mock `sessionSto
 **Route:** `/home` (nav label **Home**)  
 **Files:** [`home/page.tsx`](../apps/web/src/app/(dashboard)/home/page.tsx), [`lib/portal-access.ts`](../apps/web/src/lib/portal-access.ts), [`match-thumb-card.tsx`](../apps/web/src/components/dashboard/match-thumb-card.tsx), [`dashboard-shell.tsx`](../apps/web/src/components/layout/dashboard-shell.tsx), [`mobile-bottom-nav.tsx`](../apps/web/src/components/layout/mobile-bottom-nav.tsx)
 
-Signup stays short, so a new profile lands around **25%** complete (`profileCompleteness` is weighted: basics from signup = 25%). After register/login, members go to **Home**, not Discover.
+Signup stays short, so a new profile lands around **25%** complete (`filled / 40` details in [`profile-completeness.ts`](../apps/web/src/lib/profile-completeness.ts); the 10 signup fields are name, gender, DOB, marital status, city, religion, caste, mother tongue, profile-for, and photo). After register/login, members go to **Home**, not Discover.
 
 ### Home contents
 

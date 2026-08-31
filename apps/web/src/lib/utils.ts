@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { getProfileCompleteness } from "@/lib/profile-completeness"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -21,16 +22,5 @@ export function getMediaUrl(path: string | undefined | null): string {
 }
 
 export function calculateProfileCompleteness(profile: any): number {
-  if (!profile) return 0;
-  let score = 0;
-  if (profile.fullName) score += 10;
-  if (profile.dob || (profile.dobYear && profile.dobMonth && profile.dobDay)) score += 10;
-  if (profile.religion && profile.caste) score += 10;
-  if (profile.city && profile.state) score += 10;
-  if (profile.educationLevel || profile.education) score += 10;
-  if ((profile.profession || profile.occupation) && profile.annualIncome) score += 10;
-  if (profile.aboutMe && profile.aboutMe.length > 5) score += 10;
-  if (profile.companyName) score += 10;
-  if (profile.photos && profile.photos.length > 0) score += 20;
-  return Math.min(score, 100);
+  return getProfileCompleteness(profile ?? null)
 }

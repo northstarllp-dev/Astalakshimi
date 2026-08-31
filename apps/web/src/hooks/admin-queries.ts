@@ -34,6 +34,15 @@ export const adminQueryKeys = {
   audit: ["admin", "audit"] as const,
 }
 
+/** Admin UI works offline with mock data; skip noisy errors when Nest/API is down. */
+async function tryAdminApi<T>(fn: () => Promise<T>): Promise<T | null> {
+  try {
+    return await fn()
+  } catch {
+    return null
+  }
+}
+
 function invalidateAdmin(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: ["admin"] })
 }
@@ -78,18 +87,14 @@ export function useAdminStatsQuery() {
     queryKey: adminQueryKeys.stats,
     queryFn: async () => {
       const mockStats = await getAdminStats()
-      try {
-        const actualStats = await apiClient.admin.getStats()
-        return {
-          ...mockStats,
-          totalUsers: actualStats.totalUsers,
-          totalProfiles: actualStats.totalProfiles,
-          activeSubscriptions: actualStats.activeSubscriptions,
-          pendingVerifications: actualStats.pendingVerifications,
-        }
-      } catch (err) {
-        console.error("Failed to fetch admin stats from backend, falling back to mock:", err)
-        return mockStats
+      const actualStats = await tryAdminApi(() => apiClient.admin.getStats())
+      if (!actualStats) return mockStats
+      return {
+        ...mockStats,
+        totalUsers: actualStats.totalUsers,
+        totalProfiles: actualStats.totalProfiles,
+        activeSubscriptions: actualStats.activeSubscriptions,
+        pendingVerifications: actualStats.pendingVerifications,
       }
     },
     enabled: typeof window !== "undefined",
@@ -108,20 +113,16 @@ export function useAdminProfileQuery(id: string) {
     queryKey: adminQueryKeys.profile(id),
     queryFn: async () => {
       if (id.startsWith("adm-")) return getAdminProfile(id)
-      try {
-        const p = await apiClient.admin.getProfile(id)
-        return {
-          ...p,
-          selfiePhoto: getMediaUrl(p.selfieS3Key),
-          govtIdPhoto: getMediaUrl(p.govtIdS3Key),
-          photos: p.photos ? p.photos.map((ph: any) => ({
-            ...ph,
-            url: getMediaUrl(ph.s3Key),
-          })) : [],
-        }
-      } catch (e) {
-        console.error("Failed to load admin profile:", e)
-        return null
+      const p = await tryAdminApi(() => apiClient.admin.getProfile(id))
+      if (!p) return null
+      return {
+        ...p,
+        selfiePhoto: getMediaUrl(p.selfieS3Key),
+        govtIdPhoto: getMediaUrl(p.govtIdS3Key),
+        photos: p.photos ? p.photos.map((ph: any) => ({
+          ...ph,
+          url: getMediaUrl(ph.s3Key),
+        })) : [],
       }
     },
     enabled: Boolean(id),
@@ -132,9 +133,9 @@ export function usePendingVerificationsQuery() {
   return useQuery({
     queryKey: adminQueryKeys.pending,
     queryFn: async () => {
-      try {
-        const actualPending = await apiClient.admin.getPendingVerifications()
-        return actualPending.map((p) => ({
+      const actualPending = await tryAdminApi(() => apiClient.admin.getPendingVerifications())
+      if (!actualPending) return getPendingVerifications()
+      return actualPending.map((p) => ({
           id: `ver-${p.id}`,
           profileId: p.profileId,
           fullName: p.fullName || "Unknown",
@@ -146,11 +147,7 @@ export function usePendingVerificationsQuery() {
           submittedAt: p.submittedAt,
           slaBreached: isSlaBreached(p.submittedAt),
           primaryPhoto: getMediaUrl(p.selfieS3Key || p.govtIdS3Key || IMAGES.profiles.priya[0]),
-        }))
-      } catch (err) {
-        console.error("Failed to fetch pending verifications from backend, falling back to mock:", err)
-        return getPendingVerifications()
-      }
+      }))
     },
   })
 }
@@ -173,11 +170,7 @@ export function useApproveProfileMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ profileId, staff }: { profileId: string; staff: AdminSession }) => {
-      try {
-        await apiClient.admin.updateVerificationStatus(profileId, 'verified')
-      } catch (err) {
-        console.error("Backend update failed, proceeding with mock update:", err)
-      }
+      await tryAdminApi(() => apiClient.admin.updateVerificationStatus(profileId, 'verified'))
       return approveProfile(profileId, staff)
     },
     onSuccess: () => invalidateAdmin(queryClient),
@@ -196,11 +189,7 @@ export function useRejectProfileMutation() {
       staff: AdminSession
       rejectionReason: string
     }) => {
-      try {
-        await apiClient.admin.updateVerificationStatus(profileId, 'rejected', rejectionReason)
-      } catch (err) {
-        console.error("Backend update failed, proceeding with mock update:", err)
-      }
+      await tryAdminApi(() => apiClient.admin.updateVerificationStatus(profileId, 'rejected', rejectionReason))
       return rejectProfile(profileId, staff, rejectionReason)
     },
     onSuccess: () => invalidateAdmin(queryClient),

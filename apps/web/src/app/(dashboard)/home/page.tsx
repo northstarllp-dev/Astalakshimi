@@ -11,7 +11,7 @@ import {
   PROFILE_COMPLETE_THRESHOLD,
   canAccessFullPortal,
   getProfileActions,
-  getProfileCompleteness,
+  getProfileCompletenessStats,
   isProfileComplete,
 } from "@/lib/portal-access"
 import {
@@ -77,7 +77,8 @@ export default function HomePage() {
   const unlocked = canAccessFullPortal(profile)
   const canSeeMore = isProfileComplete(profile)
   const actions = getProfileActions(profile)
-  const completeness = getProfileCompleteness(profile)
+  const completenessStats = getProfileCompletenessStats(profile)
+  const completeness = completenessStats.percentage
   const nextActions = actions.filter((a) => !a.done).slice(0, 3)
   const allMatches = topMatchesData || []
   const previewMatches = allMatches.slice(0, 3)
@@ -293,6 +294,9 @@ export default function HomePage() {
                   <span className="text-muted-foreground">Completeness</span>
                   <span className="font-semibold tabular-nums">{completeness}%</span>
                 </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {completenessStats.filled} of {completenessStats.total} details filled
+                </p>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full rounded-full bg-primary"

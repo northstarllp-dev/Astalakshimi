@@ -60,7 +60,7 @@ Discover / Interests / Search / Shortlist always appear. Incomplete or unverifie
 | --- | --- |
 | `src/lib/matches.ts` | Demo match profiles + premium / joinedDaysAgo / manglik / star |
 | `src/lib/discover.ts` | Quick + advanced filters, browse tabs, preference apply |
-| `src/lib/portal-access.ts` | Home unlock rule, top matches, activity teasers |
+| `src/lib/portal-access.ts` | Home unlock rule; completeness from `profile-completeness.ts` (filled / 40 details) |
 | `src/lib/validation.ts` | Zod schemas for login, signup, edit, search, checkout |
 | `src/hooks/queries.ts` | TanStack Query keys/hooks over mock sessionStorage |
 | `src/hooks/admin-queries.ts` | Admin console TanStack Query hooks |

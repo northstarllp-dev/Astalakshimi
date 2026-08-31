@@ -11,7 +11,7 @@ See also the full change log: [ui-changes.md](./ui-changes.md).
 
 Post-signup landing (nav label **Home**). Always visible.
 
-Logic: [`lib/portal-access.ts`](../apps/web/src/lib/portal-access.ts). Completeness is weighted so signup-only profiles sit near **25%**.
+Logic: [`lib/portal-access.ts`](../apps/web/src/lib/portal-access.ts) and [`lib/profile-completeness.ts`](../apps/web/src/lib/profile-completeness.ts). Completeness is **filled details / 40 total details**. Short signup fills about 10 of those (~25%). Form defaults (height 165, diet Vegetarian, etc.) do not count until the member sets them.
 
 | Block | Behaviour |
 | --- | --- |
