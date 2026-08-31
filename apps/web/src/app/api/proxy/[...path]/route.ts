@@ -29,9 +29,14 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
   };
 
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    const bodyText = await request.text();
-    if (bodyText) {
-      options.body = bodyText;
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('multipart/form-data')) {
+      options.body = await request.arrayBuffer();
+    } else {
+      const bodyText = await request.text();
+      if (bodyText) {
+        options.body = bodyText;
+      }
     }
   }
 

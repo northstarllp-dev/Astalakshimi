@@ -360,6 +360,46 @@ export class InterestsService {
     return rows.map((r) => this.formatInterestItem(r.interest, r.sender, photoMap.get(r.sender.id)));
   }
 
+  async getUsage(userId: string) {
+    const plan = await this.entitlementsService.getUserPlan(userId);
+    const limit = plan.interestQuota ?? null;
+
+    const [profile] = await this.db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .limit(1);
+
+    if (!profile) {
+      return {
+        planSlug: plan.slug,
+        limit,
+        used: 0,
+        remaining: limit,
+      };
+    }
+
+    const [sentCountResult] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(interests)
+      .where(
+        and(
+          eq(interests.senderProfileId, profile.id),
+          or(eq(interests.status, 'pending'), eq(interests.status, 'accepted')),
+        ),
+      );
+
+    const used = sentCountResult?.count ?? 0;
+    const remaining = limit === null ? null : Math.max(0, limit - used);
+
+    return {
+      planSlug: plan.slug,
+      limit,
+      used,
+      remaining,
+    };
+  }
+
   async getSummary(userId: string) {
     const [received, sent, mutual, blocked] = await Promise.all([
       this.getReceivedInterests(userId),

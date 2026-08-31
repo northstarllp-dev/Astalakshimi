@@ -4,7 +4,6 @@ import {
   adminLogin,
   approveProfile,
   clearAdminSession,
-  createAdminProfile,
   getAdminProfile,
   getAdminStats,
   getPendingVerifications,
@@ -113,8 +112,18 @@ export function useAdminProfilesQuery() {
           fullName: p.fullName || "Unknown",
           city: p.city || "Unknown",
           phone: p.phone || "Unknown",
-          verificationStatus: p.verificationStatus || "pending",
+          gender: p.gender || "Female",
+          verificationStatus: p.verificationStatus || "idle",
+          completeness: p.completeness ?? 0,
+          accountStatus: p.accountStatus || "active",
+          createdBy: p.createdBy || "self",
           submittedAt: p.submittedAt,
+          photos: p.photos
+            ? p.photos.map((ph: any) => ({
+                ...ph,
+                url: getMediaUrl(ph.s3Key),
+              }))
+            : [],
         }))
       } catch (err) {
         console.error("Failed to fetch admin profiles from backend, falling back to mock:", err)
@@ -232,11 +241,41 @@ export function useCreateAdminProfileMutation() {
   return useMutation({
     mutationFn: async ({
       input,
-      staff,
+      photos,
     }: {
-      input: Omit<AdminProfile, "id" | "completeness" | "submittedAt"> & { markVerified?: boolean }
-      staff: AdminSession
-    }) => createAdminProfile(input, staff),
+      input: {
+        profileFor: string
+        phone: string
+        fullName: string
+        gender: "Male" | "Female" | "Other"
+        dobDay: string
+        dobMonth: string
+        dobYear: string
+        maritalStatus: "Never Married" | "Divorced" | "Widowed" | "Awaiting Divorce"
+        city: string
+        religion: string
+        caste: string
+        motherTongue: string
+        brothersCount: number
+        sistersCount: number
+      }
+      photos: File[]
+    }) => {
+      const profile = await apiClient.admin.createProfile(input)
+      if (photos.length === 0) return profile
+
+      const s3Keys: string[] = []
+      for (const file of photos) {
+        const contentType = file.type === "image/jpg" ? "image/jpeg" : file.type || "image/jpeg"
+        const { uploadUrl, s3Key } = await apiClient.admin.getPhotoUploadUrl(profile.id, {
+          contentType,
+          fileSize: file.size,
+        })
+        await apiClient.media.uploadFileToS3(uploadUrl, file, contentType)
+        s3Keys.push(s3Key)
+      }
+      return apiClient.admin.attachPhotos(profile.id, s3Keys)
+    },
     onSuccess: () => invalidateAdmin(queryClient),
   })
 }

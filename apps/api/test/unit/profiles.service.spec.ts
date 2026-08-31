@@ -26,7 +26,23 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       transaction: jest.fn(async (cb: any) => cb(mockDb)),
     };
 
-    profilesService = new ProfilesService(mockDb);
+    const mockBlocks = { isBlocked: jest.fn().mockResolvedValue(false) };
+    const mockEntitlements = {
+      getContactUnlockStatus: jest.fn().mockResolvedValue({
+        canView: false,
+        isUnlocked: false,
+        isMutualBenefit: false,
+        limit: 3,
+        usedThisMonth: 0,
+        remaining: 3,
+        canUnlockWithQuota: true,
+        canPayExtra: false,
+        extraContactFeePaise: 2900,
+        planSlug: 'free',
+      }),
+    };
+
+    profilesService = new ProfilesService(mockDb, mockBlocks as any, mockEntitlements as any);
   });
 
   const sampleCompletePayload: CompleteRegistrationPayload = {

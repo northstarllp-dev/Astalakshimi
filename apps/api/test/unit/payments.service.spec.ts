@@ -382,6 +382,66 @@ describe('Feature 4: Payments & Subscriptions - PaymentsService (Unit Tests)', (
     });
   });
 
+  describe('activateDemoPlan', () => {
+    it('should refuse demo activation in production', async () => {
+      const original = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      try {
+        await expect(paymentsService.activateDemoPlan('user-1', 'silver')).rejects.toThrow(
+          'Demo plan activation is disabled in production.'
+        );
+      } finally {
+        process.env.NODE_ENV = original;
+      }
+    });
+
+    it('should capture a demo payment and activate the plan', async () => {
+      const silverPlan = {
+        id: 'silver-plan-uuid',
+        slug: 'silver',
+        name: 'Silver',
+        pricePaise: 29900,
+        durationDays: 90,
+      };
+
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([silverPlan]),
+      });
+
+      mockDb.update.mockReturnValue({
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      let insertCount = 0;
+      mockDb.insert.mockImplementation(() => {
+        insertCount++;
+        if (insertCount === 1) {
+          return {
+            values: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([{ id: 'pay-demo-1' }]),
+            }),
+          };
+        }
+        return { values: jest.fn().mockResolvedValue(undefined) };
+      });
+
+      const result = await paymentsService.activateDemoPlan('user-1', 'silver');
+
+      expect(result).toEqual({
+        success: true,
+        demoActivated: true,
+        planName: 'Silver',
+        planSlug: 'silver',
+      });
+      expect(mockDb.insert).toHaveBeenCalledWith(payments);
+      expect(mockDb.insert).toHaveBeenCalledWith(subscriptions);
+      expect(mockDb.update).toHaveBeenCalledWith(subscriptions);
+    });
+  });
+
   describe('getUserInvoices', () => {
     it('should return formatted invoices for captured payments', async () => {
       const mockPaymentRows = [

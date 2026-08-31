@@ -6,7 +6,7 @@ import Link from "next/link"
 import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useInterestsQuery } from "@/hooks/queries"
+import { useInterestsQuery, useUnlockedContactsQuery } from "@/hooks/queries"
 import { cn, getMediaUrl } from "@/lib/utils"
 import {
   HeartHandshake,
@@ -246,14 +246,72 @@ function MutualTab({
 }
 
 function UnlockedContactsTab() {
-  // Empty state for now
+  const { data = [], isLoading } = useUnlockedContactsQuery()
+
+  if (isLoading) {
+    return (
+      <div className="flex py-12 items-center justify-center text-muted-foreground gap-2 text-sm">
+        <Loader2 className="h-5 w-5 animate-spin" /> Loading unlocked contacts...
+      </div>
+    )
+  }
+
+  if (data.length === 0) {
+    return (
+      <EmptyState
+        icon={LockKeyholeOpen}
+        title="No unlocked contacts yet"
+        body="Use a contact unlock from your plan to view phone numbers. Free includes 3 unlocks per month."
+        cta={{ label: "View plans", href: "/plans" }}
+      />
+    )
+  }
+
   return (
-    <EmptyState
-      icon={LockKeyholeOpen}
-      title="No unlocked contacts yet"
-      body="Use your premium contact unlocks to directly view phone numbers and initiate conversations."
-      cta={{ label: "View plans", href: "/plans" }}
-    />
+    <div className="space-y-3">
+      {data.map((item) => (
+        <article
+          key={item.profileId}
+          className="rounded-2xl border border-border bg-card p-3.5 shadow-sm sm:p-4"
+        >
+          <div className="flex gap-3">
+            <Link href={`/profiles/${item.profileId}`} className="shrink-0">
+              <ProfileAvatar
+                profile={{
+                  id: item.profileId,
+                  fullName: item.fullName,
+                  age: item.age ?? 0,
+                  city: item.city,
+                  photo: item.photo,
+                }}
+                size={56}
+              />
+            </Link>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-serif text-base font-bold">
+                {item.fullName}
+                {item.age ? `, ${item.age}` : ""}
+              </h3>
+              <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3 shrink-0" />
+                {item.city || "India"}
+                {item.caste ? ` · ${item.caste}` : ""}
+              </p>
+              <p className="mt-2 font-mono text-sm font-semibold text-foreground">
+                {item.phone}
+              </p>
+              <div className="mt-3">
+                <Link href={`/profiles/${item.profileId}`}>
+                  <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                    View profile
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
   )
 }
 

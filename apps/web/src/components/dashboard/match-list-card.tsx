@@ -6,7 +6,8 @@ import Link from "next/link"
 import { cn, getMediaUrl } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { BadgeCheck, ChevronLeft, ChevronRight, Heart, MapPin, Sparkles, Star } from "lucide-react"
+import { BadgeCheck, ChevronLeft, ChevronRight, MapPin, Sparkles, Star } from "lucide-react"
+import { ConnectButton } from "@/components/profile/connect-button"
 import { useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
 
 export function MatchListCard({
@@ -23,7 +24,6 @@ export function MatchListCard({
   onConnect?: (id: string) => void
 }) {
   const education = (match.education || match.educationLevel || "").split(/\s+/)[0]?.trim() || match.education || match.educationLevel || "Not specified"
-  const [connected, setConnected] = React.useState(false)
   const [activePhoto, setActivePhoto] = React.useState(0)
   const [paused, setPaused] = React.useState(false)
   const photos = match.photos || []
@@ -226,15 +226,7 @@ export function MatchListCard({
             <Link href={`/profiles/${match.id}`} className="min-w-0">
               <Button variant="outline" size="sm" className="h-10 w-full">View</Button>
             </Link>
-            <Button
-              size="sm"
-              className="h-10"
-              disabled={connected}
-              onClick={() => { onConnect?.(match.id); setConnected(true) }}
-            >
-              <Heart className="mr-1 h-3.5 w-3.5 fill-current" />
-              {connected ? "Sent" : "Connect"}
-            </Button>
+            <ConnectButton profileId={match.id} size="sm" className="h-10 w-full" />
           </div>
         </div>
       </div>

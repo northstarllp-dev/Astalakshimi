@@ -36,6 +36,16 @@ export class PaymentsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('demo-activate')
+  activateDemoPlan(
+    @CurrentUser() user: UserSession,
+    @Body() body: { planId: string },
+  ) {
+    if (!body.planId) throw new BadRequestException('planId is required');
+    return this.paymentsService.activateDemoPlan(user.userId, body.planId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('subscription')
   getSubscription(@CurrentUser() user: UserSession) {
     return this.paymentsService.getUserSubscription(user.userId);

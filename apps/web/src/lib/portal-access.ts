@@ -2,9 +2,19 @@ import {
   type SignupData,
   type VerificationStatus,
 } from "@/lib/profile-store"
-import { getProfileCompleteness, getProfileCompletenessStats } from "@/lib/profile-completeness"
+import {
+  getProfileCompleteness,
+  getProfileCompletenessStats,
+  getMissingRequiredFieldIds,
+  getRequiredFieldEditHash,
+} from "@/lib/profile-completeness"
 
-export { getProfileCompleteness, getProfileCompletenessStats }
+export {
+  getProfileCompleteness,
+  getProfileCompletenessStats,
+  getMissingRequiredFieldIds,
+  getRequiredFieldEditHash,
+}
 
 /** Discover / extra matches unlock once every required profile field is filled. */
 export const PROFILE_COMPLETE_THRESHOLD = 80
@@ -64,8 +74,13 @@ export function getProfileActions(data: SignupData | null): ProfileAction[] {
     {
       id: "horoscope",
       label: "Horoscope details",
-      done: done("birthTime") && done("birthPlace"),
-      href: "/profile/edit",
+      done:
+        done("birthTime") &&
+        done("birthPlace") &&
+        done("star") &&
+        done("rashi") &&
+        done("manglik"),
+      href: "/profile/edit#horoscope",
     },
     {
       id: "verify",

@@ -59,7 +59,7 @@ export class PlansService implements OnModuleInit {
         durationDays: 180,
         periodLabel: '6 Months',
         interestQuota: 500,
-        contactUnlocks: 50,
+        contactUnlocks: null, // unlimited
         hasAdvancedFilters: true,
         hasPriorityListing: true,
         badge: 'Most popular',

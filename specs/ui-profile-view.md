@@ -36,4 +36,4 @@ Portrait photo card under the header; details stack below and scroll in the righ
 | --- | --- |
 | Skip | Adds id to skipped list, back to Discover if unlocked otherwise Home |
 | Shortlist | Toggles saved list (`Saved` when on) |
-| Connect | Sends interest; label becomes `Sent` |
+| Connect | Sends interest; label becomes **Request sent** (gold `#b8901f`) while pending; **Connected** (green `#067647`) once accepted |

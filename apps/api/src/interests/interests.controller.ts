@@ -25,6 +25,11 @@ export class InterestsController {
     return this.interestsService.sendInterest(user.userId, body);
   }
 
+  @Get('usage')
+  getUsage(@CurrentUser() user: UserSession) {
+    return this.interestsService.getUsage(user.userId);
+  }
+
   @Get('summary')
   getSummary(@CurrentUser() user: UserSession) {
     return this.interestsService.getSummary(user.userId);

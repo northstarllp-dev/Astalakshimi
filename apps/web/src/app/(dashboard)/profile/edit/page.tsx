@@ -53,6 +53,11 @@ import {
 } from "@/hooks/queries"
 import { profileEditSchema } from "@/lib/validation"
 import { isProfileComplete } from "@/lib/portal-access"
+import {
+  getMissingRequiredFieldIds,
+  getProfileCompletenessStats,
+  REQUIRED_FIELD_INVALID_CLASS,
+} from "@/lib/profile-completeness"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeft, Camera, Check, ExternalLink, Eye, FileText, GripVertical, Star, Trash2, Upload } from "lucide-react"
@@ -70,21 +75,29 @@ type PhotoItem = {
 function Field({
   label,
   required,
+  missing,
   error,
   children,
 }: {
   label: string
   required?: boolean
+  missing?: boolean
   error?: string
   children: React.ReactNode
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+      <Label
+        className={cn(
+          "text-xs font-semibold tracking-wide uppercase",
+          missing ? "text-destructive" : "text-muted-foreground"
+        )}
+      >
         {label}
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
+      {missing && !error && <p className="text-xs text-destructive">Required to unlock Discover</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
@@ -118,6 +131,10 @@ export default function ProfileEditPage() {
   })
   const data = form.watch() as SignupData
   const { errors } = form.formState
+  const completenessStats = React.useMemo(() => getProfileCompletenessStats(data), [data])
+  const missingIds = React.useMemo(() => getMissingRequiredFieldIds(data), [data])
+  const isMissing = React.useCallback((id: string) => missingIds.has(id), [missingIds])
+  const invalidCls = REQUIRED_FIELD_INVALID_CLASS
   const [saved, setSaved] = React.useState(false)
   const [dragIndex, setDragIndex] = React.useState<number | null>(null)
   const fileRef = React.useRef<HTMLInputElement>(null)
@@ -176,6 +193,9 @@ export default function ProfileEditPage() {
         setSaved(true)
         window.setTimeout(() => router.push(unlockingDiscover ? "/dashboard" : "/profile"), 600)
       },
+      onError: (err) => {
+        alert(err instanceof Error ? err.message : "Failed to save profile. Please try again.")
+      },
     })
   })
 
@@ -186,17 +206,11 @@ export default function ProfileEditPage() {
 
     for (const file of filesToUpload) {
       try {
-        const { uploadUrl, s3Key } = await apiClient.media.getUploadUrl({
-          purpose: "profile_photo",
-          contentType: file.type || "image/jpeg",
-          fileSize: file.size,
-        })
-
-        await apiClient.media.uploadFileToS3(uploadUrl, file, file.type || "image/jpeg")
+        const { s3Key } = await apiClient.media.uploadMediaFile(file, "profile_photo")
         await addPhotoMutation.mutateAsync(s3Key)
       } catch (err) {
-        console.error("[Media] S3 upload failed:", err)
-        alert("Failed to upload photo. Please check your AWS credentials or network.")
+        console.error("[Media] Upload failed:", err)
+        alert("Failed to upload photo. Please try again.")
       }
     }
   }
@@ -209,12 +223,7 @@ export default function ProfileEditPage() {
       return
     }
     try {
-      const { uploadUrl, s3Key } = await apiClient.media.getUploadUrl({
-        purpose: "horoscope",
-        contentType: "application/pdf",
-        fileSize: file.size,
-      })
-      await apiClient.media.uploadFileToS3(uploadUrl, file, "application/pdf")
+      const { s3Key } = await apiClient.media.uploadMediaFile(file, "horoscope")
       update({
         horoscopeName: file.name,
         horoscopeSize: file.size,
@@ -277,36 +286,57 @@ export default function ProfileEditPage() {
         </div>
       </div>
 
+      {!completenessStats.requiredComplete && completenessStats.missingRequired.length > 0 && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+          <p className="text-sm font-semibold text-destructive">Complete required fields to unlock Discover</p>
+          <p className="mt-1 text-xs text-destructive/90">
+            Still needed: {completenessStats.missingRequired.map((field) => field.label).join(", ")}
+          </p>
+        </div>
+      )}
+
       <EditSection id="basics" title="Basic info">
-        <Field label="Full name" required error={fieldError(errors, "fullName")}>
-          <Input value={data.fullName} onChange={(e) => update({ fullName: e.target.value })} />
+        <Field label="Full name" required missing={isMissing("fullName")} error={fieldError(errors, "fullName")}>
+          <Input
+            value={data.fullName}
+            onChange={(e) => update({ fullName: e.target.value })}
+            className={cn(isMissing("fullName") && invalidCls)}
+          />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Gender" required error={fieldError(errors, "gender")}>
+          <Field label="Gender" required missing={isMissing("gender")} error={fieldError(errors, "gender")}>
             <SearchableSelect
               value={data.gender || undefined}
               onValueChange={(v) => update({ gender: v })}
               options={["Male", "Female", "Other"]}
               placeholder="Select gender"
               searchPlaceholder="Search gender…"
+              className={cn(isMissing("gender") && invalidCls)}
             />
           </Field>
-          <Field label="Marital status" required error={fieldError(errors, "maritalStatus")}>
+          <Field label="Marital status" required missing={isMissing("maritalStatus")} error={fieldError(errors, "maritalStatus")}>
             <SearchableSelect
               value={data.maritalStatus || undefined}
               onValueChange={(v) => update({ maritalStatus: v })}
               options={MARITAL_STATUSES}
               placeholder="Select marital status"
               searchPlaceholder="Search status…"
+              className={cn(isMissing("maritalStatus") && invalidCls)}
             />
           </Field>
         </div>
-        <Field label="Date of birth" required error={fieldError(errors, "dobYear") || fieldError(errors, "dobDay")}>
+        <Field
+          label="Date of birth"
+          required
+          missing={isMissing("dob")}
+          error={fieldError(errors, "dobYear") || fieldError(errors, "dobDay")}
+        >
           <DateOfBirthPicker
             dobDay={data.dobDay}
             dobMonth={data.dobMonth}
             dobYear={data.dobYear}
             onChange={(parts) => update(parts)}
+            className={cn(isMissing("dob") && invalidCls)}
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -351,17 +381,23 @@ export default function ProfileEditPage() {
 
       <EditSection id="community" title="Community details">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Religion" required error={fieldError(errors, "religion")}>
+          <Field label="Religion" required missing={isMissing("religion")} error={fieldError(errors, "religion")}>
             <SearchableSelect
               value={data.religion || undefined}
               onValueChange={(v) => update({ religion: v })}
               options={RELIGIONS}
               placeholder="Select religion"
               searchPlaceholder="Search religion…"
+              className={cn(isMissing("religion") && invalidCls)}
             />
           </Field>
-          <Field label="Caste / community">
-            <Input value={data.caste} onChange={(e) => update({ caste: e.target.value })} placeholder="e.g. Iyer" />
+          <Field label="Caste / community" required missing={isMissing("caste")} error={fieldError(errors, "caste")}>
+            <Input
+              value={data.caste}
+              onChange={(e) => update({ caste: e.target.value })}
+              placeholder="e.g. Iyer"
+              className={cn(isMissing("caste") && invalidCls)}
+            />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -372,55 +408,28 @@ export default function ProfileEditPage() {
             <Input value={data.gotra} onChange={(e) => update({ gotra: e.target.value })} placeholder="e.g. Bharadwaja" />
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Star / nakshatra">
-            <SearchableSelect
-              value={data.star || undefined}
-              onValueChange={(v) => update({ star: v })}
-              options={STARS}
-              placeholder="Select star"
-              searchPlaceholder="Search nakshatra…"
-            />
-          </Field>
-          <Field label="Rashi">
-            <SearchableSelect
-              value={data.rashi || undefined}
-              onValueChange={(v) => update({ rashi: v })}
-              options={RASHIS.map((r) => ({ value: r.value, label: r.label }))}
-              placeholder="Select rashi"
-              searchPlaceholder="Search rashi…"
-            />
-          </Field>
-        </div>
-        <Field label="Manglik status">
-          <SearchableSelect
-            value={data.manglik || undefined}
-            onValueChange={(v) => update({ manglik: v })}
-            options={MANGLIK_OPTIONS}
-            placeholder="Select Manglik status"
-            searchPlaceholder="Search…"
-          />
-        </Field>
-        <Field label="Mother tongue" required error={fieldError(errors, "motherTongue")}>
+        <Field label="Mother tongue" required missing={isMissing("motherTongue")} error={fieldError(errors, "motherTongue")}>
           <SearchableSelect
             value={data.motherTongue || undefined}
             onValueChange={(v) => update({ motherTongue: v })}
             options={MOTHER_TONGUES}
             placeholder="Select language"
             searchPlaceholder="Search language…"
+            className={cn(isMissing("motherTongue") && invalidCls)}
           />
         </Field>
       </EditSection>
 
       <EditSection id="career" title="Education & career">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Highest education" required error={fieldError(errors, "education")}>
+          <Field label="Highest education" required missing={isMissing("education")} error={fieldError(errors, "education")}>
             <Input
               value={data.otherEducation || data.education || data.degree || ""}
               onChange={(e) =>
                 update({ education: e.target.value, otherEducation: "", degree: e.target.value })
               }
               placeholder="e.g. B.Tech"
+              className={cn(isMissing("education") && invalidCls)}
             />
           </Field>
           <Field label="Specialization (optional)">
@@ -431,26 +440,28 @@ export default function ProfileEditPage() {
             />
           </Field>
         </div>
-        <Field label="Occupation" required error={fieldError(errors, "occupation")}>
+        <Field label="Occupation" required missing={isMissing("occupation")} error={fieldError(errors, "occupation")}>
           <Input
             value={data.otherOccupation || data.occupation || data.profession || ""}
             onChange={(e) =>
               update({ occupation: e.target.value, otherOccupation: "", profession: e.target.value })
             }
             placeholder="e.g. Software Engineer"
+            className={cn(isMissing("occupation") && invalidCls)}
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Employer name (optional)">
             <Input value={data.companyName} onChange={(e) => update({ companyName: e.target.value })} placeholder="e.g. Infosys" />
           </Field>
-          <Field label="Annual income" required error={fieldError(errors, "annualIncome")}>
+          <Field label="Annual income" required missing={isMissing("annualIncome")} error={fieldError(errors, "annualIncome")}>
             <SearchableSelect
               value={data.annualIncome || undefined}
               onValueChange={(v) => update({ annualIncome: v })}
               options={INCOME_BANDS}
               placeholder="Select income band"
               searchPlaceholder="Search income…"
+              className={cn(isMissing("annualIncome") && invalidCls)}
             />
           </Field>
         </div>
@@ -490,8 +501,13 @@ export default function ProfileEditPage() {
 
       <EditSection id="location" title="Location">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Current city" required error={fieldError(errors, "city")}>
-            <Input value={data.city} onChange={(e) => update({ city: e.target.value })} placeholder="e.g. Chennai" />
+          <Field label="Current city" required missing={isMissing("city")} error={fieldError(errors, "city")}>
+            <Input
+              value={data.city}
+              onChange={(e) => update({ city: e.target.value })}
+              placeholder="e.g. Chennai"
+              className={cn(isMissing("city") && invalidCls)}
+            />
           </Field>
           <Field label="State">
             <Input value={data.state} onChange={(e) => update({ state: e.target.value })} placeholder="e.g. Tamil Nadu" />
@@ -545,13 +561,23 @@ export default function ProfileEditPage() {
         </Field>
       </EditSection>
 
-      <section id="photos" className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section
+        id="photos"
+        className={cn(
+          "space-y-3 rounded-2xl border bg-card p-5 shadow-sm",
+          isMissing("photos") ? "border-destructive ring-1 ring-destructive/30" : "border-border"
+        )}
+      >
         <div className="flex items-center justify-between">
-          <h2 className="font-serif text-lg font-bold">Photos</h2>
+          <h2 className={cn("font-serif text-lg font-bold", isMissing("photos") && "text-destructive")}>
+            Photos <span className="text-destructive">*</span>
+          </h2>
           <span className="text-xs font-semibold text-muted-foreground">{photoItems.length} / {MAX_PHOTOS}</span>
         </div>
-        <p className="text-sm text-muted-foreground">
-          First photo is your primary. Drag to reorder. Primary photo is reviewed by admin within 24 hours.
+        <p className={cn("text-sm", isMissing("photos") ? "text-destructive" : "text-muted-foreground")}>
+          {isMissing("photos")
+            ? "At least one profile photo is required to unlock Discover."
+            : "First photo is your primary. Drag to reorder. Primary photo is reviewed by admin within 24 hours."}
         </p>
 
         <input
@@ -567,7 +593,12 @@ export default function ProfileEditPage() {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="flex w-full flex-col items-center gap-2 rounded-2xl border border-dashed border-border py-10 text-sm text-muted-foreground hover:border-primary/40 hover:text-primary"
+            className={cn(
+              "flex w-full flex-col items-center gap-2 rounded-2xl border border-dashed py-10 text-sm hover:border-primary/40 hover:text-primary",
+              isMissing("photos")
+                ? "border-destructive/60 bg-destructive/5 text-destructive"
+                : "border-border text-muted-foreground"
+            )}
           >
             <Camera className="h-8 w-8" />
             Upload primary photo
@@ -648,6 +679,38 @@ export default function ProfileEditPage() {
       </section>
 
       <EditSection id="horoscope" title="Horoscope details">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Star / nakshatra" required missing={isMissing("star")} error={fieldError(errors, "star")}>
+            <SearchableSelect
+              value={data.star || undefined}
+              onValueChange={(v) => update({ star: v })}
+              options={STARS}
+              placeholder="Select star"
+              searchPlaceholder="Search nakshatra…"
+              className={cn(isMissing("star") && invalidCls)}
+            />
+          </Field>
+          <Field label="Rashi" required missing={isMissing("rashi")} error={fieldError(errors, "rashi")}>
+            <SearchableSelect
+              value={data.rashi || undefined}
+              onValueChange={(v) => update({ rashi: v })}
+              options={RASHIS.map((r) => ({ value: r.value, label: r.label }))}
+              placeholder="Select rashi"
+              searchPlaceholder="Search rashi…"
+              className={cn(isMissing("rashi") && invalidCls)}
+            />
+          </Field>
+        </div>
+        <Field label="Manglik status" required missing={isMissing("manglik")} error={fieldError(errors, "manglik")}>
+          <SearchableSelect
+            value={data.manglik || undefined}
+            onValueChange={(v) => update({ manglik: v })}
+            options={MANGLIK_OPTIONS}
+            placeholder="Select Manglik status"
+            searchPlaceholder="Search…"
+            className={cn(isMissing("manglik") && invalidCls)}
+          />
+        </Field>
         {data.horoscopeName ? (
           <div className="rounded-xl border border-border bg-muted/30 p-4">
             <div className="flex items-start gap-3">
@@ -706,16 +769,25 @@ export default function ProfileEditPage() {
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Birth time">
-            <BirthTimeInput value={data.birthTime} onChange={(birthTime) => update({ birthTime })} />
+          <Field label="Birth time" required missing={isMissing("birthTime")} error={fieldError(errors, "birthTime")}>
+            <BirthTimeInput
+              value={data.birthTime}
+              onChange={(birthTime) => update({ birthTime })}
+              className={cn(isMissing("birthTime") && invalidCls)}
+            />
           </Field>
-          <Field label="Birth place">
-            <Input value={data.birthPlace} onChange={(e) => update({ birthPlace: e.target.value })} placeholder="e.g. Chennai, TN" />
+          <Field label="Birth place" required missing={isMissing("birthPlace")} error={fieldError(errors, "birthPlace")}>
+            <Input
+              value={data.birthPlace}
+              onChange={(e) => update({ birthPlace: e.target.value })}
+              placeholder="e.g. Chennai, TN"
+              className={cn(isMissing("birthPlace") && invalidCls)}
+            />
           </Field>
         </div>
         <Button type="button" variant="outline" onClick={() => horoscopeRef.current?.click()}>
           <Upload className="mr-1.5 h-4 w-4" />
-          {data.horoscopeName ? "Replace horoscope PDF" : "Upload horoscope PDF"}
+          {data.horoscopeName ? "Replace horoscope PDF (optional)" : "Upload horoscope PDF (optional)"}
         </Button>
       </EditSection>
 

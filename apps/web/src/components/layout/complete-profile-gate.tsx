@@ -6,6 +6,7 @@ import { ChevronRight, Lock } from "lucide-react"
 import {
   getProfileActions,
   getProfileCompletenessStats,
+  getRequiredFieldEditHash,
   isProfileComplete,
 } from "@/lib/portal-access"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
@@ -53,8 +54,8 @@ export function CompleteProfileGate({
       {missingRequired.length > 0 && (
         <ul className="mt-4 flex flex-wrap justify-center gap-2">
           {missingRequired.map((field) => (
-            <Link key={field.id} href={editHref}>
-              <Badge variant="outline" className="h-7 font-semibold">
+            <Link key={field.id} href={`/profile/edit${getRequiredFieldEditHash(field)}`}>
+              <Badge variant="outline" className="h-7 border-destructive/40 bg-destructive/5 font-semibold text-destructive">
                 {field.label}
               </Badge>
             </Link>

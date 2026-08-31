@@ -10,7 +10,7 @@ import { getMediaUrl } from "@/lib/utils"
 import { useProfileQuery } from "@/hooks/queries"
 import { emptySignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
-import { getProfileCompletenessStats } from "@/lib/portal-access"
+import { getProfileCompletenessStats, getRequiredFieldEditHash } from "@/lib/portal-access"
 import {
   Camera,
   CheckCircle2,
@@ -175,6 +175,20 @@ export default function MyProfilePage() {
                       : " Required details are in. Discover is unlocked — add more to stand out."
                     : " Fill required details to unlock Discover. Specialization and employer are optional."}
                 </p>
+                {!completenessStats.requiredComplete && completenessStats.missingRequired.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {completenessStats.missingRequired.map((field) => (
+                      <Link key={field.id} href={`/profile/edit${getRequiredFieldEditHash(field)}`}>
+                        <Badge
+                          variant="outline"
+                          className="h-6 border-destructive/40 bg-destructive/5 text-[10px] font-semibold text-destructive"
+                        >
+                          {field.label}
+                        </Badge>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             

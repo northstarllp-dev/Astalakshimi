@@ -5,8 +5,8 @@ import { emptySignupData, type SignupData } from "@/lib/profile-store"
  *
  * Specs (`ui-public-auth.md`, `ui-dashboard.md`, `ui-changes.md`):
  * - Short signup should land near 25% (10 of 40 details).
- * - Discover unlocks when every *required* field is filled (signup + education, occupation, income).
- *   Optional details (employer, specialization, family, horoscope, …) do not block Discover.
+ * - Discover unlocks when every *required* field is filled (signup + education, occupation, income, horoscope).
+ *   Optional details (employer, specialization, family, horoscope PDF, …) do not block Discover.
  * - Frontend never talks to Postgres; this is computed from SignupData (session cache / API profile).
  *
  * Defaults from `emptySignupData()` (height 165, diet Vegetarian, etc.) do not count
@@ -125,17 +125,18 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
   },
   { id: "subcaste", label: "Subcaste", group: "community", signup: false, filled: (d) => filledTyped(d.subcaste) },
   { id: "gotra", label: "Gotra", group: "community", signup: false, filled: (d) => filledTyped(d.gotra) },
-  { id: "star", label: "Star / nakshatra", group: "horoscope", signup: false, filled: (d) => filledTyped(d.star) },
-  { id: "rashi", label: "Rashi", group: "horoscope", signup: false, filled: (d) => filledTyped(d.rashi) },
+  { id: "star", label: "Star / nakshatra", group: "horoscope", signup: false, required: true, filled: (d) => filledTyped(d.star) },
+  { id: "rashi", label: "Rashi", group: "horoscope", signup: false, required: true, filled: (d) => filledTyped(d.rashi) },
   {
     id: "manglik",
     label: "Manglik",
     group: "horoscope",
     signup: false,
-    filled: (d) => filledCustom(d.manglik, EMPTY.manglik),
+    required: true,
+    filled: (d) => filledTyped(d.manglik),
   },
-  { id: "birthTime", label: "Birth time", group: "horoscope", signup: false, filled: (d) => filledTyped(d.birthTime) },
-  { id: "birthPlace", label: "Birth place", group: "horoscope", signup: false, filled: (d) => filledTyped(d.birthPlace) },
+  { id: "birthTime", label: "Birth time", group: "horoscope", signup: false, required: true, filled: (d) => filledTyped(d.birthTime) },
+  { id: "birthPlace", label: "Birth place", group: "horoscope", signup: false, required: true, filled: (d) => filledTyped(d.birthPlace) },
   {
     id: "horoscopeFile",
     label: "Horoscope PDF",
@@ -289,3 +290,21 @@ export function getProfileCompletenessStats(data: SignupData | null): ProfileCom
 export function getProfileCompleteness(data: SignupData | null): number {
   return getProfileCompletenessStats(data).percentage
 }
+
+export function getMissingRequiredFieldIds(data: SignupData | null): Set<string> {
+  return new Set(getProfileCompletenessStats(data).missingRequired.map((field) => field.id))
+}
+
+/** Anchor on `/profile/edit` for a missing required field. */
+export function getRequiredFieldEditHash(field: ProfileDetailField): string {
+  if (field.id === "city") return "#location"
+  if (field.group === "photos") return "#photos"
+  if (field.group === "career") return "#career"
+  if (field.group === "horoscope") return "#horoscope"
+  if (field.group === "community") return "#community"
+  return "#basics"
+}
+
+/** Shared border styles for unfilled required fields on profile forms. */
+export const REQUIRED_FIELD_INVALID_CLASS =
+  "border-destructive focus-visible:border-destructive focus-visible:shadow-[0_0_0_3px_rgba(220,38,38,0.12)]"

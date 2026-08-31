@@ -1,11 +1,15 @@
-import { Controller, Get, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';
 import { AdminService } from './admin.service';
-import { JwtAuthGuard } from '../common/guards/auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import {
+  adminCreateProfileSchema,
+  adminAttachPhotosSchema,
+  presignedUploadSchema,
+  type AdminCreateProfileInput,
+  type AdminAttachPhotosInput,
+  type PresignedUploadInput,
+} from '@astalakshimi/validation';
 
-// @UseGuards(JwtAuthGuard, RolesGuard)
-// @Roles('admin', 'moderator')
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
@@ -31,6 +35,29 @@ export class AdminController {
   @Get('profiles')
   getAllProfiles() {
     return this.adminService.getAllProfiles();
+  }
+
+  @Post('profiles')
+  createProfile(
+    @Body(new ZodValidationPipe(adminCreateProfileSchema)) body: AdminCreateProfileInput,
+  ) {
+    return this.adminService.createProfile(body);
+  }
+
+  @Post('profiles/:profileId/upload-url')
+  getPhotoUploadUrl(
+    @Param('profileId') profileId: string,
+    @Body(new ZodValidationPipe(presignedUploadSchema)) body: PresignedUploadInput,
+  ) {
+    return this.adminService.getPhotoUploadUrl(profileId, body.contentType, body.fileSize);
+  }
+
+  @Post('profiles/:profileId/photos')
+  attachPhotos(
+    @Param('profileId') profileId: string,
+    @Body(new ZodValidationPipe(adminAttachPhotosSchema)) body: AdminAttachPhotosInput,
+  ) {
+    return this.adminService.attachPhotos(profileId, body.s3Keys);
   }
 
   @Get('profiles/:profileId')

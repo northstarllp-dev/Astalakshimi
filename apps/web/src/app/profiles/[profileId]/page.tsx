@@ -7,11 +7,11 @@ import {
   Heart,
   MapPin,
   Ruler,
-  Sparkles,
   Star,
   Users,
 } from "lucide-react"
 import { ProfileActionBar } from "@/components/profile/profile-action-bar"
+import { ProfileAboutSection } from "@/components/profile/profile-about-section"
 import { ProfileGallery } from "@/components/profile/profile-gallery"
 import { ProfileVisitTracker } from "@/components/profile/profile-visit-tracker"
 
@@ -104,7 +104,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
     photos: (data.photos || []).map((p: { s3Key?: string; url?: string }) => p.s3Key || p.url || ''),
     photoVerified: data.verificationStatus === 'verified',
     verified: data.verificationStatus === 'verified',
-    hasHoroscope: !!data.horoscope?.horoscopeS3Key,
+    hasHoroscope: !!data.hasHoroscope || !!data.horoscope?.horoscopeS3Key,
     blurPhoto: data.blurPhoto,
     matchPercent: 90,
     height: `${data.profile.heightCm} cm`,
@@ -194,15 +194,22 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
               <p className="mt-4 text-sm leading-relaxed text-foreground/85">{profile.about}</p>
             </section>
 
-            <Section title={profile.gender === "Female" ? "About her" : "About him"} icon={<Sparkles className="h-4 w-4" />}>
-              <dl>
-                <DetailRow label="Marital status" value={profile.maritalStatus} />
-                <DetailRow label="Religion" value={profile.religion} />
-                <DetailRow label="Community" value={profile.community} />
-                <DetailRow label="Mother tongue" value={profile.motherTongue} />
-                <DetailRow label="Lives in" value={`${profile.city}, ${profile.state}`} />
-              </dl>
-            </Section>
+            <ProfileAboutSection
+              profileId={profile.id}
+              gender={profile.gender}
+              maritalStatus={profile.maritalStatus}
+              religion={profile.religion}
+              community={profile.community}
+              motherTongue={profile.motherTongue}
+              city={profile.city}
+              state={profile.state}
+              hasHoroscope={profile.hasHoroscope}
+              horoscopeFileName={data.horoscope?.horoscopeFileName}
+              horoscopeS3Key={data.horoscope?.horoscopeS3Key}
+              contactPhone={data.contactPhone}
+              initialMutualConnect={Boolean(data.isMutualConnect)}
+              contactAccess={data.contactAccess}
+            />
 
             <Section title="Education & career" icon={<Briefcase className="h-4 w-4" />}>
               <dl>

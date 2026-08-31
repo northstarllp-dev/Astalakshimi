@@ -181,15 +181,11 @@ export function Step6Verify({
       // If user is authenticated, upload directly to S3
       if (apiClient.getToken()) {
         try {
-          const { uploadUrl, s3Key } = await apiClient.media.getUploadUrl({
-            purpose: "selfie",
-            contentType: "image/jpeg",
-            fileSize: blob.size,
-          })
+          const file = new File([blob], "selfie.jpg", { type: "image/jpeg" })
+          const { s3Key } = await apiClient.media.uploadMediaFile(file, "selfie")
           key = s3Key
-          await apiClient.media.uploadFileToS3(uploadUrl, blob, "image/jpeg")
         } catch (uploadErr) {
-          console.warn("[Media] S3 upload fallback to mock key:", uploadErr)
+          console.warn("[Media] Upload fallback to mock key:", uploadErr)
         }
       }
 
@@ -230,15 +226,10 @@ export function Step6Verify({
 
         if (apiClient.getToken()) {
           try {
-            const { uploadUrl, s3Key } = await apiClient.media.getUploadUrl({
-              purpose: "profile_photo",
-              contentType: file.type || "image/jpeg",
-              fileSize: file.size,
-            })
+            const { s3Key } = await apiClient.media.uploadMediaFile(file, "profile_photo")
             key = s3Key
-            await apiClient.media.uploadFileToS3(uploadUrl, file, file.type || "image/jpeg")
           } catch (uploadErr) {
-            console.warn("[Media] S3 upload fallback to mock key:", uploadErr)
+            console.warn("[Media] Upload fallback to mock key:", uploadErr)
           }
         }
 
@@ -268,15 +259,10 @@ export function Step6Verify({
 
       if (apiClient.getToken()) {
         try {
-          const { uploadUrl, s3Key } = await apiClient.media.getUploadUrl({
-            purpose: "govt_id",
-            contentType: file.type || "image/jpeg",
-            fileSize: file.size,
-          })
+          const { s3Key } = await apiClient.media.uploadMediaFile(file, "govt_id")
           key = s3Key
-          await apiClient.media.uploadFileToS3(uploadUrl, file, file.type || "image/jpeg")
         } catch (uploadErr) {
-          console.warn("[Media] S3 upload fallback to mock key:", uploadErr)
+          console.warn("[Media] Upload fallback to mock key:", uploadErr)
         }
       }
 
@@ -311,15 +297,10 @@ export function Step6Verify({
 
       if (apiClient.getToken()) {
         try {
-          const { uploadUrl, s3Key } = await apiClient.media.getUploadUrl({
-            purpose: "horoscope",
-            contentType: "application/pdf",
-            fileSize: file.size,
-          })
+          const { s3Key } = await apiClient.media.uploadMediaFile(file, "horoscope")
           key = s3Key
-          await apiClient.media.uploadFileToS3(uploadUrl, file, "application/pdf")
         } catch (uploadErr) {
-          console.warn("[Media] S3 upload fallback to mock key:", uploadErr)
+          console.warn("[Media] Upload fallback to mock key:", uploadErr)
         }
       }
 

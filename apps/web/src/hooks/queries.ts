@@ -20,6 +20,9 @@ export const queryKeys = {
   search: (query: any) => ["search", query] as const,
   chat: (threadId: string) => ["chat", threadId] as const,
   chatThreads: ["chat", "threads"] as const,
+  contactUsage: ["contacts", "usage"] as const,
+  interestUsage: ["interests", "usage"] as const,
+  unlockedContacts: ["contacts", "unlocked"] as const,
 }
 
 
@@ -201,32 +204,118 @@ export function useSaveProfileMutation() {
   })
 }
 
+function normalizeManglik(value: string | undefined) {
+  if (!value) return undefined
+  return value === "Don't know" ? "Don't Know" : value
+}
+
+function buildProfileUpdatePayload(data: Partial<SignupData>) {
+  const payload: Record<string, unknown> = {}
+  const skip = new Set([
+    "photos",
+    "photoS3Keys",
+    "photoObjects",
+    "star",
+    "horoscopeName",
+    "horoscopeSize",
+    "height",
+    "education",
+    "otherEducation",
+    "occupation",
+    "otherOccupation",
+    "prefReligion",
+    "manglik",
+  ])
+
+  for (const [key, value] of Object.entries(data)) {
+    if (!skip.has(key)) payload[key] = value
+  }
+
+  if (data.height) payload.heightCm = parseInt(data.height, 10)
+  if (data.star !== undefined) payload.nakshatra = data.star
+  if (data.horoscopeName !== undefined) payload.horoscopeFileName = data.horoscopeName
+  if (data.horoscopeSize !== undefined) payload.horoscopeFileSizeBytes = data.horoscopeSize
+  if (data.horoscopeS3Key !== undefined) payload.horoscopeS3Key = data.horoscopeS3Key
+  if (data.manglik !== undefined) payload.manglik = normalizeManglik(data.manglik)
+  if (data.education !== undefined || data.otherEducation !== undefined || data.degree !== undefined) {
+    payload.degree = data.otherEducation || data.education || data.degree
+  }
+  if (data.occupation !== undefined || data.otherOccupation !== undefined || data.profession !== undefined) {
+    payload.profession = data.otherOccupation || data.occupation || data.profession
+  }
+  if (data.prefReligion !== undefined) payload.prefReligions = data.prefReligion
+
+  return payload
+}
+
+function mapFullProfileToSignupData(base: SignupData, fullProfile: Awaited<ReturnType<typeof apiClient.profiles.getMyProfile>>) {
+  return {
+    ...base,
+    profileFor: fullProfile.profile.profileFor,
+    fullName: fullProfile.profile.fullName,
+    gender: fullProfile.profile.gender,
+    dobYear: fullProfile.profile.dob.split("-")[0],
+    dobMonth: fullProfile.profile.dob.split("-")[1],
+    dobDay: fullProfile.profile.dob.split("-")[2],
+    height: String(fullProfile.profile.heightCm),
+    maritalStatus: fullProfile.profile.maritalStatus,
+    hasChildren: fullProfile.profile.hasChildren ?? false,
+    childrenCount: fullProfile.profile.childrenCount ?? 0,
+    childrenLivingWithMe: fullProfile.profile.childrenLivingWithMe ?? false,
+    religion: fullProfile.profile.religion,
+    caste: fullProfile.profile.caste,
+    subcaste: fullProfile.profile.subcaste ?? "",
+    gotra: fullProfile.profile.gotra ?? "",
+    motherTongue: fullProfile.profile.motherTongue,
+    educationLevel: fullProfile.profile.educationLevel,
+    education: fullProfile.profile.degree || "",
+    degree: fullProfile.profile.degree,
+    collegeName: fullProfile.profile.collegeName ?? "",
+    employmentStatus: fullProfile.profile.employmentStatus,
+    occupation: fullProfile.profile.profession || "",
+    profession: fullProfile.profile.profession,
+    companyName: fullProfile.profile.companyName ?? "",
+    companySector: fullProfile.profile.companySector ?? "Private",
+    annualIncome: fullProfile.profile.annualIncome,
+    photoPrivacy: fullProfile.profile.photoPrivacy,
+    city: fullProfile.profile.city,
+    state: fullProfile.profile.state,
+    aboutMe: fullProfile.profile.aboutMe ?? "",
+    familyValues: fullProfile.family?.familyValues ?? "Moderate",
+    familyType: fullProfile.family?.familyType ?? "Nuclear",
+    fatherOccupation: fullProfile.family?.fatherOccupation ?? "Employed",
+    motherOccupation: fullProfile.family?.motherOccupation ?? "Homemaker",
+    brothersCount: fullProfile.family?.brothersCount ?? 0,
+    sistersCount: fullProfile.family?.sistersCount ?? 0,
+    diet: fullProfile.lifestyle?.diet ?? "Vegetarian",
+    birthTime: fullProfile.horoscope?.birthTime ?? "",
+    birthPlace: fullProfile.horoscope?.birthPlace ?? "",
+    manglik: fullProfile.horoscope?.manglik ?? "Don't Know",
+    rashi: fullProfile.horoscope?.rashi ?? "",
+    star: fullProfile.horoscope?.nakshatra ?? "",
+    horoscopeName: fullProfile.horoscope?.horoscopeFileName ?? "",
+    horoscopeS3Key: fullProfile.horoscope?.horoscopeS3Key ?? "",
+    horoscopeSize: fullProfile.horoscope?.horoscopeFileSizeBytes ?? 0,
+    photos: fullProfile.photos.map((p: { url?: string; s3Key?: string }) => p.url || p.s3Key),
+    photoS3Keys: fullProfile.photos.map((p: { s3Key?: string }) => p.s3Key),
+    photoObjects: fullProfile.photos,
+    verificationStatus: fullProfile.verificationStatus as SignupData["verificationStatus"],
+  }
+}
+
 export function useUpdateProfileMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: Partial<SignupData>) => {
-      if (!apiClient.getToken()) throw new Error("Not authenticated");
-      
-      const payload: any = { ...data };
-      if (data.height) payload.heightCm = parseInt(data.height, 10);
-      if (data.horoscopeName) payload.horoscopeFileName = data.horoscopeName;
-      if (data.horoscopeSize) payload.horoscopeFileSizeBytes = data.horoscopeSize;
-      if (data.education !== undefined || data.otherEducation !== undefined || data.degree !== undefined) {
-        payload.degree = data.otherEducation || data.education || data.degree;
-      }
-      if (data.occupation !== undefined || data.otherOccupation !== undefined || data.profession !== undefined) {
-        payload.profession = data.otherOccupation || data.occupation || data.profession;
-      }
-      
-      const fullProfile = await apiClient.profiles.updateMyProfile(payload);
-      
-      const base = loadProfile() || emptySignupData();
-      const mapped = {
-        ...base,
-        ...data,
-      };
-      saveProfile(mapped);
-      return mapped;
+      if (!apiClient.getToken()) throw new Error("Not authenticated")
+
+      const payload = buildProfileUpdatePayload(data)
+      const fullProfile = await apiClient.profiles.updateMyProfile(payload as any)
+
+      const base = loadProfile() || emptySignupData()
+      const mapped = mapFullProfileToSignupData(base, fullProfile)
+      saveProfile(mapped)
+      return mapped
     },
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.profile, data)
@@ -521,8 +610,34 @@ export function useSendInterestMutation() {
       const message = typeof payload === 'object' ? payload.message : undefined;
       return apiClient.interests.sendInterest(profileId, message);
     },
+    onMutate: async (payload) => {
+      const profileId = typeof payload === 'string' ? payload : payload.targetProfileId;
+      await queryClient.cancelQueries({ queryKey: queryKeys.interests });
+      const previous = queryClient.getQueryData<any>(queryKeys.interests);
+      if (previous) {
+        queryClient.setQueryData(queryKeys.interests, {
+          ...previous,
+          sent: [
+            ...(previous.sent || []),
+            {
+              id: `temp-${Date.now()}`,
+              profileId,
+              status: 'pending',
+              time: 'Just now',
+            },
+          ],
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _payload, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.interests, context.previous);
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.interests })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.interestUsage })
       void queryClient.invalidateQueries({ queryKey: queryKeys.notifications })
       void queryClient.invalidateQueries({ queryKey: ["activity"] })
     },
@@ -716,7 +831,6 @@ export function useSendMessageMutation(threadId?: string | null) {
         senderName: "You",
         isRead: false,
         createdAt: new Date().toISOString(),
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         isSelf: true,
       };
 
@@ -748,6 +862,61 @@ export function useSendMessageMutation(threadId?: string | null) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.chat(threadId) });
         void queryClient.invalidateQueries({ queryKey: queryKeys.chatThreads });
       }
+    },
+  })
+}
+
+export function useContactUsageQuery() {
+  return useQuery({
+    queryKey: queryKeys.contactUsage,
+    queryFn: () => apiClient.contacts.getUsage(),
+    enabled: Boolean(apiClient.getToken()),
+  })
+}
+
+export function useInterestUsageQuery() {
+  return useQuery({
+    queryKey: queryKeys.interestUsage,
+    queryFn: () => apiClient.interests.getUsage(),
+    enabled: Boolean(apiClient.getToken()),
+  })
+}
+
+export function useUnlockedContactsQuery() {
+  return useQuery({
+    queryKey: queryKeys.unlockedContacts,
+    queryFn: () => apiClient.contacts.listUnlocked(),
+    enabled: Boolean(apiClient.getToken()),
+  })
+}
+
+export function useUnlockContactMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (targetProfileId: string) => apiClient.contacts.unlock(targetProfileId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contactUsage })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.unlockedContacts })
+    },
+  })
+}
+
+export function usePayExtraContactUnlockMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (targetProfileId: string) => {
+      const order = await apiClient.contacts.createPaidOrder(targetProfileId)
+      const verified = await apiClient.contacts.verifyPaidUnlock({
+        targetProfileId,
+        razorpayOrderId: order.orderId,
+        razorpayPaymentId: `pay_${Date.now()}`,
+        razorpaySignature: "demo_signature",
+      })
+      return { success: verified.success, contactPhone: verified.contactPhone ?? null }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.contactUsage })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.unlockedContacts })
     },
   })
 }

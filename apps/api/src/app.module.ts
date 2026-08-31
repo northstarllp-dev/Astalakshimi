@@ -20,6 +20,7 @@ import { ActivityModule } from './activity/activity.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { BlocksModule } from './blocks/blocks.module';
+import { ContactsModule } from './contacts/contacts.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { BlocksModule } from './blocks/blocks.module';
     NotificationsModule,
     ChatModule,
     BlocksModule,
+    ContactsModule,
   ],
 })
 export class AppModule {}

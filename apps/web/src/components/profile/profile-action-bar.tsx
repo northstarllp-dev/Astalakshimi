@@ -3,45 +3,34 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { ConnectButton } from "@/components/profile/connect-button"
 import {
   useProfileQuery,
   useSendInterestMutation,
   useShortlistQuery,
   useSkipMatchMutation,
   useToggleShortlistMutation,
-  useInterestsQuery,
   useInvalidateInterests,
 } from "@/hooks/queries"
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import { Heart, Star, Check, Clock3, HeartHandshake, Loader2 } from "lucide-react"
+import { Star } from "lucide-react"
 
 export function ProfileActionBar({ profileId }: { profileId: string }) {
   const router = useRouter()
-  const { data: profile = null } = useProfileQuery()
   const { data: shortlist = [] } = useShortlistQuery()
-  const { data: interests } = useInterestsQuery()
   const invalidateInterests = useInvalidateInterests()
   const skipMutation = useSkipMatchMutation()
   const toggleMutation = useToggleShortlistMutation()
   const connectMutation = useSendInterestMutation()
-  
+
   const [justSent, setJustSent] = React.useState(false)
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
   const [isAccepting, setIsAccepting] = React.useState(false)
 
   const shortlisted = shortlist.some((item: any) =>
-    typeof item === "string" ? item === profileId : (item.id === profileId || item.profileId === profileId)
+    typeof item === "string" ? item === profileId : item.id === profileId || item.profileId === profileId
   )
-
-  // Determine current interaction status
-  const sentItem = interests?.sent?.find((i: any) => i.profileId === profileId)
-  const receivedItem = interests?.received?.find((i: any) => i.profileId === profileId)
-  const mutualItem = interests?.mutual?.find((i: any) => i.profileId === profileId)
-
-  const isMutual = !!mutualItem || sentItem?.status === "accepted" || receivedItem?.status === "accepted"
-  const isPendingSent = justSent || sentItem?.status === "pending"
-  const isPendingReceived = !isMutual && receivedItem?.status === "pending"
 
   const handleConnect = async () => {
     setErrorMsg(null)
@@ -110,59 +99,25 @@ export function ProfileActionBar({ profileId }: { profileId: string }) {
           disabled={toggleMutation.isPending}
           onClick={() => toggleMutation.mutate(profileId)}
         >
-          <Star className={cn("mr-2 h-4 w-4 transition-colors", shortlisted ? "fill-amber-400 text-amber-400" : "text-muted-foreground")} />{" "}
+          <Star
+            className={cn(
+              "mr-2 h-4 w-4 transition-colors",
+              shortlisted ? "fill-amber-400 text-amber-400" : "text-muted-foreground"
+            )}
+          />{" "}
           {shortlisted ? "Saved" : "Shortlist"}
         </Button>
 
-        {isMutual ? (
-          <Button
-            className="flex-[1.4] bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => router.push(`/inbox?thread=${profileId}`)}
-          >
-            <HeartHandshake className="mr-2 h-4 w-4 fill-current" /> Connected
-          </Button>
-        ) : isPendingReceived ? (
-          <Button
-            className="flex-[1.4] bg-primary text-white"
-            disabled={isAccepting}
-            onClick={handleAccept}
-          >
-            {isAccepting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Accepting...
-              </>
-            ) : (
-              <>
-                <Check className="mr-2 h-4 w-4" /> Accept Interest
-              </>
-            )}
-          </Button>
-        ) : isPendingSent ? (
-          <Button
-            className="flex-[1.4] bg-muted text-muted-foreground cursor-not-allowed border border-border"
-            disabled
-          >
-            <Clock3 className="mr-2 h-4 w-4 text-amber-500" /> Interest Sent
-          </Button>
-        ) : (
-          <Button
-            className="flex-[1.4]"
-            disabled={connectMutation.isPending}
-            onClick={handleConnect}
-          >
-            {connectMutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
-              </>
-            ) : (
-              <>
-                <Heart className="mr-2 h-4 w-4 fill-current" /> Connect
-              </>
-            )}
-          </Button>
-        )}
+        <ConnectButton
+          profileId={profileId}
+          className="flex-[1.4]"
+          justSent={justSent}
+          isSending={connectMutation.isPending}
+          isAccepting={isAccepting}
+          onConnect={handleConnect}
+          onAccept={handleAccept}
+        />
       </div>
     </div>
   )
 }
-

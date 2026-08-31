@@ -3,9 +3,10 @@ import { ProfilesService } from './profiles.service';
 import { ProfilesController } from './profiles.controller';
 import { DatabaseModule } from '../database/database.module';
 import { BlocksModule } from '../blocks/blocks.module';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
 
 @Module({
-  imports: [DatabaseModule, BlocksModule],
+  imports: [DatabaseModule, BlocksModule, EntitlementsModule],
   controllers: [ProfilesController],
   providers: [ProfilesService],
   exports: [ProfilesService],

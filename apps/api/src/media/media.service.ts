@@ -27,8 +27,34 @@ export class MediaService {
     );
   }
 
+  async uploadFileBuffer(
+    userId: string,
+    buffer: Buffer,
+    input: PresignedUploadInput,
+  ) {
+    const { s3Key, bucket } = await this.s3Provider.generateUploadUrl(
+      userId,
+      input.purpose,
+      input.contentType,
+      input.fileSize,
+    );
+
+    await this.s3Provider.putObject(s3Key, buffer, input.contentType, bucket);
+
+    return {
+      s3Key,
+      bucket,
+      uploadUrl: '',
+      expiresInSeconds: 0,
+    };
+  }
+
   async getSignedMediaUrl(s3Key: string): Promise<string> {
     return this.s3Provider.getSignedMediaUrl(s3Key);
+  }
+
+  getDemoMedia(s3Key: string) {
+    return this.s3Provider.getDemoObject(s3Key);
   }
 
   async confirmPhoto(userId: string, input: ConfirmPhotoInput) {

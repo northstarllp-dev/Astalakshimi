@@ -102,7 +102,24 @@ export interface FullProfileView {
   }[];
   verificationStatus: 'idle' | 'pending' | 'verified' | 'rejected';
   blurPhoto?: boolean;
+  isMutualConnect?: boolean;
+  contactPhone?: string | null;
+  hasHoroscope?: boolean;
+  contactAccess?: {
+    canView: boolean;
+    isUnlocked: boolean;
+    isMutualBenefit: boolean;
+    limit: number | null;
+    usedThisMonth: number;
+    remaining: number | null;
+    canUnlockWithQuota: boolean;
+    canPayExtra: boolean;
+    extraContactFeePaise: number;
+    planSlug: string;
+  };
 }
+
+export type ContactAccess = NonNullable<FullProfileView['contactAccess']>;
 
 // Complete registration submission payload (Steps 1–6)
 export interface CompleteRegistrationPayload {

@@ -67,8 +67,8 @@ export function PlanCompare({ currentPlanId, selectedPlanId, onSelect, onChoose 
           </nav>
         </header>
 
-        <div className="-mx-4 overflow-x-auto px-4 pb-2 hide-scrollbar sm:-mx-2 sm:px-2">
-          <div className="flex min-w-max items-stretch gap-3 lg:min-w-0 lg:grid lg:grid-cols-5 lg:items-end lg:gap-3">
+        <div className="-mx-4 overflow-x-auto px-4 pb-2 pt-2 hide-scrollbar sm:-mx-2 sm:px-2 lg:overflow-x-visible">
+          <div className="flex min-w-max items-stretch gap-3 pt-1 lg:min-w-0 lg:grid lg:grid-cols-5 lg:items-stretch lg:gap-3 lg:pt-0">
             {MEMBERSHIP_PLANS.map((plan) => {
               const isCurrent = plan.id === currentPlanId
               const isSelected = plan.id === selectedPlanId
@@ -86,7 +86,7 @@ export function PlanCompare({ currentPlanId, selectedPlanId, onSelect, onChoose 
                     "relative flex w-[min(248px,82vw)] shrink-0 cursor-pointer flex-col overflow-hidden rounded-[1.35rem] border bg-card transition-all duration-300",
                     "lg:w-auto",
                     isGold
-                      ? "z-10 border-secondary shadow-[0_12px_36px_rgba(184,144,31,0.22)] lg:-mt-5"
+                      ? "z-10 border-secondary shadow-[0_12px_36px_rgba(184,144,31,0.22)] ring-1 ring-secondary/30"
                       : "border-border hover:border-secondary/45",
                     isSelected && !isGold && "border-primary/35 shadow-[0_8px_24px_rgba(124,21,53,0.08)]"
                   )}

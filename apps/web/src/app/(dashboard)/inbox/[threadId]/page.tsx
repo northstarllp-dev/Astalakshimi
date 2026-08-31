@@ -13,15 +13,12 @@ import {
   useProfileQuery,
   useInterestsQuery,
 } from "@/hooks/queries"
-import { cn, getMediaUrl } from "@/lib/utils"
+import { getMediaUrl } from "@/lib/utils"
+import { shouldShowMessageTimestamp } from "@/lib/chat-utils"
+import { ChatMessageBubble } from "@/components/chat/chat-message-bubble"
 import {
-  ArrowLeft,
-  Check,
-  CheckCheck,
   ChevronLeft,
   Loader2,
-  Lock,
-  MapPin,
   Send,
   ShieldCheck,
   Sparkles,
@@ -177,33 +174,13 @@ function ChatThreadInner({ threadId }: { threadId: string }) {
             </div>
           </div>
         ) : (
-          messages.map((msg: any) => {
-            const isSelf = msg.isSelf
-
-            return (
-              <div
-                key={msg.id}
-                className={cn("flex flex-col", isSelf ? "items-end" : "items-start")}
-              >
-                <div
-                  className={cn(
-                    "max-w-[80%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
-                    isSelf
-                      ? "bg-primary text-primary-foreground rounded-br-none"
-                      : "bg-muted text-foreground rounded-bl-none border border-border/60"
-                  )}
-                >
-                  {msg.text}
-                </div>
-                <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground px-1">
-                  <span>{msg.time}</span>
-                  {isSelf && (
-                    <CheckCheck className={cn("h-3 w-3", msg.isRead ? "text-sky-500" : "text-muted-foreground")} />
-                  )}
-                </div>
-              </div>
-            )
-          })
+          messages.map((msg: any, index: number) => (
+            <ChatMessageBubble
+              key={msg.id}
+              message={msg}
+              showTimestamp={shouldShowMessageTimestamp(messages, index)}
+            />
+          ))
         )}
         <div ref={messagesEndRef} />
       </div>

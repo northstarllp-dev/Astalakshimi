@@ -116,7 +116,7 @@ export const emptySignupData = (): SignupData => ({
   gotra: "",
   star: "",
   rashi: "",
-  manglik: "Don't Know",
+  manglik: "",
   motherTongue: "",
   education: "",
   educationLevel: "Bachelors",

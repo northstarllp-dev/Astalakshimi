@@ -104,9 +104,11 @@ export function InputWithUnit({
 export function BirthTimeInput({
   value,
   onChange,
+  className,
 }: {
   value: string
   onChange: (value: string) => void
+  className?: string
 }) {
   const { clock, meridiem } = parseBirthTime(value)
 
@@ -122,6 +124,7 @@ export function BirthTimeInput({
       units={["AM", "PM"]}
       onUnitChange={(next) => onChange(formatBirthTime(clock, next as Meridiem))}
       unitAriaLabel="AM or PM"
+      className={className}
     />
   )
 }

@@ -18,6 +18,8 @@ import {
 
 import { apiClient } from "@/lib/api-client"
 import { cn, getMediaUrl } from "@/lib/utils"
+import { shouldShowMessageTimestamp } from "@/lib/chat-utils"
+import { ChatMessageBubble } from "@/components/chat/chat-message-bubble"
 import {
   Check,
   Clock3,
@@ -360,23 +362,12 @@ function InboxPageInner() {
                       )}
 
                       {/* Message Bubbles */}
-                      {threadMessages.map((msg: any) => (
-                        <div
+                      {threadMessages.map((msg: any, index: number) => (
+                        <ChatMessageBubble
                           key={msg.id}
-                          className={cn("flex flex-col", msg.isSelf ? "items-end" : "items-start")}
-                        >
-                          <div
-                            className={cn(
-                              "max-w-[75%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-                              msg.isSelf
-                                ? "bg-primary text-primary-foreground rounded-br-none shadow-sm"
-                                : "bg-muted text-foreground rounded-bl-none border border-border/60"
-                            )}
-                          >
-                            {msg.text}
-                          </div>
-                          <span className="mt-0.5 text-[10px] text-muted-foreground px-1">{msg.time}</span>
-                        </div>
+                          message={msg}
+                          showTimestamp={shouldShowMessageTimestamp(threadMessages, index)}
+                        />
                       ))}
                     </div>
 

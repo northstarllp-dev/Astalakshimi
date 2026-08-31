@@ -37,10 +37,14 @@ class ApiClient {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     // The Next.js proxy will attach the HTTP-only cookie automatically
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
     };
+
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     // If endpoint starts with /api/auth, we bypass the proxy base URL
     // since we hit the Next.js auth routes directly.
@@ -104,11 +108,29 @@ class ApiClient {
         body: JSON.stringify(data),
       }),
 
-    uploadFileToS3: async (uploadUrl: string, file: File | Blob, contentType: string): Promise<void> => {
-      // In mock mode without live AWS, the URL has a mock signature query param
+    uploadMediaFile: async (file: File, purpose: PresignedUploadRequest['purpose']) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('purpose', purpose);
+      return this.request<PresignedUploadResponse>('/media/upload', {
+        method: 'POST',
+        body: formData,
+      });
+    },
+
+    uploadFileToS3: async (
+      uploadUrl: string,
+      file: File | Blob,
+      contentType: string,
+      purpose?: PresignedUploadRequest['purpose'],
+    ): Promise<void> => {
       if (uploadUrl.includes('mock-signature=')) {
-        // Mock upload delay for local dev without active AWS S3
         await new Promise((resolve) => setTimeout(resolve, 300));
+        return;
+      }
+
+      if (purpose && file instanceof File) {
+        await this.media.uploadMediaFile(file, purpose);
         return;
       }
 
@@ -241,6 +263,14 @@ class ApiClient {
       }),
 
     getSummary: () => this.request<any>('/interests/summary'),
+
+    getUsage: () =>
+      this.request<{
+        planSlug: string
+        limit: number | null
+        used: number
+        remaining: number | null
+      }>('/interests/usage'),
 
     getReceived: (status?: string) => {
       const qs = status ? `?status=${encodeURIComponent(status)}` : '';
@@ -375,6 +405,78 @@ class ApiClient {
     getSubscription: () => this.request<any>('/payments/subscription'),
 
     getInvoices: () => this.request<any[]>('/payments/invoices'),
+
+    activateDemoPlan: (planId: string) =>
+      this.request<{ success: boolean; demoActivated?: boolean; planName?: string; planSlug?: string }>(
+        '/payments/demo-activate',
+        {
+          method: 'POST',
+          body: JSON.stringify({ planId }),
+        }
+      ),
+  };
+
+  contacts = {
+    getUsage: () =>
+      this.request<{
+        planSlug: string
+        limit: number | null
+        usedThisMonth: number
+        remaining: number | null
+        extraContactFeePaise: number
+        canPayExtra: boolean
+      }>('/contacts/usage'),
+
+    unlock: (targetProfileId: string) =>
+      this.request<{
+        success: boolean
+        alreadyUnlocked?: boolean
+        contactPhone: string | null
+        remaining: number | null
+      }>('/contacts/unlock', {
+        method: 'POST',
+        body: JSON.stringify({ targetProfileId }),
+      }),
+
+    createPaidOrder: (targetProfileId: string) =>
+      this.request<{
+        orderId: string
+        amount: number
+        currency: string
+        keyId: string
+        targetProfileId: string
+      }>('/contacts/unlock/order', {
+        method: 'POST',
+        body: JSON.stringify({ targetProfileId }),
+      }),
+
+    verifyPaidUnlock: (data: {
+      targetProfileId: string
+      razorpayOrderId: string
+      razorpayPaymentId: string
+      razorpaySignature: string
+    }) =>
+      this.request<{ success: boolean; contactPhone?: string | null }>('/contacts/unlock/verify', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    listUnlocked: () =>
+      this.request<
+        {
+          profileId: string
+          fullName: string
+          age: number | null
+          city?: string
+          state?: string
+          caste?: string
+          educationLevel?: string
+          profession?: string
+          photo?: string | null
+          phone: string
+          unlockedAt: string
+        }[]
+      >('/contacts/unlocked'),
   };
 
   // --- Admin APIs ---
@@ -388,6 +490,45 @@ class ApiClient {
     getProfile: (profileId: string) => this.request<any>(`/admin/profiles/${profileId}`),
 
     deleteProfile: (profileId: string) => this.request<any>(`/admin/profiles/${profileId}`, { method: 'DELETE' }),
+
+    createProfile: (data: {
+      profileFor: string
+      phone: string
+      fullName: string
+      gender: "Male" | "Female" | "Other"
+      dobDay: string
+      dobMonth: string
+      dobYear: string
+      maritalStatus: "Never Married" | "Divorced" | "Widowed" | "Awaiting Divorce"
+      city: string
+      state?: string
+      religion: string
+      caste: string
+      motherTongue: string
+      brothersCount: number
+      sistersCount: number
+      aboutMe?: string
+    }) =>
+      this.request<any>('/admin/profiles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    getPhotoUploadUrl: (profileId: string, data: { contentType: string; fileSize: number }) =>
+      this.request<{ uploadUrl: string; s3Key: string }>('/admin/profiles/' + profileId + '/upload-url', {
+        method: 'POST',
+        body: JSON.stringify({
+          purpose: 'profile_photo',
+          contentType: data.contentType,
+          fileSize: data.fileSize,
+        }),
+      }),
+
+    attachPhotos: (profileId: string, s3Keys: string[]) =>
+      this.request<any>(`/admin/profiles/${profileId}/photos`, {
+        method: 'POST',
+        body: JSON.stringify({ s3Keys }),
+      }),
 
     updateVerificationStatus: (profileId: string, status: 'verified' | 'rejected', rejectionReason?: string) =>
       this.request<any>(`/admin/verifications/${profileId}`, {

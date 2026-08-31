@@ -2,8 +2,10 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException,
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { BlocksService } from '../blocks/blocks.service';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 import {
   profiles,
+  users,
   familyDetails,
   lifestyleInterests,
   horoscopes,
@@ -21,7 +23,60 @@ export class ProfilesService {
   constructor(
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly blocksService: BlocksService,
+    private readonly entitlementsService: EntitlementsService,
   ) {}
+
+  private async getMutualConnectState(
+    viewerUserId: string | undefined,
+    targetProfile: { id: string; userId: string },
+  ): Promise<{ isMutualConnect: boolean; contactPhone: string | null }> {
+    if (!viewerUserId || viewerUserId === targetProfile.userId) {
+      return { isMutualConnect: true, contactPhone: null };
+    }
+
+    const [viewerProfile] = await this.db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(eq(profiles.userId, viewerUserId))
+      .limit(1);
+
+    if (!viewerProfile) {
+      return { isMutualConnect: false, contactPhone: null };
+    }
+
+    const connections = await this.db
+      .select({ id: interests.id })
+      .from(interests)
+      .where(
+        and(
+          or(
+            eq(interests.senderProfileId, viewerProfile.id),
+            eq(interests.receiverProfileId, viewerProfile.id),
+          ),
+          or(
+            eq(interests.senderProfileId, targetProfile.id),
+            eq(interests.receiverProfileId, targetProfile.id),
+          ),
+          eq(interests.status, 'accepted'),
+        ),
+      )
+      .limit(1);
+
+    if (connections.length === 0) {
+      return { isMutualConnect: false, contactPhone: null };
+    }
+
+    const [owner] = await this.db
+      .select({ phone: users.phone })
+      .from(users)
+      .where(eq(users.id, targetProfile.userId))
+      .limit(1);
+
+    return {
+      isMutualConnect: true,
+      contactPhone: owner?.phone ?? null,
+    };
+  }
 
   async completeRegistration(userId: string, payload: CompleteRegistrationPayload) {
     return this.db.transaction(async (tx) => {
@@ -351,7 +406,23 @@ export class ProfilesService {
       if (payload.horoscopeFileSizeBytes !== undefined) horoscopesUpdate.horoscopeFileSizeBytes = payload.horoscopeFileSizeBytes;
       if (Object.keys(horoscopesUpdate).length > 0) {
         horoscopesUpdate.updatedAt = new Date();
-        await tx.update(horoscopes).set(horoscopesUpdate).where(eq(horoscopes.profileId, profileId));
+        await tx
+          .insert(horoscopes)
+          .values({
+            profileId,
+            birthTime: horoscopesUpdate.birthTime ?? null,
+            birthPlace: horoscopesUpdate.birthPlace ?? null,
+            manglik: horoscopesUpdate.manglik ?? "Don't Know",
+            rashi: horoscopesUpdate.rashi ?? null,
+            nakshatra: horoscopesUpdate.nakshatra ?? null,
+            horoscopeS3Key: horoscopesUpdate.horoscopeS3Key ?? null,
+            horoscopeFileName: horoscopesUpdate.horoscopeFileName ?? null,
+            horoscopeFileSizeBytes: horoscopesUpdate.horoscopeFileSizeBytes ?? null,
+          })
+          .onConflictDoUpdate({
+            target: horoscopes.profileId,
+            set: horoscopesUpdate,
+          });
       }
 
       // Check if any fields belong to partnerPreferences
@@ -536,7 +607,7 @@ export class ProfilesService {
       .where(eq(lifestyleInterests.profileId, profile.id))
       .limit(1);
 
-    const [horoscope] = await this.db
+    const [horoscopeRow] = await this.db
       .select()
       .from(horoscopes)
       .where(eq(horoscopes.profileId, profile.id))
@@ -559,8 +630,38 @@ export class ProfilesService {
       .where(eq(profilePhotos.profileId, profile.id))
       .orderBy(asc(profilePhotos.displayOrder));
 
+    const { isMutualConnect, contactPhone } = await this.getMutualConnectState(
+      viewerUserId,
+      profile,
+    );
+
+    const isOwnProfile = Boolean(viewerUserId && viewerUserId === profile.userId);
+
+    const contactAccess = viewerUserId
+      ? await this.entitlementsService.getContactUnlockStatus(
+          viewerUserId,
+          profile.id,
+          isMutualConnect,
+        )
+      : {
+          canView: false,
+          isUnlocked: false,
+          isMutualBenefit: false,
+          limit: 3,
+          usedThisMonth: 0,
+          remaining: 3,
+          canUnlockWithQuota: false,
+          canPayExtra: false,
+          extraContactFeePaise: 2900,
+          planSlug: 'free',
+        };
+
+    if (isOwnProfile) {
+      contactAccess.canView = true;
+    }
+
     let blurPhoto = false;
-    
+
     // Only fetch blur settings and compute connection if viewer is not the profile owner
     if (viewerUserId && viewerUserId !== profile.userId) {
       const [setting] = await this.db
@@ -570,31 +671,37 @@ export class ProfilesService {
         .limit(1);
 
       const photoBlurSetting = setting?.photoBlur || 'always';
-      
-      if (photoBlurSetting !== 'never') {
-        const [viewerProfile] = await this.db
-          .select({ id: profiles.id })
-          .from(profiles)
-          .where(eq(profiles.userId, viewerUserId))
-          .limit(1);
 
-        let isAccepted = false;
-        if (viewerProfile) {
-          const connections = await this.db
-            .select()
-            .from(interests)
-            .where(
-              and(
-                or(eq(interests.senderProfileId, viewerProfile.id), eq(interests.receiverProfileId, viewerProfile.id)),
-                or(eq(interests.senderProfileId, profile.id), eq(interests.receiverProfileId, profile.id)),
-                eq(interests.status, 'accepted')
-              )
-            )
-            .limit(1);
-          isAccepted = connections.length > 0;
-        }
-        
-        blurPhoto = !isAccepted;
+      if (photoBlurSetting !== 'never') {
+        blurPhoto = !isMutualConnect;
+      }
+    }
+
+    const canViewHoroscope = isOwnProfile || (isMutualConnect && contactAccess.isMutualBenefit);
+
+    const horoscopePayload =
+      horoscopeRow && canViewHoroscope
+        ? (horoscopeRow as any)
+        : horoscopeRow
+          ? {
+              ...(horoscopeRow as any),
+              horoscopeS3Key: null,
+              horoscopeFileName: null,
+              horoscopeFileSizeBytes: null,
+            }
+          : null;
+
+    const canViewContact = contactAccess.canView;
+    let visiblePhone: string | null = null;
+    if (canViewContact) {
+      visiblePhone = contactPhone;
+      if (!visiblePhone) {
+        const [owner] = await this.db
+          .select({ phone: users.phone })
+          .from(users)
+          .where(eq(users.id, profile.userId))
+          .limit(1);
+        visiblePhone = owner?.phone ?? null;
       }
     }
 
@@ -602,10 +709,14 @@ export class ProfilesService {
       profile: profile as any,
       family: (family as any) || null,
       lifestyle: (lifestyle as any) || null,
-      horoscope: (horoscope as any) || null,
+      horoscope: horoscopePayload,
       photos,
       verificationStatus: verification?.status || 'idle',
       blurPhoto,
+      isMutualConnect,
+      contactPhone: visiblePhone,
+      hasHoroscope: Boolean(horoscopeRow?.horoscopeS3Key),
+      contactAccess,
     };
   }
 

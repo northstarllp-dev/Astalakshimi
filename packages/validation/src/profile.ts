@@ -104,11 +104,11 @@ export const step5LifestyleAstrologySchema = z.object({
   smoking: habitFrequencySchema.default('Never'),
   alcohol: habitFrequencySchema.default('Never'),
   interests: z.array(z.string()).max(7, 'Please select up to 7 interests maximum').default([]),
-  birthTime: z.string().optional(),
-  birthPlace: z.string().optional(),
-  manglik: manglikStatusSchema.default("Don't Know"),
-  rashi: z.string().optional(),
-  nakshatra: z.string().optional(),
+  birthTime: z.string().trim().min(1, 'Birth time is required'),
+  birthPlace: z.string().trim().min(1, 'Birth place is required'),
+  manglik: manglikStatusSchema,
+  rashi: z.string().trim().min(1, 'Rashi is required'),
+  nakshatra: z.string().trim().min(1, 'Star / nakshatra is required'),
 });
 
 // Step 6: Photos & Verification

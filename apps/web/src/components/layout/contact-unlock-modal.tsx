@@ -51,10 +51,10 @@ export function ContactUnlockModal() {
         <div className="bg-primary/5 p-4 rounded-xl mt-2 border border-primary/20">
           <div className="flex items-center gap-2 font-bold justify-center text-primary">
             <Lock className="h-4 w-4" />
-            <span>₹49 One-time Unlock</span>
+            <span>₹29 extra unlock</span>
           </div>
           <p className="text-[11px] text-muted-foreground mt-1.5 font-medium">
-            Instantly get their verified Phone Number and WhatsApp details.
+            Use a plan unlock if you still have quota, or pay ₹29 after your monthly limit.
           </p>
         </div>
 
@@ -64,11 +64,14 @@ export function ContactUnlockModal() {
             size="lg"
             onClick={() => {
               setOpen(false)
-              // In the future this can open Razorpay natively or go to a dedicated checkout
-              alert("Razorpay checkout for ₹49 goes here!")
+              if (targetId) {
+                router.push(`/profiles/${targetId}`)
+              } else {
+                router.push("/plans")
+              }
             }}
           >
-            Pay ₹49 to Unlock Details
+            Unlock contact
           </Button>
           <Button 
             variant="ghost" 

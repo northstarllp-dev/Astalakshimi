@@ -40,7 +40,9 @@ function CheckoutInner() {
   const [upiId, setUpiId] = React.useState("")
   const [paying, setPaying] = React.useState(false)
   const [done, setDone] = React.useState(false)
+  const [skipped, setSkipped] = React.useState(false)
   const [error, setError] = React.useState("")
+  const isDemoCheckout = process.env.NODE_ENV !== "production"
 
   if (!plan) {
     return (
@@ -59,6 +61,17 @@ function CheckoutInner() {
       : { label: plan.price, paise: plan.priceInPaise }
   const unlocks = plan.unlocks || []
 
+  const finishCheckout = async (asSkip = false) => {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.subscription })
+    await queryClient.invalidateQueries({ queryKey: queryKeys.invoices })
+    await queryClient.invalidateQueries({ queryKey: queryKeys.paid })
+    await queryClient.invalidateQueries({ queryKey: queryKeys.contactUsage })
+    setPaying(false)
+    setSkipped(asSkip)
+    setDone(true)
+    window.setTimeout(() => router.push("/plans"), 1400)
+  }
+
   const confirm = async () => {
     const parsed = checkoutSchema.safeParse({
       method,
@@ -73,20 +86,13 @@ function CheckoutInner() {
     setPaying(true)
 
     try {
-      // 1. Frontend sends planId -> Backend loads plan -> Backend determines amount -> Backend creates payment order
       const order = await apiClient.payments.createOrder(plan.id)
 
       if (order.freeActivated) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription })
-        await queryClient.invalidateQueries({ queryKey: queryKeys.invoices })
-        await queryClient.invalidateQueries({ queryKey: queryKeys.paid })
-        setPaying(false)
-        setDone(true)
-        window.setTimeout(() => router.push("/plans"), 1400)
+        await finishCheckout()
         return
       }
 
-      // 2. Verify payment on backend
       if (order.orderId) {
         await apiClient.payments.verifyPayment({
           razorpayOrderId: order.orderId,
@@ -95,15 +101,23 @@ function CheckoutInner() {
         })
       }
 
-      await queryClient.invalidateQueries({ queryKey: queryKeys.subscription })
-      await queryClient.invalidateQueries({ queryKey: queryKeys.invoices })
-      await queryClient.invalidateQueries({ queryKey: queryKeys.paid })
-      setPaying(false)
-      setDone(true)
-      window.setTimeout(() => router.push("/plans"), 1400)
+      await finishCheckout()
     } catch (err: any) {
       console.error("Payment error:", err)
       setError(err?.message || "Payment processing failed. Please try again.")
+      setPaying(false)
+    }
+  }
+
+  const skipPayment = async () => {
+    setError("")
+    setPaying(true)
+    try {
+      await apiClient.payments.activateDemoPlan(plan.id)
+      await finishCheckout(true)
+    } catch (err: any) {
+      console.error("Demo skip error:", err)
+      setError(err?.message || "Could not activate the plan. Try again.")
       setPaying(false)
     }
   }
@@ -133,9 +147,14 @@ function CheckoutInner() {
             <p className="mt-4 font-serif text-4xl font-bold text-primary">{priced.label}</p>
             <p className="text-xs text-muted-foreground">/ {plan.period}</p>
 
-            {plan.priceInPaise > 0 && (
+            {plan.priceInPaise > 0 && plan.id === "silver" && (
               <p className="mt-4 text-xs text-muted-foreground">
                 Extra contacts are ₹29 each after your included unlocks.
+              </p>
+            )}
+            {plan.id === "free" && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                3 contact unlocks this month. Extra contacts are ₹29 each.
               </p>
             )}
           </div>
@@ -162,9 +181,13 @@ function CheckoutInner() {
           {done ? (
             <div className="py-8 text-center text-emerald-900">
               <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
-              <p className="mt-3 font-serif text-2xl font-bold">Payment successful</p>
+              <p className="mt-3 font-serif text-2xl font-bold">
+                {skipped ? "Plan activated" : "Payment successful"}
+              </p>
               <p className="mt-1 text-sm text-emerald-800/80">
-                {plan.name} is active. Invoice saved. Returning to plans…
+                {skipped
+                  ? `${plan.name} is active (demo skip). Returning to plans…`
+                  : `${plan.name} is active. Invoice saved. Returning to plans…`}
               </p>
             </div>
           ) : (
@@ -231,8 +254,21 @@ function CheckoutInner() {
                     ? "Activate free plan"
                     : `Pay ${priced.label}`}
               </Button>
+              {isDemoCheckout && plan.priceInPaise > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-2 w-full"
+                  disabled={paying}
+                  onClick={skipPayment}
+                >
+                  Skip payment (demo)
+                </Button>
+              )}
               <p className="mt-3 text-center text-[11px] text-muted-foreground">
-                One-tap upgrade. Live Razorpay keys plug in later  this saves plan + invoice on this device.
+                {isDemoCheckout
+                  ? "Demo checkout. Skip payment to activate this plan without Razorpay."
+                  : "One-tap upgrade. Live Razorpay keys plug in later  this saves plan + invoice on this device."}
               </p>
             </>
           )}

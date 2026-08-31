@@ -17,6 +17,7 @@ describe('Feature 4: Payments - PaymentsController (Integration Tests)', () => {
     const mockPaymentsService = {
       createOrder: jest.fn(),
       verifyPayment: jest.fn(),
+      activateDemoPlan: jest.fn(),
       getUserSubscription: jest.fn(),
       getUserInvoices: jest.fn(),
     };
@@ -82,6 +83,27 @@ describe('Feature 4: Payments - PaymentsController (Integration Tests)', () => {
         body.razorpayOrderId,
         body.razorpayPaymentId,
         body.razorpaySignature
+      );
+      expect(result).toEqual(expected);
+    });
+  });
+
+  describe('POST /payments/demo-activate', () => {
+    it('should activate the selected plan without Razorpay', async () => {
+      const expected = {
+        success: true,
+        demoActivated: true,
+        planName: 'Silver',
+        planSlug: 'silver',
+      };
+
+      paymentsService.activateDemoPlan.mockResolvedValue(expected);
+
+      const result = await controller.activateDemoPlan(mockUserSession, { planId: 'silver' });
+
+      expect(paymentsService.activateDemoPlan).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        'silver'
       );
       expect(result).toEqual(expected);
     });

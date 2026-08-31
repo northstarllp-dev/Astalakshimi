@@ -135,6 +135,42 @@ export const profileEditSchema = z
         path: ["annualIncome"],
       })
     }
+    const horoscope = value as Record<string, unknown>
+    if (!hasText(horoscope.birthTime)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Birth time is required.",
+        path: ["birthTime"],
+      })
+    }
+    if (!hasText(horoscope.birthPlace)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Birth place is required.",
+        path: ["birthPlace"],
+      })
+    }
+    if (!hasText(horoscope.star)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Star / nakshatra is required.",
+        path: ["star"],
+      })
+    }
+    if (!hasText(horoscope.rashi)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Rashi is required.",
+        path: ["rashi"],
+      })
+    }
+    if (!hasText(horoscope.manglik)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Manglik status is required.",
+        path: ["manglik"],
+      })
+    }
   })
 
 export const searchFiltersSchema = z
@@ -210,9 +246,9 @@ export const adminCreateProfileSchema = z
     phone: phoneSchema,
     fullName: z.string().trim().min(3, "Name must be at least 3 characters."),
     gender: z.string().min(1, "Select gender."),
-    dobDay: z.string().regex(/^\d{2}$/, "Enter a valid day."),
-    dobMonth: z.string().regex(/^\d{2}$/, "Enter a valid month."),
-    dobYear: z.string().regex(/^\d{4}$/, "Enter a valid year."),
+    dobDay: z.string().regex(/^(0[1-9]|[12]\d|3[01])$/, "Enter a valid day."),
+    dobMonth: z.string().regex(/^(0[1-9]|1[0-2])$/, "Enter a valid month."),
+    dobYear: z.string().regex(/^(19\d{2}|20\d{2})$/, "Enter a valid year."),
     maritalStatus: z.string().min(1, "Select marital status."),
     city: z.string().trim().min(2, "Enter city."),
     religion: z.string().min(1, "Select religion."),
@@ -220,7 +256,6 @@ export const adminCreateProfileSchema = z
     motherTongue: z.string().min(1, "Select mother tongue."),
     brothersCount: z.number().int().min(0).max(5),
     sistersCount: z.number().int().min(0).max(5),
-    markVerified: z.boolean(),
   })
   .superRefine((value, ctx) => {
     const age = dobAge(value.dobDay, value.dobMonth, value.dobYear, value.gender)

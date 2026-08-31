@@ -487,7 +487,7 @@ export function suspendProfile(profileId: string, staff: AdminSession) {
 }
 
 export function createAdminProfile(
-  input: Omit<AdminProfile, "id" | "completeness" | "submittedAt"> & { markVerified?: boolean },
+  input: Omit<AdminProfile, "id" | "completeness" | "submittedAt">,
   staff: AdminSession
 ) {
   const profiles = loadAdminProfiles()
@@ -495,15 +495,15 @@ export function createAdminProfile(
   const profile: AdminProfile = {
     ...input,
     id,
-    verificationStatus: input.markVerified ? "verified" : input.verificationStatus ?? "pending",
+    verificationStatus: "verified",
     submittedAt: new Date().toISOString(),
     createdBy: "staff",
     createdByStaff: staff.name,
     accountStatus: "active",
     completeness: 0,
     photos: input.photos.length
-      ? input.photos
-      : photoSet([IMAGES.profiles.priya[0]], input.markVerified ? "approved" : "pending"),
+      ? input.photos.map((photo) => ({ ...photo, status: "approved" as const }))
+      : photoSet([IMAGES.profiles.priya[0]], "approved"),
   }
   profile.completeness = calcCompleteness(profile)
   profiles.unshift(profile)
@@ -514,7 +514,7 @@ export function createAdminProfile(
     action: "created",
     staffName: staff.name,
     staffEmail: staff.email,
-    note: input.markVerified ? "Created and marked verified" : undefined,
+    note: "Created and marked verified",
   })
   return profile
 }

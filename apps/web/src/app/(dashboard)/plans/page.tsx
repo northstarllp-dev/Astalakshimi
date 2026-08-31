@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { getPlanById, MEMBERSHIP_PLANS, PLAN_FEATURE_MATRIX, CURRENT_PLAN_ID, featureCell, computeAddonPrice, DURATION_ADDONS, PLAN_IDS, type PlanId } from "@/lib/plans"
 import { PlanCompare } from "@/components/plans/plan-compare"
 import { planSelectSchema } from "@/lib/validation"
-import { useProfileQuery, useSubscriptionQuery, useInvoicesQuery } from "@/hooks/queries"
+import { useProfileQuery, useSubscriptionQuery, useInvoicesQuery, useContactUsageQuery, useInterestUsageQuery } from "@/hooks/queries"
 import {
   Check,
   Copy,
@@ -40,6 +40,11 @@ const formatExpiry = (date: any) => {
   })
 }
 
+const formatQuotaUsage = (used: number, limit: number | null | undefined) => {
+  if (limit == null) return `${used} · Unlimited`
+  return `${used} / ${limit}`
+}
+
 const getOrCreateReferralCode = (name?: string) => {
   const clean = (name || "member").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()
   return `ASTA-${clean || "MEMBER"}-2026`
@@ -69,6 +74,8 @@ export default function PlansPage() {
   const { data: profile } = useProfileQuery()
   const { data: sub } = useSubscriptionQuery()
   const { data: invoices = [] } = useInvoicesQuery()
+  const { data: contactUsage } = useContactUsageQuery()
+  const { data: interestUsage } = useInterestUsageQuery()
   const [referralCode, setReferralCode] = React.useState("")
   const [referralLink, setReferralLink] = React.useState("")
   const [copied, setCopied] = React.useState(false)
@@ -176,6 +183,16 @@ export default function PlansPage() {
                 }
               />
               <Stat label="Days remaining" value={`${remaining} day${remaining === 1 ? "" : "s"}`} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Stat
+                label="Connection requests used"
+                value={formatQuotaUsage(interestUsage?.used ?? 0, interestUsage?.limit)}
+              />
+              <Stat
+                label="Contact unlocks used"
+                value={formatQuotaUsage(contactUsage?.usedThisMonth ?? 0, contactUsage?.limit)}
+              />
             </div>
             <div>
               <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Features unlocked</p>
@@ -289,7 +306,7 @@ export default function PlansPage() {
         <div className="border-b border-border px-5 py-4 md:px-6">
           <h2 className="font-serif text-xl font-bold">Full feature comparison</h2>
           <p className="text-sm text-muted-foreground">
-            Extra contacts are ₹29 each on every plan. Mutual horoscope & contact unlock on Silver and above.
+            Extra contacts are ₹29 each on Free and Silver after included unlocks. Mutual horoscope & contact unlock on Silver and above.
           </p>
         </div>
         <div className="overflow-x-auto">

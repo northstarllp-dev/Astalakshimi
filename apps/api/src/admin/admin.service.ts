@@ -1,15 +1,30 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, ConflictException } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { profiles, users, subscriptions, verifications, profilePhotos } from '@astalakshimi/database';
-import { eq, sql } from 'drizzle-orm';
+import {
+  profiles,
+  users,
+  subscriptions,
+  verifications,
+  profilePhotos,
+  familyDetails,
+  lifestyleInterests,
+  horoscopes,
+  partnerPreferences,
+  userSettings,
+} from '@astalakshimi/database';
+import { eq, inArray, and, sql } from 'drizzle-orm';
+import type { AdminCreateProfileInput } from '@astalakshimi/validation';
 import { NotificationsService } from '../notifications/notifications.service';
+import { S3Provider } from '../media/providers/s3.provider';
+import { calculateProfileCompleteness } from './profile-completeness';
 
 @Injectable()
 export class AdminService {
   constructor(
     @Inject(DB_CLIENT) private readonly db: Database,
-    private readonly notificationsService: NotificationsService
+    private readonly notificationsService: NotificationsService,
+    private readonly s3Provider: S3Provider,
   ) {}
 
   async getStats() {
@@ -85,23 +100,103 @@ export class AdminService {
     const records = await this.db
       .select({
         id: profiles.id,
+        userId: profiles.userId,
         fullName: profiles.fullName,
+        gender: profiles.gender,
         city: profiles.city,
+        religion: profiles.religion,
+        caste: profiles.caste,
+        motherTongue: profiles.motherTongue,
+        aboutMe: profiles.aboutMe,
         phone: users.phone,
-        status: verifications.status,
-        submittedAt: profiles.createdAt,
+        accountStatus: users.status,
+        verificationStatus: verifications.status,
+        submittedAt: verifications.updatedAt,
+        createdAt: profiles.createdAt,
       })
       .from(profiles)
       .innerJoin(users, eq(profiles.userId, users.id))
       .leftJoin(verifications, eq(profiles.id, verifications.profileId));
 
-    return records.map(r => ({
-      ...r,
-      verificationStatus: r.status || 'idle',
-      activeSubscription: false,
-      completeness: 80,
-      photos: [],
-    }));
+    if (!records.length) return [];
+
+    const profileIds = records.map((r) => r.id);
+
+    const [dbPhotos, dbHoroscopes, activeSubs] = await Promise.all([
+      this.db
+        .select({
+          profileId: profilePhotos.profileId,
+          id: profilePhotos.id,
+          s3Key: profilePhotos.s3Key,
+          isPrimary: profilePhotos.isPrimary,
+          displayOrder: profilePhotos.displayOrder,
+          status: profilePhotos.status,
+        })
+        .from(profilePhotos)
+        .where(inArray(profilePhotos.profileId, profileIds)),
+      this.db
+        .select({
+          profileId: horoscopes.profileId,
+          birthTime: horoscopes.birthTime,
+          birthPlace: horoscopes.birthPlace,
+        })
+        .from(horoscopes)
+        .where(inArray(horoscopes.profileId, profileIds)),
+      this.db
+        .select({ userId: subscriptions.userId })
+        .from(subscriptions)
+        .where(eq(subscriptions.status, 'active')),
+    ]);
+
+    const photosByProfile = new Map<string, typeof dbPhotos>();
+    for (const photo of dbPhotos) {
+      const list = photosByProfile.get(photo.profileId) ?? [];
+      list.push(photo);
+      photosByProfile.set(photo.profileId, list);
+    }
+
+    const horoscopeByProfile = new Map(dbHoroscopes.map((h) => [h.profileId, h]));
+    const activeUserIds = new Set(activeSubs.map((s) => s.userId));
+
+    return records.map((r) => {
+      const profilePhotosList = (photosByProfile.get(r.id) ?? []).sort(
+        (a, b) => a.displayOrder - b.displayOrder,
+      );
+      const horoscope = horoscopeByProfile.get(r.id);
+      const verificationStatus = r.verificationStatus || 'idle';
+
+      return {
+        id: r.id,
+        fullName: r.fullName,
+        gender: r.gender,
+        city: r.city,
+        phone: r.phone,
+        verificationStatus,
+        accountStatus: r.accountStatus,
+        createdBy: 'self' as const,
+        submittedAt: r.submittedAt || r.createdAt,
+        activeSubscription: activeUserIds.has(r.userId),
+        completeness: calculateProfileCompleteness({
+          fullName: r.fullName,
+          phone: r.phone,
+          city: r.city,
+          religion: r.religion,
+          caste: r.caste,
+          motherTongue: r.motherTongue,
+          aboutMe: r.aboutMe,
+          photoCount: profilePhotosList.length,
+          birthTime: horoscope?.birthTime,
+          birthPlace: horoscope?.birthPlace,
+          verificationStatus,
+        }),
+        photos: profilePhotosList.map((ph) => ({
+          id: ph.id,
+          s3Key: ph.s3Key,
+          isPrimary: ph.isPrimary,
+          status: ph.status,
+        })),
+      };
+    });
   }
 
   async getProfile(profileId: string) {
@@ -113,17 +208,32 @@ export class AdminService {
     const u = userRecords[0];
 
     const verificationRecords = await this.db.select().from(verifications).where(eq(verifications.profileId, profileId));
-    const v = verificationRecords[0] || {};
-    
-    const dbPhotos = await this.db.select().from(profilePhotos).where(eq(profilePhotos.profileId, profileId));
-    const mappedPhotos = dbPhotos.map(ph => ({
-      id: ph.id,
-      s3Key: ph.s3Key,
-      isPrimary: ph.isPrimary,
-      displayOrder: ph.displayOrder,
-      status: ph.status,
-    })).sort((a, b) => a.displayOrder - b.displayOrder);
-    
+    const v = verificationRecords[0];
+
+    const [dbPhotos, horoscopeRecords, activeSub] = await Promise.all([
+      this.db.select().from(profilePhotos).where(eq(profilePhotos.profileId, profileId)),
+      this.db.select().from(horoscopes).where(eq(horoscopes.profileId, profileId)),
+      this.db
+        .select({ userId: subscriptions.userId })
+        .from(subscriptions)
+        .where(and(eq(subscriptions.userId, p.userId), eq(subscriptions.status, 'active')))
+        .limit(1),
+    ]);
+
+    const mappedPhotos = dbPhotos
+      .map((ph) => ({
+        id: ph.id,
+        s3Key: ph.s3Key,
+        isPrimary: ph.isPrimary,
+        displayOrder: ph.displayOrder,
+        status: ph.status,
+      }))
+      .sort((a, b) => a.displayOrder - b.displayOrder);
+
+    const h = horoscopeRecords[0];
+    const dobParts = p.dob ? String(p.dob).split('-') : [];
+    const verificationStatus = v?.status || 'idle';
+
     return {
       id: p.id,
       phone: u.phone,
@@ -135,23 +245,199 @@ export class AdminService {
       religion: p.religion,
       caste: p.caste,
       motherTongue: p.motherTongue,
-      dobDay: '01', dobMonth: '01', dobYear: '2000',
+      dobDay: dobParts[2] || '01',
+      dobMonth: dobParts[1] || '01',
+      dobYear: dobParts[0] || '2000',
       maritalStatus: p.maritalStatus,
-      brothersCount: 0, sistersCount: 0,
+      brothersCount: 0,
+      sistersCount: 0,
       aboutMe: p.aboutMe || '',
-      verificationMethod: v.method || '',
-      verificationStatus: v.status || 'pending',
-      selfieS3Key: v.selfieS3Key,
-      govtIdType: v.govtIdType,
-      govtIdS3Key: v.govtIdS3Key,
-      horoscopeName: '', birthTime: '', birthPlace: '', rashi: '', star: '', manglik: '',
+      verificationMethod: v?.method || '',
+      verificationStatus,
+      selfieS3Key: v?.selfieS3Key,
+      govtIdType: v?.govtIdType,
+      govtIdS3Key: v?.govtIdS3Key,
+      horoscopeName: h?.horoscopeFileName || '',
+      birthTime: h?.birthTime || '',
+      birthPlace: h?.birthPlace || '',
+      rashi: h?.rashi || '',
+      star: h?.nakshatra || '',
+      manglik: h?.manglik || '',
       photos: mappedPhotos,
-      completeness: 80,
-      createdBy: 'self',
+      completeness: calculateProfileCompleteness({
+        fullName: p.fullName,
+        phone: u.phone,
+        city: p.city,
+        religion: p.religion,
+        caste: p.caste,
+        motherTongue: p.motherTongue,
+        aboutMe: p.aboutMe,
+        photoCount: mappedPhotos.length,
+        birthTime: h?.birthTime,
+        birthPlace: h?.birthPlace,
+        verificationStatus,
+      }),
+      createdBy: 'self' as const,
       accountStatus: u.status,
-      submittedAt: v.updatedAt || p.createdAt,
-      activeSubscription: false
+      submittedAt: v?.updatedAt || p.createdAt,
+      activeSubscription: activeSub.some((s) => s.userId === p.userId),
     };
+  }
+
+  async createProfile(input: AdminCreateProfileInput) {
+    const phone = input.phone.replace(/\s+/g, '');
+    const [existingUser] = await this.db.select().from(users).where(eq(users.phone, phone)).limit(1);
+
+    if (existingUser) {
+      const [existingProfile] = await this.db
+        .select({ id: profiles.id })
+        .from(profiles)
+        .where(eq(profiles.userId, existingUser.id))
+        .limit(1);
+      if (existingProfile) {
+        throw new ConflictException('This mobile number is already registered.');
+      }
+    }
+
+    const month = input.dobMonth.padStart(2, '0');
+    const day = input.dobDay.padStart(2, '0');
+    const dobStr = `${input.dobYear}-${month}-${day}`;
+    const heightCm = input.gender === 'Male' ? 172 : 160;
+    const now = new Date();
+
+    const profileId = await this.db.transaction(async (tx) => {
+      let userId: string;
+
+      if (existingUser) {
+        userId = existingUser.id;
+        await tx
+          .update(users)
+          .set({
+            isPhoneVerified: true,
+            consentAccepted: true,
+            consentTimestamp: now,
+            status: 'active',
+            updatedAt: now,
+          })
+          .where(eq(users.id, userId));
+      } else {
+        const [newUser] = await tx
+          .insert(users)
+          .values({
+            phone,
+            isPhoneVerified: true,
+            consentAccepted: true,
+            consentTimestamp: now,
+            role: 'member',
+            status: 'active',
+          })
+          .returning();
+        userId = newUser.id;
+      }
+
+      const [newProfile] = await tx
+        .insert(profiles)
+        .values({
+          userId,
+          profileFor: input.profileFor,
+          fullName: input.fullName.trim(),
+          gender: input.gender,
+          dob: dobStr,
+          maritalStatus: input.maritalStatus,
+          heightCm,
+          aboutMe: input.aboutMe?.trim() || 'Profile created by staff on behalf of the family.',
+          city: input.city.trim(),
+          state: input.state?.trim() || 'Tamil Nadu',
+          country: 'India',
+          religion: input.religion,
+          caste: input.caste.trim(),
+          motherTongue: input.motherTongue,
+          educationLevel: 'Bachelors',
+          degree: 'Not specified',
+          employmentStatus: 'Employed',
+          profession: 'Not specified',
+          annualIncome: 'Prefer not to say',
+          photoPrivacy: 'visible',
+        })
+        .returning();
+
+      const id = newProfile.id;
+
+      await tx.insert(familyDetails).values({
+        profileId: id,
+        familyValues: 'Moderate',
+        familyType: 'Nuclear',
+        fatherOccupation: 'Employed',
+        motherOccupation: 'Homemaker',
+        brothersCount: input.brothersCount,
+        sistersCount: input.sistersCount,
+      });
+
+      await tx.insert(lifestyleInterests).values({
+        profileId: id,
+        diet: 'Vegetarian',
+        smoking: 'Never',
+        alcohol: 'Never',
+        interests: [],
+      });
+
+      await tx.insert(horoscopes).values({
+        profileId: id,
+        manglik: "Don't Know",
+      });
+
+      await tx.insert(partnerPreferences).values({
+        profileId: id,
+        prefReligions: [input.religion],
+        prefCastes: [input.caste.trim()],
+        prefMotherTongues: [input.motherTongue],
+        prefLocations: [input.city.trim()],
+      });
+
+      await tx.insert(userSettings).values({ userId }).onConflictDoNothing();
+
+      await tx.insert(verifications).values({
+        profileId: id,
+        method: 'selfie',
+        status: 'verified',
+        reviewedAt: now,
+      });
+
+      return id;
+    });
+
+    return this.getProfile(profileId);
+  }
+
+  async getPhotoUploadUrl(profileId: string, contentType: string, fileSize: number) {
+    const [profile] = await this.db
+      .select({ userId: profiles.userId })
+      .from(profiles)
+      .where(eq(profiles.id, profileId))
+      .limit(1);
+    if (!profile) throw new NotFoundException('Profile not found');
+
+    return this.s3Provider.generateUploadUrl(profile.userId, 'profile_photo', contentType, fileSize);
+  }
+
+  async attachPhotos(profileId: string, s3Keys: string[]) {
+    const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, profileId)).limit(1);
+    if (!profile) throw new NotFoundException('Profile not found');
+
+    const existing = await this.db.select().from(profilePhotos).where(eq(profilePhotos.profileId, profileId));
+    const startOrder = existing.length;
+
+    await this.db.insert(profilePhotos).values(
+      s3Keys.map((s3Key, index) => ({
+        profileId,
+        s3Key,
+        isPrimary: existing.length === 0 && index === 0,
+        displayOrder: startOrder + index,
+        status: 'approved' as const,
+      })),
+    );
+
+    return this.getProfile(profileId);
   }
 
   async deleteProfile(profileId: string) {

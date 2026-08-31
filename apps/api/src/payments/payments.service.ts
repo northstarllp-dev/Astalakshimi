@@ -2,7 +2,7 @@ import { Injectable, Inject, InternalServerErrorException, NotFoundException, Ba
 import { ConfigService } from '@nestjs/config';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { payments, subscriptions, plans, profiles, unlockedContacts, chatSessions } from '@astalakshimi/database';
+import { payments, subscriptions, plans, profiles, users, unlockedContacts, chatSessions } from '@astalakshimi/database';
 import { eq, and, gt, desc } from 'drizzle-orm';
 import Razorpay = require('razorpay');
 import * as crypto from 'crypto';
@@ -116,6 +116,69 @@ export class PaymentsService {
     }
   }
 
+  private isDemoPaymentsEnabled() {
+    return process.env.NODE_ENV !== 'production';
+  }
+
+  private async activatePlanForUser(
+    userId: string,
+    plan: { id: string; durationDays: number; name: string; slug: string },
+    paymentId?: string | null,
+  ) {
+    const startsAt = new Date();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + plan.durationDays);
+
+    await this.db
+      .update(subscriptions)
+      .set({ status: 'expired' })
+      .where(and(eq(subscriptions.userId, userId), eq(subscriptions.status, 'active')));
+
+    await this.db.insert(subscriptions).values({
+      userId,
+      planId: plan.id,
+      paymentId: paymentId ?? null,
+      startsAt,
+      expiresAt,
+      status: 'active',
+    });
+  }
+
+  async activateDemoPlan(userId: string, planIdentifier: string) {
+    if (!this.isDemoPaymentsEnabled()) {
+      throw new BadRequestException('Demo plan activation is disabled in production.');
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(planIdentifier);
+    const planCondition = isUuid ? eq(plans.id, planIdentifier) : eq(plans.slug, planIdentifier);
+    const [plan] = await this.db.select().from(plans).where(planCondition).limit(1);
+    if (!plan) throw new NotFoundException(`Plan '${planIdentifier}' not found`);
+
+    const stamp = Date.now();
+    const [payment] = await this.db
+      .insert(payments)
+      .values({
+        userId,
+        planId: plan.id,
+        amountPaise: plan.pricePaise,
+        currency: 'INR',
+        provider: 'razorpay',
+        providerOrderId: `demo_skip_${plan.slug}_${stamp}`,
+        providerPaymentId: `demo_pay_${stamp}`,
+        status: 'captured',
+      })
+      .returning();
+
+    await this.activatePlanForUser(userId, plan, payment?.id);
+
+    return {
+      success: true,
+      demoActivated: true,
+      planName: plan.name,
+      planSlug: plan.slug,
+    };
+  }
+
   async verifyPayment(
     userId: string,
     razorpayOrderId: string,
@@ -161,34 +224,11 @@ export class PaymentsService {
       })
       .where(eq(payments.id, payment.id));
 
-    // Get plan details for subscription
+    // Create or update subscription
     const [plan] = await this.db.select().from(plans).where(eq(plans.id, payment.planId!)).limit(1);
     if (!plan) throw new NotFoundException('Plan not found');
-    
-    // Create or update subscription
-    const startsAt = new Date();
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + plan.durationDays);
 
-    // Deactivate old subscriptions
-    await this.db
-      .update(subscriptions)
-      .set({ status: 'expired' })
-      .where(
-        and(
-          eq(subscriptions.userId, userId),
-          eq(subscriptions.status, 'active')
-        )
-      );
-
-    await this.db.insert(subscriptions).values({
-      userId,
-      planId: plan.id,
-      paymentId: payment.id,
-      startsAt,
-      expiresAt,
-      status: 'active',
-    });
+    await this.activatePlanForUser(userId, plan, payment.id);
 
     return { success: true, planName: plan.name, planSlug: plan.slug };
   }
@@ -273,36 +313,46 @@ export class PaymentsService {
     const [profile] = await this.db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
 
-    const amountPaise = 4900; // 49 INR
-    
+    const amountPaise = 2900; // ₹29 extra contact unlock
+    const keyId = this.configService.get<string>('RAZORPAY_KEY_ID') || 'test_key';
+
     try {
-      const options = {
-        amount: amountPaise,
-        currency: 'INR',
-        receipt: `rcpt_cu_${profile.id.substring(0, 8)}_${Date.now()}`,
-        notes: {
-          userId,
-          type: 'contact_unlock',
-          targetProfileId,
-        },
-      };
-      
-      const order = await this.razorpay.orders.create(options);
+      let orderId = `order_cu_${Date.now()}`;
+      let orderAmount: number | string = amountPaise;
+      let orderCurrency = 'INR';
+
+      if (keyId && keyId !== 'test_key') {
+        const options = {
+          amount: amountPaise,
+          currency: 'INR',
+          receipt: `rcpt_cu_${profile.id.substring(0, 8)}_${Date.now()}`,
+          notes: {
+            userId,
+            type: 'contact_unlock',
+            targetProfileId,
+          },
+        };
+
+        const order = await this.razorpay.orders.create(options);
+        orderId = order.id;
+        orderAmount = order.amount;
+        orderCurrency = order.currency;
+      }
 
       await this.db.insert(payments).values({
         userId,
         amountPaise,
         currency: 'INR',
         provider: 'razorpay',
-        providerOrderId: order.id,
+        providerOrderId: orderId,
         status: 'created',
       });
 
       return {
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        keyId: this.configService.get<string>('RAZORPAY_KEY_ID') || 'test_key',
+        orderId,
+        amount: orderAmount,
+        currency: orderCurrency,
+        keyId,
         targetProfileId,
       };
     } catch (err) {
@@ -325,7 +375,8 @@ export class PaymentsService {
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
-    if (generatedSignature !== razorpaySignature) {
+    const isDemo = secret === 'test_secret' && razorpaySignature === 'demo_signature';
+    if (generatedSignature !== razorpaySignature && !isDemo) {
       throw new BadRequestException('Invalid payment signature');
     }
 
@@ -336,7 +387,17 @@ export class PaymentsService {
       .limit(1);
 
     if (!payment) throw new NotFoundException('Payment record not found');
-    if (payment.status === 'captured') return { success: true };
+    if (payment.status === 'captured') {
+      const [target] = await this.db
+        .select({ userId: profiles.userId })
+        .from(profiles)
+        .where(eq(profiles.id, targetProfileId))
+        .limit(1);
+      const [owner] = target
+        ? await this.db.select({ phone: users.phone }).from(users).where(eq(users.id, target.userId)).limit(1)
+        : [];
+      return { success: true, contactPhone: owner?.phone ?? null };
+    }
 
     const [profile] = await this.db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
@@ -383,6 +444,15 @@ export class PaymentsService {
       });
     }
 
-    return { success: true };
+    const [target] = await this.db
+      .select({ userId: profiles.userId })
+      .from(profiles)
+      .where(eq(profiles.id, targetProfileId))
+      .limit(1);
+    const [owner] = target
+      ? await this.db.select({ phone: users.phone }).from(users).where(eq(users.id, target.userId)).limit(1)
+      : [];
+
+    return { success: true, contactPhone: owner?.phone ?? null };
   }
 }
