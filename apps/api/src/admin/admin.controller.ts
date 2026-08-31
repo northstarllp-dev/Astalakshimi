@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -36,5 +36,10 @@ export class AdminController {
   @Get('profiles/:profileId')
   getProfile(@Param('profileId') profileId: string) {
     return this.adminService.getProfile(profileId);
+  }
+
+  @Delete('profiles/:profileId')
+  deleteProfile(@Param('profileId') profileId: string) {
+    return this.adminService.deleteProfile(profileId);
   }
 }

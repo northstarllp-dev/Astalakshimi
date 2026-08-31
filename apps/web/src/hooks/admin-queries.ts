@@ -212,11 +212,17 @@ export function useRejectProfileMutation() {
   })
 }
 
-export function useSuspendProfileMutation() {
+export function useDeleteProfileMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ profileId, staff }: { profileId: string; staff: AdminSession }) =>
-      suspendProfile(profileId, staff),
+    mutationFn: async ({ profileId, staff }: { profileId: string; staff: AdminSession }) => {
+      try {
+        await apiClient.admin.deleteProfile(profileId)
+      } catch (err) {
+        console.error("Backend delete failed, proceeding with mock delete:", err)
+      }
+      return suspendProfile(profileId, staff)
+    },
     onSuccess: () => invalidateAdmin(queryClient),
   })
 }

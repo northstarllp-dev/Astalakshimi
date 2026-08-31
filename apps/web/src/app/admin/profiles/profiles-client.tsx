@@ -17,7 +17,7 @@ import {
 import {
   useAdminProfilesQuery,
   usePendingVerificationsQuery,
-  useSuspendProfileMutation,
+  useDeleteProfileMutation,
   useAdminSessionQuery,
 } from "@/hooks/admin-queries"
 import { formatRelativeHours, type AdminProfile } from "@/lib/admin-store"
@@ -41,7 +41,7 @@ export default function AdminProfilesPageInner() {
   const { data: profiles = [] } = useAdminProfilesQuery()
   const { data: pending = [] } = usePendingVerificationsQuery()
   const { data: session } = useAdminSessionQuery()
-  const suspend = useSuspendProfileMutation()
+  const deleteMutation = useDeleteProfileMutation()
 
   const cities = React.useMemo(
     () => Array.from(new Set(profiles.map((p) => p.city))).sort(),
@@ -209,9 +209,9 @@ export default function AdminProfilesPageInner() {
                 <ProfileCard
                   key={p.id}
                   profile={p}
-                  onSuspend={() => {
+                  onDelete={() => {
                     if (!session) return
-                    void suspend.mutateAsync({ profileId: p.id, staff: session })
+                    void deleteMutation.mutateAsync({ profileId: p.id, staff: session })
                   }}
                 />
               ))
@@ -234,9 +234,9 @@ export default function AdminProfilesPageInner() {
                   <ProfileRow
                     key={p.id}
                     profile={p}
-                    onSuspend={() => {
+                    onDelete={() => {
                       if (!session) return
-                      void suspend.mutateAsync({ profileId: p.id, staff: session })
+                      void deleteMutation.mutateAsync({ profileId: p.id, staff: session })
                     }}
                   />
                 ))}
@@ -249,7 +249,7 @@ export default function AdminProfilesPageInner() {
   )
 }
 
-function ProfileCard({ profile: p, onSuspend }: { profile: AdminProfile; onSuspend: () => void }) {
+function ProfileCard({ profile: p, onDelete }: { profile: AdminProfile; onDelete: () => void }) {
   return (
     <article className="rounded-xl border border-border bg-card p-3">
       <div className="flex items-center gap-3">
@@ -271,8 +271,8 @@ function ProfileCard({ profile: p, onSuspend }: { profile: AdminProfile; onSuspe
           </Button>
         </Link>
         {p.accountStatus !== "suspended" && (
-          <Button size="sm" variant="ghost" className="rounded-lg" onClick={onSuspend}>
-            Suspend
+          <Button size="sm" variant="ghost" className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onDelete}>
+            Delete
           </Button>
         )}
       </div>
@@ -280,7 +280,7 @@ function ProfileCard({ profile: p, onSuspend }: { profile: AdminProfile; onSuspe
   )
 }
 
-function ProfileRow({ profile: p, onSuspend }: { profile: AdminProfile; onSuspend: () => void }) {
+function ProfileRow({ profile: p, onDelete }: { profile: AdminProfile; onDelete: () => void }) {
   return (
     <tr className="border-b border-border/70 last:border-0">
       <td className="px-4 py-2.5">
@@ -307,8 +307,8 @@ function ProfileRow({ profile: p, onSuspend }: { profile: AdminProfile; onSuspen
             </Button>
           </Link>
           {p.accountStatus !== "suspended" && (
-            <Button size="sm" variant="ghost" className="rounded-lg" onClick={onSuspend}>
-              Suspend
+            <Button size="sm" variant="ghost" className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onDelete}>
+              Delete
             </Button>
           )}
         </div>

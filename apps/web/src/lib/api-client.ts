@@ -387,6 +387,8 @@ class ApiClient {
 
     getProfile: (profileId: string) => this.request<any>(`/admin/profiles/${profileId}`),
 
+    deleteProfile: (profileId: string) => this.request<any>(`/admin/profiles/${profileId}`, { method: 'DELETE' }),
+
     updateVerificationStatus: (profileId: string, status: 'verified' | 'rejected', rejectionReason?: string) =>
       this.request<any>(`/admin/verifications/${profileId}`, {
         method: 'PATCH',

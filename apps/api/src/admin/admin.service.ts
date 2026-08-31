@@ -153,4 +153,15 @@ export class AdminService {
       activeSubscription: false
     };
   }
+
+  async deleteProfile(profileId: string) {
+    const profileRecords = await this.db.select({ userId: profiles.userId }).from(profiles).where(eq(profiles.id, profileId));
+    if (!profileRecords.length) throw new NotFoundException('Profile not found');
+    
+    const userId = profileRecords[0].userId;
+    
+    // Delete the user, which should cascade and delete the profile, photos, verifications, etc.
+    await this.db.delete(users).where(eq(users.id, userId));
+    return { success: true };
+  }
 }
