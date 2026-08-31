@@ -248,7 +248,10 @@ function buildProfileUpdatePayload(data: Partial<SignupData>) {
   return payload
 }
 
-function mapFullProfileToSignupData(base: SignupData, fullProfile: Awaited<ReturnType<typeof apiClient.profiles.getMyProfile>>) {
+function mapFullProfileToSignupData(
+  base: SignupData,
+  fullProfile: Awaited<ReturnType<typeof apiClient.profiles.getMyProfile>>,
+): SignupData {
   return {
     ...base,
     profileFor: fullProfile.profile.profileFor,
@@ -267,16 +270,16 @@ function mapFullProfileToSignupData(base: SignupData, fullProfile: Awaited<Retur
     subcaste: fullProfile.profile.subcaste ?? "",
     gotra: fullProfile.profile.gotra ?? "",
     motherTongue: fullProfile.profile.motherTongue,
-    educationLevel: fullProfile.profile.educationLevel,
+    educationLevel: fullProfile.profile.educationLevel ?? "",
     education: fullProfile.profile.degree || "",
-    degree: fullProfile.profile.degree,
+    degree: fullProfile.profile.degree ?? "",
     collegeName: fullProfile.profile.collegeName ?? "",
-    employmentStatus: fullProfile.profile.employmentStatus,
+    employmentStatus: fullProfile.profile.employmentStatus ?? "",
     occupation: fullProfile.profile.profession || "",
-    profession: fullProfile.profile.profession,
+    profession: fullProfile.profile.profession ?? "",
     companyName: fullProfile.profile.companyName ?? "",
     companySector: fullProfile.profile.companySector ?? "Private",
-    annualIncome: fullProfile.profile.annualIncome,
+    annualIncome: fullProfile.profile.annualIncome ?? "",
     photoPrivacy: fullProfile.profile.photoPrivacy,
     city: fullProfile.profile.city,
     state: fullProfile.profile.state,
@@ -296,8 +299,12 @@ function mapFullProfileToSignupData(base: SignupData, fullProfile: Awaited<Retur
     horoscopeName: fullProfile.horoscope?.horoscopeFileName ?? "",
     horoscopeS3Key: fullProfile.horoscope?.horoscopeS3Key ?? "",
     horoscopeSize: fullProfile.horoscope?.horoscopeFileSizeBytes ?? 0,
-    photos: fullProfile.photos.map((p: { url?: string; s3Key?: string }) => p.url || p.s3Key),
-    photoS3Keys: fullProfile.photos.map((p: { s3Key?: string }) => p.s3Key),
+    photos: fullProfile.photos
+      .map((p: { url?: string; s3Key?: string }) => p.url || p.s3Key)
+      .filter((url): url is string => Boolean(url)),
+    photoS3Keys: fullProfile.photos
+      .map((p: { s3Key?: string }) => p.s3Key)
+      .filter((key): key is string => Boolean(key)),
     photoObjects: fullProfile.photos,
     verificationStatus: fullProfile.verificationStatus as SignupData["verificationStatus"],
   }
