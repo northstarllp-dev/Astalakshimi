@@ -4,6 +4,65 @@ Running log of product UI shipped in `apps/web` (frontend-only, mock `sessionSto
 
 ---
 
+## Member verification states (Home)
+
+**Routes:** `/home`, `/profile/verify`  
+**Files:** [`home/page.tsx`](../apps/web/src/app/(dashboard)/home/page.tsx), [`profile/verify/page.tsx`](../apps/web/src/app/(dashboard)/profile/verify/page.tsx), [`profile-store.ts`](../apps/web/src/lib/profile-store.ts)
+
+- Member `verificationStatus`: `idle` | `pending` | `verified` | `rejected` (+ optional `rejectionReason`)
+- Home: amber pending banner (demo Approve / Simulate reject) · red rejected banner with reason + Re-upload CTA
+- `/profile/verify` reuses signup verify step; resubmit → pending and clears reason
+- Discover still requires verified + 80% completeness
+
+---
+
+## Offer bar (replaces hero timeline)
+
+**Route:** `/`  
+**File:** [`hero-free-search-countdown.tsx`](../apps/web/src/components/landing/hero-free-search-countdown.tsx)
+
+- Replaced Days/Hrs/Min/Sec boxes with a slim maroon strip under the header
+- Copy: `3 months free from 14 Sep 2026 · Nd Nh Nm left` (minute refresh; hides when expired)
+
+---
+
+## Admin mobile + PWA redesign
+
+**Routes:** `/admin/*`  
+**Files:** [`admin-shell.tsx`](../apps/web/src/components/admin/admin-shell.tsx), [`install-app-button.tsx`](../apps/web/src/components/admin/install-app-button.tsx), [`manifest.ts`](../apps/web/src/app/manifest.ts)
+
+- Removed sidebar / “operations console” decorative AI look
+- Mobile bottom tabs + compact top bar; desktop uses top links
+- Flat stat cards and list rows; profiles use cards on phone, table on desktop
+- **Install app** button (PWA) on login and header  Chrome prompt or iOS Add to Home Screen tip
+- Spec: [ui-admin.md](./ui-admin.md)
+
+---
+
+## Login split layout
+
+**Route:** `/login`  
+**File:** [`login/page.tsx`](../apps/web/src/app/(auth)/login/page.tsx)
+
+- Full-bleed heritage split: temple-lamps photo with maroon wash on desktop; cream OTP card with kolam corners and gold rule
+- Mobile: compact photo banner, then the same form
+- OTP flow unchanged (phone → 6-digit code → `/home` or `/register`)
+
+---
+
+## Admin operations console
+
+**Routes:** `/admin`, `/admin/login`, `/admin/profiles`, `/admin/profiles/new`, `/admin/profiles/[id]`, `/admin/reports`, `/admin/audit`  
+**Files:** [`admin-store.ts`](../apps/web/src/lib/admin-store.ts), [`admin-queries.ts`](../apps/web/src/hooks/admin-queries.ts), [`admin-shell.tsx`](../apps/web/src/components/admin/admin-shell.tsx)
+
+- Separate staff auth (email + password)  not member OTP at `/login`
+- Analytics home: users, profiles, subscriptions, pending verifications, revenue, SLA breaches
+- Profiles: Review queue + All profiles with search/filters; create-for-others; KYC detail (photos, govt ID, horoscope) with approve/reject
+- Reports and audit trail (mock sessionStorage)
+- Spec: [ui-admin.md](./ui-admin.md)
+
+---
+
 ## Plans compare redesign
 
 **Route:** `/plans`  
@@ -29,7 +88,7 @@ Running log of product UI shipped in `apps/web` (frontend-only, mock `sessionSto
 **Route:** `/home` (nav label **Home**)  
 **Files:** [`home/page.tsx`](../apps/web/src/app/(dashboard)/home/page.tsx), [`lib/portal-access.ts`](../apps/web/src/lib/portal-access.ts), [`match-thumb-card.tsx`](../apps/web/src/components/dashboard/match-thumb-card.tsx), [`dashboard-shell.tsx`](../apps/web/src/components/layout/dashboard-shell.tsx), [`mobile-bottom-nav.tsx`](../apps/web/src/components/layout/mobile-bottom-nav.tsx)
 
-Signup stays short, so a new profile lands around **25%** complete (`profileCompleteness` is weighted: basics from signup = 25%). After register/login, members go to **Home**, not Discover.
+Signup stays short, so a new profile lands around **25%** complete (`filled / 40` details in [`profile-completeness.ts`](../apps/web/src/lib/profile-completeness.ts); the 10 signup fields are name, gender, DOB, marital status, city, religion, caste, mother tongue, profile-for, and photo). After register/login, members go to **Home**, not Discover.
 
 ### Home contents
 
@@ -46,7 +105,7 @@ Discover, Interests, Search, and Shortlist stay in the nav. If the member is not
 
 ---
 
-## Discover — Search & Browse (Section 2)
+## Discover  Search & Browse (Section 2)
 
 **Route:** `/dashboard` (nav label **Discover**)  
 **Files:** [`dashboard/page.tsx`](../apps/web/src/app/(dashboard)/dashboard/page.tsx), [`lib/discover.ts`](../apps/web/src/lib/discover.ts), [`lib/matches.ts`](../apps/web/src/lib/matches.ts)
@@ -55,7 +114,7 @@ Discover, Interests, Search, and Shortlist stay in the nav. If the member is not
 
 | Feature | Access | Behaviour |
 | --- | --- | --- |
-| Quick search | All | Age range (dual sliders), location, community — **3 fields only**. Results update live; no Search button. |
+| Quick search | All | Age range (dual sliders), location, community  **3 fields only**. Results update live; no Search button. |
 | Advanced filters | Paid | “More filters” sheet: height, education, income, occupation, diet, smoking, drinking, Manglik, horoscope star, willing to relocate. Free → upgrade prompt → `/plans`. |
 | Saved searches | Paid | Save current quick filters with a label; reapply from dropdown. Stored in `astalakshimi.savedSearches`. |
 | Partner preference match | All | “My preferences” applies signup `prefAgeMin` / `prefAgeMax` / city / caste as the active search. |
@@ -123,7 +182,7 @@ Product note (not enforced in demo): max **3 push notifications per day**; respe
 
 ---
 
-## Signup — siblings
+## Signup  siblings
 
 **Route:** `/register` step 3 (Community & background)  
 **Files:** [`register/page.tsx`](../apps/web/src/app/(auth)/register/page.tsx), [`lib/profile-store.ts`](../apps/web/src/lib/profile-store.ts)
@@ -164,7 +223,7 @@ Dashboard filter accordion sections **default collapsed** (chevron down), matchi
 | Topic | Detail |
 | --- | --- |
 | Vercel Root Directory | Must be `apps/web` so Next.js is detected |
-| Install on Vercel | Prefer `npm ci` in `apps/web` (avoids pnpm `ERR_INVALID_THIS` on some builders) |
+| Install on Vercel | Automatic `pnpm install` across workspace (pnpm monorepo with `workspace:*` dependencies) |
 | Node | `engines.node: 22.x` in package.json; `.nvmrc` = 22 |
 | GitHub Actions | Do not push `.github/workflows/*` with Cursor OAuth (needs `workflow` scope) |
 | Commit email | Must match a verified GitHub email or Vercel blocks private-repo deploys |
@@ -186,7 +245,7 @@ Dashboard filter accordion sections **default collapsed** (chevron down), matchi
 
 ## Related specs
 
-- [ui-overview.md](./ui-overview.md) — route map
-- [ui-dashboard.md](./ui-dashboard.md) — Home, Discover, notifications, plans
-- [ui-profile-view.md](./ui-profile-view.md) — other-member profile
-- [ui-public-auth.md](./ui-public-auth.md) — register siblings
+- [ui-overview.md](./ui-overview.md)  route map
+- [ui-dashboard.md](./ui-dashboard.md)  Home, Discover, notifications, plans
+- [ui-profile-view.md](./ui-profile-view.md)  other-member profile
+- [ui-public-auth.md](./ui-public-auth.md)  register siblings

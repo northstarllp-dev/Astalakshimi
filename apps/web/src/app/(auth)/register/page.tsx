@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, ChevronRight } from "lucide-react"
+import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react"
+import { apiClient } from "@/lib/api-client"
 import {
   emptySignupData,
   formatSiblings,
@@ -71,16 +72,28 @@ function SignupPageInner() {
     if (step > 1) setStep((prev) => prev - 1)
   }
 
-  const finishVerification = () => {
+  const finishVerification = async (enteredOtp?: string) => {
+    const otpToUse = enteredOtp || data.otp || '123456'
+    
+    // First verify OTP and get token
+    try {
+      const auth = await apiClient.auth.verifyOtp({ phone: data.phone, otp: otpToUse })
+      if (auth.accessToken) {
+        apiClient.setToken(auth.accessToken)
+      }
+    } catch (err: any) {
+      throw new Error(err.message || "Invalid OTP. Please check and try again.")
+    }
+
     const payload: SignupData = {
       ...data,
+      otp: otpToUse,
       siblings: formatSiblings(data.brothersCount, data.sistersCount),
       verificationStatus: "pending",
       submittedAt: new Date().toISOString(),
     }
-    saveProfileMutation.mutate(payload, {
-      onSuccess: () => setSubmitted(true),
-    })
+    await saveProfileMutation.mutateAsync(payload)
+    setSubmitted(true)
   }
 
   return (
@@ -135,7 +148,12 @@ function SignupPageInner() {
                   <Step4Verify data={data} updateData={updateData} onNext={nextStep} />
                 )}
                 {step === 5 && (
-                  <Step5OTP data={data} updateData={updateData} onSubmit={finishVerification} />
+                  <Step5OTP
+                    data={data}
+                    updateData={updateData}
+                    onSubmit={finishVerification}
+                    isSubmitting={saveProfileMutation.isPending}
+                  />
                 )}
               </>
             )}
@@ -171,6 +189,7 @@ function Step1AccountCreation({
   updateData: (fields: Partial<SignupData>) => void
   nextStep: () => void
 }) {
+  const [loading, setLoading] = useState(false)
   const form = useForm({
     resolver: zodResolver(signupStep1Schema),
     defaultValues: { profileFor: data.profileFor, phone: data.phone, terms: false },
@@ -187,17 +206,36 @@ function Step1AccountCreation({
     { id: "Relative", icon: "👥" },
   ]
 
+  const router = useRouter()
+  const onStep1Submit = async (values: any) => {
+    setLoading(true)
+    updateData({ profileFor: values.profileFor, phone: values.phone })
+    try {
+      const res = await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true, type: "register" })
+      if (res.mockOtp) {
+        updateData({ otp: res.mockOtp })
+      }
+      nextStep()
+    } catch (err: any) {
+      console.warn("sendOtp error:", err)
+      if (err.message && err.message.toLowerCase().includes("already registered")) {
+        router.push("/login")
+      } else {
+        form.setError("phone", { message: err.message || "Failed to send OTP. Please try again." })
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <form
       className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8"
-      onSubmit={form.handleSubmit((values) => {
-        updateData({ profileFor: values.profileFor, phone: values.phone })
-        nextStep()
-      })}
+      onSubmit={form.handleSubmit(onStep1Submit)}
     >
       <StepHeading
         title="Create your account"
-        subtitle="Who is this profile for? Enter your mobile — we'll send an OTP after you've set up the profile."
+        subtitle="Who is this profile for? Enter your mobile  we'll send an OTP after you've set up the profile."
       />
 
       {/* Profile for */}
@@ -226,20 +264,20 @@ function Step1AccountCreation({
       </div>
 
       {/* Mobile */}
-      <div className="space-y-2">
-        <Label htmlFor="phone">Mobile number</Label>
-        <div className="flex">
-          <span className="inline-flex items-center rounded-l-xl border border-r-0 border-input bg-muted px-4 text-sm text-muted-foreground">
-            +91
-          </span>
-          <Input
-            id="phone"
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel"
-            placeholder="98765 43210"
-            className="rounded-l-none text-lg"
-            maxLength={10}
+          <div className="space-y-2">
+            <Label htmlFor="phone">Mobile number</Label>
+            <div className="flex">
+              <span className="inline-flex items-center rounded-l-xl border border-r-0 border-input bg-muted px-4 text-sm text-muted-foreground">
+                +91
+              </span>
+              <Input
+                id="phone"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="98765 43210"
+                className="rounded-l-none text-lg"
+                maxLength={10}
             {...form.register("phone", {
               onChange: (event) => {
                 const next = event.target.value.replace(/\D/g, "")
@@ -247,34 +285,42 @@ function Step1AccountCreation({
                 updateData({ phone: next })
               },
             })}
-          />
-        </div>
+              />
+            </div>
         {form.formState.errors.phone && (
           <p className="text-xs text-destructive">{form.formState.errors.phone.message}</p>
         )}
-      </div>
+          </div>
 
       {/* Consent */}
       <label className="flex items-start gap-3 text-xs leading-relaxed text-muted-foreground cursor-pointer">
         <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" {...form.register("terms")} />
         By continuing, you agree to our Terms of Service and Privacy Policy. Profiles are screened
         before they go live.
-      </label>
+          </label>
       {form.formState.errors.terms && (
         <p className="text-xs text-destructive">{form.formState.errors.terms.message}</p>
       )}
 
       <div className="mt-auto space-y-4 pt-4">
-        <Button className="w-full" size="lg" type="submit">
-          Continue <ChevronRight className="ml-1 h-5 w-5" />
-        </Button>
-        <p className="text-center text-sm text-muted-foreground">
-          Already a member?{" "}
-          <Link href="/login" className="font-semibold text-primary">
-            Login
-          </Link>
-        </p>
-      </div>
+        <Button className="w-full" size="lg" type="submit" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Continuing…
+            </>
+          ) : (
+            <>
+              Continue <ChevronRight className="ml-1 h-5 w-5" />
+            </>
+          )}
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Already a member?{" "}
+              <Link href="/login" className="font-semibold text-primary">
+                Login
+              </Link>
+            </p>
+          </div>
     </form>
   )
 }
@@ -406,45 +452,45 @@ function Step2Identity({
 
       <div className="space-y-5">
         {/* Name */}
-        <div className="space-y-2">
+          <div className="space-y-2">
           <Label htmlFor="fullName">{p}Full name</Label>
-          <Input
-            id="fullName"
-            placeholder="e.g. Priya Sharma"
-            autoComplete="name"
-            value={data.fullName}
-            onChange={(e) => updateData({ fullName: e.target.value })}
-          />
+            <Input
+              id="fullName"
+              placeholder="e.g. Priya Sharma"
+              autoComplete="name"
+              value={data.fullName}
+              onChange={(e) => updateData({ fullName: e.target.value })}
+            />
           {errors.fullName && (
             <p className="text-xs text-destructive">{errors.fullName.message}</p>
-          )}
-        </div>
+            )}
+          </div>
 
         {/* Gender */}
-        <div className="space-y-2">
+          <div className="space-y-2">
           <Label>Gender</Label>
-          <div className="grid grid-cols-3 gap-2.5">
-            {["Male", "Female", "Other"].map((g) => (
-              <TapCard key={g} selected={data.gender === g} onClick={() => updateData({ gender: g })} title={g} />
-            ))}
+            <div className="grid grid-cols-3 gap-2.5">
+              {["Male", "Female", "Other"].map((g) => (
+                <TapCard key={g} selected={data.gender === g} onClick={() => updateData({ gender: g })} title={g} />
+              ))}
+            </div>
           </div>
-        </div>
 
         {/* DOB */}
-        <div className="space-y-2">
+          <div className="space-y-2">
           <Label>{p}Date of birth</Label>
-          <DobFields
-            day={data.dobDay}
-            month={data.dobMonth}
-            year={data.dobYear}
-            onChange={updateData}
-          />
+            <DobFields
+              day={data.dobDay}
+              month={data.dobMonth}
+              year={data.dobYear}
+              onChange={updateData}
+            />
           {errors.dobYear && <p className="text-xs text-destructive">{errors.dobYear.message}</p>}
           {errors.gender && <p className="text-xs text-destructive">{errors.gender.message}</p>}
-        </div>
+          </div>
 
         {/* Marital status */}
-        <div className="space-y-2">
+          <div className="space-y-2">
           <Label>{p}Marital status</Label>
           <Select
             value={data.maritalStatus || undefined}
@@ -461,7 +507,7 @@ function Step2Identity({
               ))}
             </SelectContent>
           </Select>
-        </div>
+          </div>
 
         {/* Location */}
         <div className="space-y-2">
@@ -578,12 +624,12 @@ function Step3Community({
           <div>
             <p className="text-sm font-semibold text-foreground">Family details</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Brothers, sisters, and family background — used by families to assess compatibility.
+              Brothers, sisters, and family background  used by families to assess compatibility.
             </p>
-          </div>
+    </div>
 
           {/* Family type */}
-          <div className="space-y-2">
+        <div className="space-y-2">
             <Label htmlFor="familyType">{p}Family type</Label>
             <Select
               value={data.familyType || undefined}
@@ -600,10 +646,10 @@ function Step3Community({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+        </div>
 
           {/* Family status */}
-          <div className="space-y-2">
+        <div className="space-y-2">
             <Label htmlFor="familyStatus">{p}Family status</Label>
             <Select
               value={data.familyStatus || undefined}
@@ -613,17 +659,17 @@ function Step3Community({
                 <SelectValue placeholder="Select family status" />
               </SelectTrigger>
               <SelectContent>
-                {FAMILY_STATUS.map((s) => (
+                {FAMILY_STATUS.map((s: any) => (
                   <SelectItem key={s} value={s}>
                     {s}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
+        </div>
 
           {/* Siblings */}
-          <div className="space-y-2">
+            <div className="space-y-2">
             <p className="text-sm font-medium text-foreground">Siblings</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -636,14 +682,14 @@ function Step3Community({
                     <SelectValue placeholder="Brothers" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SIBLING_COUNTS.map((n) => (
+                    {SIBLING_COUNTS.map((n: any) => (
                       <SelectItem key={n} value={String(n)}>
                         {n === 5 ? "5+" : String(n)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+            </div>
               <div className="space-y-1.5">
                 <Label htmlFor="sisters">{p}Sisters</Label>
                 <Select
@@ -654,7 +700,7 @@ function Step3Community({
                     <SelectValue placeholder="Sisters" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SIBLING_COUNTS.map((n) => (
+                    {SIBLING_COUNTS.map((n: any) => (
                       <SelectItem key={n} value={String(n)}>
                         {n === 5 ? "5+" : String(n)}
                       </SelectItem>
@@ -683,34 +729,66 @@ function Step5OTP({
   data,
   updateData,
   onSubmit,
+  isSubmitting,
 }: {
   data: SignupData
   updateData: (fields: Partial<SignupData>) => void
-  onSubmit: () => void
+  onSubmit: (otp?: string) => Promise<void> | void
+  isSubmitting?: boolean
 }) {
   const form = useForm({
     resolver: zodResolver(signupStep5Schema),
-    values: { otp: data.otp },
+    values: { otp: data.otp || "" },
     mode: "onChange",
   })
   const [seconds, setSeconds] = useState(30)
   const [otpSent, setOtpSent] = useState(true)
+  const [error, setError] = useState("")
 
   React.useEffect(() => {
     if (!otpSent || seconds <= 0) return
-    const id = window.setInterval(() => setSeconds((s) => s - 1), 1000)
+    const id = window.setInterval(() => {
+      setSeconds((s: any) => {
+        if (s <= 1) {
+          window.clearInterval(id)
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
     return () => window.clearInterval(id)
-  }, [otpSent, seconds])
+  }, [otpSent])
 
-  const resend = () => {
-    setSeconds(30)
-    setOtpSent(true)
+  const resend = async () => {
+    setError("")
+    try {
+      const res = await apiClient.auth.sendOtp({ phone: data.phone, consentAccepted: true, type: "register" })
+      setSeconds(30)
+      setOtpSent(true)
+      if (res.mockOtp) {
+        form.setValue("otp", res.mockOtp)
+      } else {
+        form.setValue("otp", "")
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to resend OTP.")
+    }
+  }
+
+  const handleVerifySubmit = async (values: { otp: string }) => {
+    setError("")
+    updateData({ otp: values.otp })
+    try {
+      await onSubmit(values.otp)
+    } catch (err: any) {
+      setError(err.message || "Failed to verify OTP or save profile. Please check and try again.")
+    }
   }
 
   return (
     <form
       className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8"
-      onSubmit={form.handleSubmit(() => onSubmit())}
+      onSubmit={form.handleSubmit(handleVerifySubmit)}
     >
       <StepHeading
         title="OTP verification"
@@ -722,10 +800,10 @@ function Step5OTP({
           <Label htmlFor="otp" className="sr-only">
             OTP
           </Label>
-          <Input
+            <Input
             id="otp"
             type="text"
-            inputMode="numeric"
+              inputMode="numeric"
             autoComplete="one-time-code"
             placeholder="••••••"
             className="h-14 text-center text-2xl tracking-[0.6em]"
@@ -741,8 +819,11 @@ function Step5OTP({
           {form.formState.errors.otp && (
             <p className="text-xs text-destructive">{form.formState.errors.otp.message}</p>
           )}
-          <button
-            type="button"
+          {error && (
+            <p className="text-xs text-destructive">{error}</p>
+          )}
+                <button
+                  type="button"
             disabled={seconds > 0}
             className="text-xs font-medium text-primary disabled:text-muted-foreground"
             onClick={resend}
@@ -750,7 +831,7 @@ function Step5OTP({
             {seconds > 0
               ? `Resend OTP in 00:${String(seconds).padStart(2, "0")}`
               : "Resend OTP"}
-          </button>
+                </button>
         </div>
 
         <p className="rounded-xl bg-muted/60 px-4 py-3 text-center text-xs text-muted-foreground">
@@ -760,10 +841,16 @@ function Step5OTP({
       </div>
 
       <div className="mt-auto pt-4">
-        <Button className="w-full" size="lg" type="submit">
-          Verify &amp; create profile
-        </Button>
-      </div>
+        <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Creating profile…
+            </>
+          ) : (
+            "Verify & create profile"
+          )}
+      </Button>
+    </div>
     </form>
   )
 }

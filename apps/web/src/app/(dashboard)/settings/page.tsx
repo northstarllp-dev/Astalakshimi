@@ -13,10 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { type UserSettings } from "@/lib/user-activity"
 import { usePaidQuery, useProfileQuery, useSaveSettingsMutation, useSettingsQuery } from "@/hooks/queries"
 import { ArrowLeft, Lock, LogOut, MapPin, UserX, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+type UserSettings = any;
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -82,7 +83,7 @@ export default function SettingsPage() {
             ))}
           </div>
           {settings.profileVisibility === "hidden" && (
-            <p className="text-xs text-amber-600">Your profile is paused — it won't appear in any search results.</p>
+            <p className="text-xs text-amber-600">Your profile is paused  it won't appear in any search results.</p>
           )}
         </div>
       </section>
@@ -112,7 +113,7 @@ export default function SettingsPage() {
           {!paid && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
         </div>
         {!paid && (
-          <p className="text-xs text-muted-foreground">Premium feature — enter a profile ID to hide your profile from that person.</p>
+          <p className="text-xs text-muted-foreground">Premium feature  enter a profile ID to hide your profile from that person.</p>
         )}
         {paid ? (
           <div className="space-y-3">
@@ -139,12 +140,12 @@ export default function SettingsPage() {
             </div>
             {settings.hideFromUsers.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {settings.hideFromUsers.map((id) => (
+                {settings.hideFromUsers.map((id: any) => (
                   <span key={id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
                     {id}
                     <button
                       type="button"
-                      onClick={() => update({ hideFromUsers: settings.hideFromUsers.filter((u) => u !== id) })}
+                      onClick={() => update({ hideFromUsers: settings.hideFromUsers.filter((u: any) => u !== id) })}
                       className="text-muted-foreground hover:text-destructive"
                       aria-label={`Remove ${id}`}
                     >
@@ -170,7 +171,7 @@ export default function SettingsPage() {
           {!paid && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
         </div>
         {!paid && (
-          <p className="text-xs text-muted-foreground">Premium feature — hide your profile from members in a specific city.</p>
+          <p className="text-xs text-muted-foreground">Premium feature  hide your profile from members in a specific city.</p>
         )}
         {paid ? (
           <div className="space-y-3">
@@ -197,12 +198,12 @@ export default function SettingsPage() {
             </div>
             {settings.hideFromCities.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {settings.hideFromCities.map((city) => (
+                {settings.hideFromCities.map((city: any) => (
                   <span key={city} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
                     {city}
                     <button
                       type="button"
-                      onClick={() => update({ hideFromCities: settings.hideFromCities.filter((c) => c !== city) })}
+                      onClick={() => update({ hideFromCities: settings.hideFromCities.filter((c: any) => c !== city) })}
                       className="text-muted-foreground hover:text-destructive"
                       aria-label={`Remove ${city}`}
                     >
@@ -240,16 +241,28 @@ export default function SettingsPage() {
       </section>
 
       {/* Account */}
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h2 className="font-serif text-lg font-bold">Account</h2>
-        <p className="mt-3 text-sm text-muted-foreground">Phone</p>
-        <p className="font-medium">{phone ? `+91 ${phone}` : "Not set"}</p>
+        <div>
+          <p className="text-sm text-muted-foreground">Phone</p>
+          <p className="font-medium mb-4">{phone ? `+91 ${phone}` : "Not set"}</p>
+          <Toggle label="Hide my phone number" hint="Don't show my phone number to other users" checked={settings.hidePhone} onChange={(v) => update({ hidePhone: v })} />
+        </div>
         <Button
           variant="outline"
-          className="mt-4"
-          onClick={() => {
+          className="w-full"
+          onClick={async () => {
             sessionStorage.clear()
-            router.push("/login")
+            localStorage.clear()
+            
+            // Clear backend cookies
+            try {
+              const { apiClient } = await import("@/lib/api-client")
+              await apiClient.auth.logout()
+            } catch (err) {}
+
+            // Hard reload to destroy React Query cache and application state
+            window.location.href = "/login"
           }}
         >
           <LogOut className="mr-2 h-4 w-4" /> Log out (demo)

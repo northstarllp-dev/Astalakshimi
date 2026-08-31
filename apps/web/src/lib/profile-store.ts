@@ -1,9 +1,15 @@
 export type VerificationMethod = "selfie" | "govt_id" | ""
-export type VerificationStatus = "idle" | "pending" | "verified"
+export type VerificationStatus = "idle" | "pending" | "verified" | "rejected"
+
+export const DEMO_REJECTION_REASON = "Selfie does not match profile photos."
 
 export type SignupData = {
+  id?: string
   phone: string
+
   otp: string
+  consentAccepted: boolean
+  referredBy?: string
   profileFor: string
   fullName: string
   gender: string
@@ -16,6 +22,9 @@ export type SignupData = {
   diet: string
   disability: string
   maritalStatus: string
+  hasChildren?: boolean
+  childrenCount?: number
+  childrenLivingWithMe?: boolean
   religion: string
   caste: string
   subcaste: string
@@ -25,12 +34,19 @@ export type SignupData = {
   manglik: string
   motherTongue: string
   education: string
+  educationLevel?: string
   educationStream: string
   otherEducation: string
+  degree?: string
+  collegeName?: string
   occupation: string
+  employmentStatus?: string
+  profession?: string
   otherOccupation: string
   companyName: string
+  companySector?: string
   annualIncome: string
+  familyValues?: string
   familyType: string
   familyStatus: string
   fatherOccupation: string
@@ -44,18 +60,31 @@ export type SignupData = {
   aboutMe: string
   prefAgeMin: number
   prefAgeMax: number
+  prefHeightMinCm?: number
+  prefHeightMaxCm?: number
   prefReligion: string[]
+  prefCastes?: string[]
+  prefMotherTongues?: string[]
+  prefMinEducation?: string
+  prefAcceptableIncomes?: string[]
+  prefLocations?: string[]
   photos: string[]
+  photoS3Keys: string[]
+  photoObjects?: any[]
   photoPrivacy: string
   verificationMethod: VerificationMethod
   selfiePhoto: string
+  selfieS3Key?: string
   govtIdType: string
   govtIdPhoto: string
+  govtIdS3Key?: string
   horoscopeName: string
   horoscopeSize: number
+  horoscopeS3Key?: string
   birthTime: string
   birthPlace: string
   verificationStatus: VerificationStatus
+  rejectionReason?: string
   submittedAt: string
 }
 
@@ -64,58 +93,82 @@ export const PROFILE_STORAGE_KEY = "astalakshimi.profile"
 export const emptySignupData = (): SignupData => ({
   phone: "",
   otp: "",
+  consentAccepted: true,
+  referredBy: "",
   profileFor: "",
   fullName: "",
   gender: "",
   dobDay: "",
   dobMonth: "",
   dobYear: "",
-  height: "",
+  height: "165",
   weight: "",
   complexion: "",
-  diet: "",
+  diet: "Vegetarian",
   disability: "",
-  maritalStatus: "",
-  religion: "",
+  maritalStatus: "Never Married",
+  hasChildren: false,
+  childrenCount: 0,
+  childrenLivingWithMe: false,
+  religion: "Hindu",
   caste: "",
   subcaste: "",
   gotra: "",
   star: "",
   rashi: "",
-  manglik: "",
+  manglik: "Don't Know",
   motherTongue: "",
   education: "",
+  educationLevel: "Bachelors",
   educationStream: "",
   otherEducation: "",
+  degree: "",
+  collegeName: "",
   occupation: "",
+  employmentStatus: "Employed",
+  profession: "",
   otherOccupation: "",
   companyName: "",
-  annualIncome: "",
-  familyType: "",
-  familyStatus: "",
-  fatherOccupation: "",
-  motherOccupation: "",
+  companySector: "Private",
+  annualIncome: "₹10 – 15 Lakh",
+  familyValues: "Moderate",
+  familyType: "Nuclear",
+  familyStatus: "Middle class",
+  fatherOccupation: "Employed",
+  motherOccupation: "Homemaker",
   brothersCount: 0,
   sistersCount: 0,
   siblings: "",
   city: "",
-  state: "",
-  willingToRelocate: "",
+  state: "Tamil Nadu",
+  willingToRelocate: "Yes",
   aboutMe: "",
   prefAgeMin: 24,
-  prefAgeMax: 34,
+  prefAgeMax: 32,
+  prefHeightMinCm: 140,
+  prefHeightMaxCm: 200,
   prefReligion: ["Hindu"],
+  prefCastes: [],
+  prefMotherTongues: [],
+  prefMinEducation: "Bachelors",
+  prefAcceptableIncomes: [],
+  prefLocations: [],
   photos: [],
+  photoS3Keys: [],
   photoPrivacy: "blurred",
   verificationMethod: "",
   selfiePhoto: "",
+  selfieS3Key: "",
   govtIdType: "",
   govtIdPhoto: "",
+  govtIdS3Key: "",
   horoscopeName: "",
   horoscopeSize: 0,
+  horoscopeS3Key: "",
   birthTime: "",
   birthPlace: "",
   verificationStatus: "idle",
+  rejectionReason: undefined,
   submittedAt: "",
 })
 
@@ -142,7 +195,22 @@ export function getPrefix(profileFor: string) {
 
 export function saveProfile(data: SignupData) {
   if (typeof window === "undefined") return
-  sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(data))
+  try {
+    sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(data))
+  } catch (err) {
+    console.warn("Storage quota limit reached, saving sanitized lightweight profile:", err)
+    try {
+      const lightweight = {
+        ...data,
+        photos: data.photos.map((p) => p.startsWith("data:") ? "" : p),
+        selfiePhoto: data.selfiePhoto?.startsWith("data:") ? "" : data.selfiePhoto,
+        govtIdPhoto: data.govtIdPhoto?.startsWith("data:") ? "" : data.govtIdPhoto,
+      }
+      sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(lightweight))
+    } catch {
+      // Non-critical cache fallback
+    }
+  }
 }
 
 export function loadProfile(): SignupData | null {
@@ -215,6 +283,16 @@ export const STARS = [
   "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati",
 ]
 export const RASHIS = [
-  "Mesha", "Vrishabha", "Mithuna", "Karka", "Simha", "Kanya",
-  "Tula", "Vrishchika", "Dhanu", "Makara", "Kumbha", "Meena",
-]
+  { value: "Mesha", label: "Aries (Mesha)" },
+  { value: "Vrishabha", label: "Taurus (Vrishabha)" },
+  { value: "Mithuna", label: "Gemini (Mithuna)" },
+  { value: "Karka", label: "Cancer (Karka)" },
+  { value: "Simha", label: "Leo (Simha)" },
+  { value: "Kanya", label: "Virgo (Kanya)" },
+  { value: "Tula", label: "Libra (Tula)" },
+  { value: "Vrishchika", label: "Scorpio (Vrishchika)" },
+  { value: "Dhanu", label: "Sagittarius (Dhanu)" },
+  { value: "Makara", label: "Capricorn (Makara)" },
+  { value: "Kumbha", label: "Aquarius (Kumbha)" },
+  { value: "Meena", label: "Pisces (Meena)" },
+] as const

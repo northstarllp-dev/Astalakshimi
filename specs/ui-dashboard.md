@@ -11,16 +11,20 @@ See also the full change log: [ui-changes.md](./ui-changes.md).
 
 Post-signup landing (nav label **Home**). Always visible.
 
-Logic: [`lib/portal-access.ts`](../apps/web/src/lib/portal-access.ts). Completeness is weighted so signup-only profiles sit near **25%**.
+Logic: [`lib/portal-access.ts`](../apps/web/src/lib/portal-access.ts) and [`lib/profile-completeness.ts`](../apps/web/src/lib/profile-completeness.ts). Completeness is **filled details / 40 total details**. Short signup fills about 10 of those (~25%). Form defaults (height 165, diet Vegetarian, etc.) do not count until the member sets them.
 
 | Block | Behaviour |
 | --- | --- |
 | Completeness | Ring + missing steps until unlocked |
-| Verification | Pending review copy; demo approve marks verified |
-| Top matches | 4 portrait thumbnails (name + photo + match %) — [`MatchThumbCard`](../apps/web/src/components/dashboard/match-thumb-card.tsx) |
+| Verification | **verified** · **pending** (amber banner + demo Approve/Reject) · **rejected** (red banner + reason + Re-upload → `/profile/verify`) |
+| Top matches | Sample bride/groom rows; completeness gate for “see more” |
 | Activity | Who viewed you, you viewed, interests received, shortlisted you (locked overlays until unlock; viewers/shortlist also paid) |
 
-**Unlock Discover + Interests:** verified **and** completeness ≥ 80%. Until then those tabs stay visible and show [`CompleteProfileGate`](../apps/web/src/components/layout/complete-profile-gate.tsx) via [`RequireFullPortal`](../apps/web/src/components/layout/require-full-portal.tsx).
+**Unlock Discover + Interests:** verified **and** completeness ≥ 80%. Until then those tabs stay visible and show [`CompleteProfileGate`](../apps/web/src/components/layout/complete-profile-gate.tsx) via [`RequireFullPortal`](../apps/web/src/components/layout/require-full-portal.tsx). Rejected members stay locked from Discover until they resubmit and are approved.
+
+### Verification retry
+
+Route: [`/profile/verify`](../apps/web/src/app/(dashboard)/profile/verify/page.tsx) — reuses signup verify step. Submit sets `verificationStatus: pending` and clears `rejectionReason`.
 
 ## Discover `/dashboard`
 
@@ -30,13 +34,13 @@ Primary search & browse (nav label **Discover**). Always in the nav. Incomplete 
 
 - Age min/max dual sliders, city select, community select
 - Results apply **instantly** (no Search button)
-- **My preferences** — applies partner prefs from signup
+- **My preferences**  applies partner prefs from signup
 - **Clear all** resets to defaults
 
 ### Paid search
 
-- **More filters** — height, education, income, occupation, diet, smoking, drinking, Manglik, star, relocate
-- **Save search** — label + reapply dropdown (`astalakshimi.savedSearches`)
+- **More filters**  height, education, income, occupation, diet, smoking, drinking, Manglik, star, relocate
+- **Save search**  label + reapply dropdown (`astalakshimi.savedSearches`)
 - Free users get an upgrade banner → `/plans`
 
 ### Browse tabs
@@ -87,7 +91,7 @@ In-app notification centre (Section 6). Bell in header shows unread count.
 | Filters | All / Interests / Messages / Profile / Account |
 | Mark all read | Clears unread |
 | Clear all | Confirm, then wipe `astalakshimi.notifications` |
-| Deep links | Always present — profile, chat, Discover, plans, edit, register |
+| Deep links | Always present  profile, chat, Discover, plans, edit, register |
 | Paid blur | Profile viewed / shortlisted → lock + `/plans` for free |
 
 Seeded kinds: interest received/accepted, new match digest, profile viewed, shortlisted, incomplete nudge, plan expiry, verification reminder.

@@ -67,6 +67,7 @@ export default function LandingPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <SiteHeader />
+      <HeroFreeSearchCountdown />
 
       {/* ── Hero ── */}
       <section className="relative overflow-hidden">
@@ -101,7 +102,7 @@ export default function LandingPage() {
               <div className="h-px w-10 bg-gradient-to-r from-secondary/60 to-transparent" />
             </div>
 
-            {/* Headline overlaid — moved up */}
+            {/* Headline overlaid  moved up */}
             <div className="absolute bottom-0 inset-x-0 px-5 pb-14 space-y-0">
               <h1
                 className="text-[2.35rem] font-bold leading-[1.12] tracking-tight text-white drop-shadow-xl"
@@ -113,7 +114,6 @@ export default function LandingPage() {
               <p className="text-sm text-white/75 leading-relaxed">
                 Every community. Every mother tongue. Trusted by families nationwide.
               </p>
-              <HeroFreeSearchCountdown compact />
             </div>
           </div>
 
@@ -167,15 +167,6 @@ export default function LandingPage() {
               <p className="text-base leading-relaxed text-white/80 drop-shadow max-w-md">
                 Pan-India matchmaking for every community and mother tongue  with verified photos and screened profiles.
               </p>
-
-              <HeroFreeSearchCountdown className="max-w-md" />
-
-              {/* Bottom gold rule */}
-              <div className="flex items-center gap-3">
-                <div className="h-px w-16 bg-gradient-to-r from-secondary/60 to-secondary/20" />
-                <span className="text-secondary/50 text-xs tracking-[0.4em] uppercase font-semibold">Astalakshimi</span>
-                <div className="h-px flex-1 bg-gradient-to-r from-secondary/20 to-transparent" />
-              </div>
             </div>
 
             {/* Right: Register card */}
@@ -238,7 +229,7 @@ export default function LandingPage() {
                 { icon: BriefcaseBusiness, label: "Portal for brokers" },
                 { icon: Gift, label: "Referral system" },
                 { icon: IndianRupee, label: "Lower subscription cost" },
-              ].map((item) => (
+              ].map((item: any) => (
                 <li key={item.label} className="flex flex-col items-center gap-2 text-center sm:items-start sm:text-left">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-primary sm:h-12 sm:w-12">
                     <item.icon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -252,7 +243,7 @@ export default function LandingPage() {
 
             <p className="mt-5 max-w-md rounded-xl border border-secondary/30 bg-secondary/10 px-3 py-2 text-xs leading-relaxed text-foreground/80">
               Why pay premium rates on big portals? Astalakshimi memberships start from{" "}
-              <span className="font-semibold text-primary">₹300</span> — with a free 3-month window from{" "}
+              <span className="font-semibold text-primary">₹300</span>  with a free 3-month window from{" "}
               <span className="font-semibold">14 Sep 2026</span>.
             </p>
 
@@ -310,7 +301,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Cards — always one row; scroll on smaller screens */}
+          {/* Cards  always one row; scroll on smaller screens */}
           <div className="-mx-4 overflow-x-auto px-4 pb-3 hide-scrollbar lg:mx-0 lg:overflow-visible lg:px-0">
           <div className="flex min-w-max flex-nowrap items-end gap-4 lg:min-w-0 lg:grid lg:grid-cols-5">
             {MEMBERSHIP_PLANS.map((plan) => {
@@ -482,7 +473,7 @@ export default function LandingPage() {
                 title: "Control over privacy",
                 body: "Hide contact details, blur photos, and decide who can connect  just like the platforms you trust.",
               },
-            ].map((item) => (
+            ].map((item: any) => (
               <article key={item.title} className="royal-card p-7">
                 <div className="mb-5 flex h-13 w-13 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 text-primary border border-secondary/20">
                   <item.icon className="h-6 w-6" />
@@ -588,7 +579,7 @@ export default function LandingPage() {
               Browse by mother tongue, caste, city and profession. Horoscope matching is optional. Your photos stay private until they are verified.
             </p>
             <div className="flex flex-wrap gap-2">
-              {communities.map((c) => (
+              {communities.map((c: any) => (
                 <span key={c} className="rounded-full border border-secondary/25 bg-muted px-3 py-1 text-xs font-medium text-foreground/80">
                   {c}
                 </span>

@@ -1,27 +1,14 @@
 "use client"
 
+import { useRouter } from "next/navigation"
+import { Badge } from "@/components/ui/badge"
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { getPlanById, MEMBERSHIP_PLANS, PLAN_FEATURE_MATRIX, CURRENT_PLAN_ID, featureCell, computeAddonPrice, DURATION_ADDONS, PLAN_IDS, type PlanId } from "@/lib/plans"
 import { PlanCompare } from "@/components/plans/plan-compare"
-import { useInvoicesQuery, useProfileQuery, useSubscriptionQuery } from "@/hooks/queries"
-import {
-  MEMBERSHIP_PLANS,
-  PLAN_FEATURE_MATRIX,
-  RENEWAL_WINDOW_DAYS,
-  daysRemaining,
-  featureCell,
-  formatExpiry,
-  getOrCreateReferralCode,
-  getPlanById,
-  getReferralLink,
-  shouldShowRenewal,
-  type InvoiceRecord,
-  type PlanId,
-} from "@/lib/plans"
 import { planSelectSchema } from "@/lib/validation"
+import { useProfileQuery, useSubscriptionQuery, useInvoicesQuery } from "@/hooks/queries"
 import {
   Check,
   Copy,
@@ -36,6 +23,46 @@ import {
 } from "lucide-react"
 
 const TIER_ORDER: PlanId[] = ["free", "silver", "gold", "platinum", "diamond"]
+const RENEWAL_WINDOW_DAYS = 7
+type InvoiceRecord = any
+const daysRemaining = (date: any) => {
+  if (!date) return 0
+  const diff = new Date(date).getTime() - Date.now()
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+}
+
+const formatExpiry = (date: any) => {
+  if (!date) return ""
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+const getOrCreateReferralCode = (name?: string) => {
+  const clean = (name || "member").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()
+  return `ASTA-${clean || "MEMBER"}-2026`
+}
+
+const getReferralLink = (code: any) => {
+  if (typeof window === "undefined") return `https://astalakshimi.com/register?ref=${code}`
+  return `${window.location.origin}/register?ref=${code}`
+}
+
+const shouldShowRenewal = (date: any) => {
+  if (!date) return false
+  const days = daysRemaining(date)
+  return days > 0 && days <= RENEWAL_WINDOW_DAYS
+}
+
+
+
+const getNextBetterPlan = (planId: PlanId): PlanId => {
+  const idx = TIER_ORDER.indexOf(planId)
+  if (idx === -1 || idx >= TIER_ORDER.length - 1) return "diamond"
+  return TIER_ORDER[idx + 1]
+}
 
 export default function PlansPage() {
   const router = useRouter()
@@ -45,8 +72,14 @@ export default function PlansPage() {
   const [referralCode, setReferralCode] = React.useState("")
   const [referralLink, setReferralLink] = React.useState("")
   const [copied, setCopied] = React.useState(false)
-  const [selectedCompare, setSelectedCompare] = React.useState<PlanId>("gold")
-  const didInitSelection = React.useRef(false)
+
+  const currentPlanId: PlanId = React.useMemo(() => {
+    if (!sub) return "free"
+    const raw = (sub.planSlug || sub.planId || sub.plan?.slug || "free").toString().toLowerCase().trim()
+    return TIER_ORDER.includes(raw as PlanId) ? (raw as PlanId) : "free"
+  }, [sub])
+
+  const [selectedCompare, setSelectedCompare] = React.useState<PlanId>("silver")
 
   React.useEffect(() => {
     const code = getOrCreateReferralCode(profile?.fullName || profile?.phone || "member")
@@ -55,19 +88,22 @@ export default function PlansPage() {
   }, [profile])
 
   React.useEffect(() => {
-    if (!sub || didInitSelection.current) return
-    didInitSelection.current = true
-    if (sub.planId === "diamond") return
-    const next = TIER_ORDER[Math.min(TIER_ORDER.indexOf(sub.planId) + 1, TIER_ORDER.length - 1)]
-    setSelectedCompare(next === "free" ? "silver" : next)
-  }, [sub])
+    const nextBetter = getNextBetterPlan(currentPlanId)
+    const currIdx = TIER_ORDER.indexOf(currentPlanId)
+    const selIdx = TIER_ORDER.indexOf(selectedCompare)
 
-  const current = sub ? getPlanById(sub.planId) : getPlanById("free")
+    // When active plan changes or if current selection is <= active plan,
+    // automatically select the next higher plan!
+    if (selIdx <= currIdx) {
+      setSelectedCompare(nextBetter)
+    }
+  }, [currentPlanId])
+
+  const current = getPlanById(currentPlanId)
   const remaining = sub ? daysRemaining(sub.expiresAt) : 0
   const showRenewal = sub ? shouldShowRenewal(sub.expiresAt) : false
   const previewPlan = getPlanById(selectedCompare)
   const unlockedLabels = current?.features ?? []
-  const currentPlanId = sub?.planId ?? "free"
 
   const choosePlan = (planId: PlanId) => {
     const parsed = planSelectSchema.safeParse({ planId })
@@ -90,7 +126,7 @@ export default function PlansPage() {
       try {
         await navigator.share({
           title: "Astalakshimi Matrimony",
-          text: "Join Astalakshimi — use my link and we both benefit. You get started free; I get 1 month Silver.",
+          text: "Join Astalakshimi  use my link and we both benefit. You get started free; I get 1 month Silver.",
           url: referralLink,
         })
         return
@@ -136,7 +172,7 @@ export default function PlansPage() {
                     ? current.period
                     : sub
                       ? formatExpiry(sub.expiresAt)
-                      : "—"
+                      : ""
                 }
               />
               <Stat label="Days remaining" value={`${remaining} day${remaining === 1 ? "" : "s"}`} />
@@ -165,9 +201,12 @@ export default function PlansPage() {
                   Renew {current?.name}
                 </Button>
               </div>
-            ) : current?.id !== "diamond" ? (
+            ) : currentPlanId !== "diamond" ? (
               <Button onClick={() => choosePlan(selectedCompare)}>
-                <Sparkles className="mr-2 h-4 w-4" /> Upgrade to {previewPlan?.name}
+                <Sparkles className="mr-2 h-4 w-4" />
+                {TIER_ORDER.indexOf(selectedCompare) > TIER_ORDER.indexOf(currentPlanId)
+                  ? `Upgrade to ${previewPlan?.name}`
+                  : `Select ${previewPlan?.name}`}
               </Button>
             ) : (
               <p className="text-sm text-muted-foreground">You&apos;re on the highest plan. Enjoy unlimited access.</p>
@@ -181,7 +220,7 @@ export default function PlansPage() {
                 { icon: Lock, text: "Mutual horoscope & contact stay locked on Free" },
                 { icon: Lock, text: "Advanced filters & priority listing on Gold+" },
                 { icon: Lock, text: "Unlimited interests on Platinum & Diamond" },
-              ].map((item) => (
+              ].map((item: any) => (
                 <li key={item.text} className="flex items-start gap-2">
                   <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
                   {item.text}
@@ -203,22 +242,32 @@ export default function PlansPage() {
         <section className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="royal-label">Feature unlock preview</p>
+              <p className="royal-label">
+                {TIER_ORDER.indexOf(previewPlan.id) > TIER_ORDER.indexOf(currentPlanId)
+                  ? "Feature unlock preview"
+                  : "Plan feature preview"}
+              </p>
               <h2 className="mt-1 font-serif text-2xl font-bold">
-                You&apos;ll unlock with {previewPlan.name}
+                {TIER_ORDER.indexOf(previewPlan.id) > TIER_ORDER.indexOf(currentPlanId)
+                  ? `You'll unlock with ${previewPlan.name}`
+                  : `Features in ${previewPlan.name}`}
               </h2>
             </div>
             {previewPlan.id !== currentPlanId && (
               <Button size="lg" onClick={() => choosePlan(previewPlan.id)}>
-                Upgrade to {previewPlan.name} · {previewPlan.price}
+                {TIER_ORDER.indexOf(previewPlan.id) > TIER_ORDER.indexOf(currentPlanId)
+                  ? `Upgrade to ${previewPlan.name} · ${previewPlan.price}`
+                  : `Switch to ${previewPlan.name} · ${previewPlan.price}`}
               </Button>
             )}
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
-            You&apos;ll unlock: {previewPlan.unlocks.join(" · ")}.
+            {TIER_ORDER.indexOf(previewPlan.id) > TIER_ORDER.indexOf(currentPlanId)
+              ? `You'll unlock: ${previewPlan.unlocks.join(" · ")}.`
+              : `Included: ${previewPlan.unlocks.join(" · ")}.`}
           </p>
           <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {previewPlan.unlocks.map((item) => (
+            {previewPlan.unlocks.map((item: any) => (
               <div
                 key={item}
                 className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 py-3"
@@ -322,24 +371,24 @@ export default function PlansPage() {
             </div>
           ) : (
             <ul className="mt-4 space-y-2">
-              {invoices.map((inv) => (
+              {invoices.map((inv: any) => (
                 <li
-                  key={inv.id}
+                  key={inv?.id}
                   className="flex items-center justify-between gap-3 rounded-2xl border border-border px-3 py-3"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">
-                      {inv.planName} · {inv.amount}
+                      {inv?.planName} · {inv?.amount}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {inv.id} · {formatExpiry(inv.paidAt)} · {inv.method}
+                      {inv?.id} · {formatExpiry(inv?.paidAt)} · {inv?.method}
                     </p>
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => downloadInvoice(inv)}
-                    aria-label={`Download ${inv.id}`}
+                    aria-label={`Download ${inv?.id}`}
                   >
                     <Download className="h-3.5 w-3.5" />
                   </Button>
@@ -376,13 +425,13 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function downloadInvoice(inv: InvoiceRecord) {
   const lines = [
-    "Astalakshimi Matrimony — Tax Invoice (demo)",
-    `Invoice: ${inv.id}`,
-    `Plan: ${inv.planName}`,
-    `Amount: ${inv.amount}`,
-    `Method: ${inv.method}`,
+    "Astalakshimi Matrimony  Tax Invoice (demo)",
+    `Invoice: ${inv?.id}`,
+    `Plan: ${inv?.planName}`,
+    `Amount: ${inv?.amount}`,
+    `Method: ${inv?.method}`,
     `Status: ${inv.status}`,
-    `Paid at: ${new Date(inv.paidAt).toLocaleString("en-IN")}`,
+    `Paid at: ${new Date(inv?.paidAt).toLocaleString("en-IN")}`,
     "",
     "This is a demo invoice generated in the browser.",
   ]
@@ -390,7 +439,7 @@ function downloadInvoice(inv: InvoiceRecord) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
-  a.download = `${inv.id}.txt`
+  a.download = `${inv?.id}.txt`
   a.click()
   URL.revokeObjectURL(url)
 }

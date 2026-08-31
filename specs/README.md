@@ -4,15 +4,17 @@ Any engineer or agent working on Astalakshimi must read these files **before** c
 
 ## Reading order
 
-1. [tech-stack.md](./tech-stack.md) — required technologies. Do not substitute without updating this file.
-2. [architecture.md](./architecture.md) — target monorepo, AWS layout, and what to build now vs later.
-3. [ui-overview.md](./ui-overview.md) — current frontend screens (start here for UI work).
-4. [ui-changes.md](./ui-changes.md) — change log (Home hub, portal gating, Discover, notifications).
-5. [ui-ux.md](./ui-ux.md) — colour codes, type, radius, motion, button variants, UX rules.
-6. [ui-theme.md](./ui-theme.md) — short theme recap (logo, chrome, imagery).
-7. [ui-public-auth.md](./ui-public-auth.md) — landing, login, register.
-8. [ui-dashboard.md](./ui-dashboard.md) — logged-in user area.
-9. [ui-profile-view.md](./ui-profile-view.md) — other-member profile page.
+1. [tech-stack.md](./tech-stack.md)  required technologies. Do not substitute without updating this file.
+2. [architecture.md](./architecture.md)  target monorepo, AWS layout, and what to build now vs later.
+3. [frontend-db.md](./frontend-db.md)  how the Next.js UI reaches Postgres (BFF → Nest → Drizzle).
+4. [ui-overview.md](./ui-overview.md)  current frontend screens (start here for UI work).
+5. [ui-changes.md](./ui-changes.md)  change log (Home hub, portal gating, Discover, notifications).
+6. [ui-ux.md](./ui-ux.md)  colour codes, type, radius, motion, button variants, UX rules.
+7. [ui-theme.md](./ui-theme.md)  short theme recap (logo, chrome, imagery).
+8. [ui-public-auth.md](./ui-public-auth.md)  landing, login, register.
+9. [ui-dashboard.md](./ui-dashboard.md)  logged-in user area.
+10. [ui-admin.md](./ui-admin.md)  staff operations console.
+11. [ui-profile-view.md](./ui-profile-view.md)  other-member profile page.
 
 ## Rules
 

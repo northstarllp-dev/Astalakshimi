@@ -6,13 +6,24 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "pnpm --filter @astalakshimi/web dev",
+    "dev": "pnpm dev:all",
+    "dev:api": "pnpm --filter @astalakshimi/api dev",
+    "dev:web": "pnpm --filter @astalakshimi/web dev",
+    "dev:all": "pnpm --parallel --filter @astalakshimi/api --filter @astalakshimi/web dev",
     "build": "pnpm --filter @astalakshimi/web build",
     "start": "pnpm --filter @astalakshimi/web start",
     "lint": "pnpm --filter @astalakshimi/web lint",
-    "typecheck": "pnpm --filter @astalakshimi/web typecheck"
+    "typecheck": "pnpm --filter @astalakshimi/web typecheck",
+    "db:migrate": "pnpm --filter @astalakshimi/database db:migrate",
+    "db:push": "pnpm --filter @astalakshimi/database db:push",
+    "db:generate": "pnpm --filter @astalakshimi/database db:generate",
+    "db:studio": "pnpm --filter @astalakshimi/database db:studio",
+    "db:seed": "pnpm --filter @astalakshimi/database db:seed"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "next-auth": "5.0.0-beta.32"
   }
 }

@@ -1,16 +1,10 @@
 "use client"
 
-import * as React from "react"
-import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import {
-  activatePlan,
-  addInvoice,
-  getPlanById,
-  getUnlockPreview,
-  type PlanId,
-} from "@/lib/plans"
+import * as React from "react"
+import Link from "next/link"
+import { getPlanById, type PlanId } from "@/lib/plans"
 import {
   ArrowLeft,
   CheckCircle2,
@@ -24,6 +18,7 @@ import { checkoutSchema } from "@/lib/validation"
 import { queryKeys } from "@/hooks/queries"
 import { useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
+import { apiClient } from "@/lib/api-client"
 
 type PayMethod = "upi" | "card" | "netbanking" | "wallet"
 
@@ -62,10 +57,9 @@ function CheckoutInner() {
     plan.priceInPaise === 0
       ? { label: "₹0", paise: 0 }
       : { label: plan.price, paise: plan.priceInPaise }
-  const unlocks = getUnlockPreview(plan.id)
-  const durationDays = plan.durationDays
+  const unlocks = plan.unlocks || []
 
-  const confirm = () => {
+  const confirm = async () => {
     const parsed = checkoutSchema.safeParse({
       method,
       upiId,
@@ -77,22 +71,41 @@ function CheckoutInner() {
     }
     setError("")
     setPaying(true)
-    window.setTimeout(() => {
-      activatePlan(plan.id, durationDays)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.paid })
-      if (plan.priceInPaise > 0) {
-        addInvoice({
-          planId: plan.id,
-          planName: `${plan.name} (${plan.period})`,
-          amount: priced.label,
-          method: PAY_METHODS.find((m) => m.id === method)?.label ?? method,
-          status: "paid",
+
+    try {
+      // 1. Frontend sends planId -> Backend loads plan -> Backend determines amount -> Backend creates payment order
+      const order = await apiClient.payments.createOrder(plan.id)
+
+      if (order.freeActivated) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.subscription })
+        await queryClient.invalidateQueries({ queryKey: queryKeys.invoices })
+        await queryClient.invalidateQueries({ queryKey: queryKeys.paid })
+        setPaying(false)
+        setDone(true)
+        window.setTimeout(() => router.push("/plans"), 1400)
+        return
+      }
+
+      // 2. Verify payment on backend
+      if (order.orderId) {
+        await apiClient.payments.verifyPayment({
+          razorpayOrderId: order.orderId,
+          razorpayPaymentId: `pay_${Date.now()}`,
+          razorpaySignature: "demo_signature",
         })
       }
+
+      await queryClient.invalidateQueries({ queryKey: queryKeys.subscription })
+      await queryClient.invalidateQueries({ queryKey: queryKeys.invoices })
+      await queryClient.invalidateQueries({ queryKey: queryKeys.paid })
       setPaying(false)
       setDone(true)
       window.setTimeout(() => router.push("/plans"), 1400)
-    }, 900)
+    } catch (err: any) {
+      console.error("Payment error:", err)
+      setError(err?.message || "Payment processing failed. Please try again.")
+      setPaying(false)
+    }
   }
 
   return (
@@ -133,7 +146,7 @@ function CheckoutInner() {
               {unlocks.join(" · ")}.
             </p>
             <ul className="mt-4 space-y-2">
-              {unlocks.map((item) => (
+              {unlocks.map((item: any) => (
                 <li key={item} className="flex items-center gap-2 text-sm">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Lock className="h-3.5 w-3.5" />
@@ -158,11 +171,11 @@ function CheckoutInner() {
             <>
               <h3 className="font-semibold">Pay with Razorpay</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                UPI, cards, netbanking, and wallets — demo checkout only.
+                UPI, cards, netbanking, and wallets  demo checkout only.
               </p>
 
               <div className="mt-4 grid grid-cols-2 gap-2">
-                {PAY_METHODS.map((m) => {
+                {PAY_METHODS.map((m: any) => {
                   const Icon = m.icon
                   return (
                     <button
@@ -219,7 +232,7 @@ function CheckoutInner() {
                     : `Pay ${priced.label}`}
               </Button>
               <p className="mt-3 text-center text-[11px] text-muted-foreground">
-                One-tap upgrade. Live Razorpay keys plug in later — this saves plan + invoice on this device.
+                One-tap upgrade. Live Razorpay keys plug in later  this saves plan + invoice on this device.
               </p>
             </>
           )}

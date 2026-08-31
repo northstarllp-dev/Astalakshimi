@@ -51,7 +51,7 @@ apps/web/src/app/
 │                      # messages, notifications, subscriptions, settings
 ├── profiles/[profileId]/
 ├── checkout/
-├── admin/             # later
+├── admin/             # operations console (separate staff auth)
 ├── layout.tsx
 ├── loading.tsx
 ├── error.tsx

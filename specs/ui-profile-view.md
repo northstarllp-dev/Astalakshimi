@@ -14,9 +14,9 @@ Two columns under the header. The **page does not scroll**; only the right colum
 | Side | Behaviour |
 | --- | --- |
 | Left | Portrait photo card `aspect-[3/4]`, ~40% width (max ~480px), `overflow-hidden`, match % pill on photo |
-| Right | About chips, About her/him, Education & career, Lifestyle, Family, Partner preferences — `overflow-y-auto` |
+| Right | About chips, About her/him, Education & career, Lifestyle, Family, Partner preferences  `overflow-y-auto` |
 
-No separate “Matches” back link — use header Home / Discover / logo.
+No separate “Matches” back link  use header Home / Discover / logo.
 
 ## Mobile
 

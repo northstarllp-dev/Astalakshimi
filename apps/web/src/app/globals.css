@@ -61,6 +61,8 @@
 
   --font-sans: var(--font-mukta), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-cormorant), ui-serif, Georgia, "Times New Roman", serif;
+  --font-display: var(--font-rozha), var(--font-cormorant), ui-serif, Georgia, serif;
+  --font-royal: var(--font-cinzel), ui-serif, Georgia, "Times New Roman", serif;
   --font-tamil: var(--font-tiro), ui-serif, Georgia, serif;
 }
 
@@ -106,6 +108,12 @@
 
   .safe-top {
     padding-top: env(safe-area-inset-top);
+  }
+
+  /* Stick below the global offer banner; safe-area only when banner is hidden */
+  .sticky-below-offer {
+    top: var(--offer-banner-height, 0px);
+    padding-top: var(--header-safe-top, env(safe-area-inset-top));
   }
 
   .hide-scrollbar {
@@ -202,9 +210,10 @@
 
   /* Royal section label */
   .royal-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.22em;
+    font-family: var(--font-royal), ui-serif, Georgia, serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.28em;
     text-transform: uppercase;
     color: var(--secondary);
   }

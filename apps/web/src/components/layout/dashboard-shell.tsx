@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { getMediaUrl } from "@/lib/utils"
 import { Logo } from "@/components/ui/logo"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -10,14 +11,17 @@ import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
 import { useProfileQuery, useUnreadCountQuery } from "@/hooks/queries"
 import { cn } from "@/lib/utils"
 import { Bell, Search } from "lucide-react"
+import { ContactUnlockModal } from "./contact-unlock-modal"
 
 const desktopLinks = [
   { href: "/home", label: "Home", match: (p: string) => p === "/home" },
   { href: "/dashboard", label: "Discover", match: (p: string) => p === "/dashboard" || p.startsWith("/search") },
+  { href: "/inbox", label: "Inbox", match: (p: string) => p.startsWith("/inbox") },
+  { href: "/matches", label: "Matches", match: (p: string) => p.startsWith("/matches") },
   { href: "/interests", label: "Interests", match: (p: string) => p.startsWith("/interests") },
   { href: "/plans", label: "Premium", match: (p: string) => p.startsWith("/plans") || p.startsWith("/checkout") },
-  { href: "/profile", label: "Profile", match: (p: string) => p.startsWith("/profile") || p.startsWith("/settings") },
 ]
+
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -26,13 +30,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
   const pending = profile?.verificationStatus === "pending"
-  const isMatchProfile = pathname.startsWith("/profiles/")
+  const isany = pathname.startsWith("/profiles/")
 
   return (
     <div
       className={cn(
         "flex min-h-dvh flex-col bg-background",
-        isMatchProfile ? "h-dvh overflow-hidden" : "pb-24 md:pb-12"
+        isany ? "h-dvh overflow-hidden" : "pb-24 md:pb-12"
       )}
     >
       <header className="sticky top-0 z-50 border-b border-secondary/30 bg-[#fffbf4]/92 backdrop-blur-xl safe-top">
@@ -87,7 +91,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <Avatar className="size-9 border-2 border-primary/20">
                 {profile?.photos[0] ? (
                   <AvatarImage
-                    src={profile.photos[0]}
+                    src={getMediaUrl(profile.photos[0])}
                     alt={firstName}
                     className={cn("object-cover", pending && "blur-[2px]")}
                   />
@@ -101,8 +105,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className={cn("flex-1", isMatchProfile && "min-h-0 overflow-hidden")}>{children}</div>
-      {isMatchProfile ? null : <MobileBottomNav />}
+      <div className={cn("flex-1", isany && "min-h-0 overflow-hidden")}>{children}</div>
+      {isany ? null : <MobileBottomNav />}
+      <ContactUnlockModal />
     </div>
   )
 }

@@ -2,15 +2,15 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { BadgeCheck, Star } from "lucide-react"
+import { getMediaUrl } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-import type { MatchProfile } from "@/lib/matches"
+import { BadgeCheck, Star } from "lucide-react"
 
 export function MatchThumbCard({
   match,
   priority = false,
 }: {
-  match: MatchProfile
+  match: any
   priority?: boolean
 }) {
   return (
@@ -20,7 +20,7 @@ export function MatchThumbCard({
     >
       <div className="relative aspect-[3/4]">
         <Image
-          src={match.photos[0] ?? ""}
+          src={getMediaUrl(match.photos[0])}
           alt={`${match.fullName}, ${match.age}`}
           fill
           priority={priority}

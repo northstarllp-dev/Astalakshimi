@@ -1,13 +1,10 @@
 "use client"
 
-import * as React from "react"
-import Link from "next/link"
+import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { Button } from "@/components/ui/button"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
-import { RequireFullPortal } from "@/components/layout/require-full-portal"
-import { MATCHES } from "@/lib/matches"
-import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
-import { clearSkipped } from "@/lib/user-activity"
+import * as React from "react"
+import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   useAddSavedSearchMutation,
@@ -19,16 +16,15 @@ import {
   useShortlistQuery,
   useSkipMatchMutation,
   useSkippedQuery,
+  useSearchQuery,
   queryKeys,
 } from "@/hooks/queries"
 import { discoverQuickSchema } from "@/lib/validation"
+import { VERIFICATION_SLA_HOURS, INCOME_BANDS, DIETS, STARS } from "@/lib/profile-store"
 import {
-  applyDiscover,
   BROWSE_TABS,
   DEFAULT_DISCOVER,
   EMPTY_ADVANCED,
-  fromPartnerPreferences,
-  uniqueField,
   type AdvancedFilters,
   type BrowseTab,
   type DiscoverQuery,
@@ -120,6 +116,7 @@ function DiscoverPage() {
   const connectMutation = useSendInterestMutation()
   const saveSearchMutation = useAddSavedSearchMutation()
   const [query, setQuery] = React.useState<DiscoverQuery>(DEFAULT_DISCOVER)
+  const [page, setPage] = React.useState(1)
   const [moreOpen, setMoreOpen] = React.useState(false)
   const [saveOpen, setSaveOpen] = React.useState(false)
   const [saveLabel, setSaveLabel] = React.useState("")
@@ -131,10 +128,9 @@ function DiscoverPage() {
   const pending = profile?.verificationStatus === "pending"
   const userCity = profile?.city || "Chennai"
 
-  const visibleMatches = React.useMemo(
-    () => applyDiscover(MATCHES, query, skipped, userCity),
-    [query, skipped, userCity]
-  )
+  const { data: searchResult, isLoading: isSearchLoading } = useSearchQuery({ ...query, page, limit: 10 })
+  const visibleMatches = (searchResult?.profiles || []).filter((profile: any) => !skipped.includes(profile.id))
+  const totalCount = searchResult?.totalCount || 0
 
   const setQuick = (patch: Partial<DiscoverQuery>) => {
     setQuery((q) => {
@@ -148,10 +144,12 @@ function DiscoverPage() {
       if (!parsed.success) return q
       return { ...next, ...parsed.data }
     })
+    setPage(1)
   }
 
   const setAdvanced = (patch: Partial<AdvancedFilters>) => {
     setQuery((q) => ({ ...q, advanced: { ...q.advanced, ...patch } }))
+    setPage(1)
   }
 
   const requirePaid = (feature: string, action: () => void) => {
@@ -164,15 +162,16 @@ function DiscoverPage() {
   }
 
   const applyPreferences = () => {
-    setQuery((q) => ({ ...q, ...fromPartnerPreferences(profile), advanced: EMPTY_ADVANCED }))
+    setQuery((q) => ({ ...q, ...{}, advanced: EMPTY_ADVANCED }))
+    setPage(1)
   }
 
-  const cities = uniqueField("city")
-  const communities = uniqueField("community")
-  const occupations = uniqueField("occupation")
-  const incomes = uniqueField("income")
-  const diets = Array.from(new Set(MATCHES.map((m) => m.lifestyle.diet)))
-  const stars = uniqueField("star")
+  const cities = ["Chennai", "Coimbatore", "Madurai", "Trichy", "Salem", "Tirunelveli", "Bengaluru", "Hyderabad", "Mumbai", "Delhi"]
+  const communities = ["Brahmin - Iyer", "Brahmin - Iyengar", "Chettiar", "Gounder", "Vanniyar", "Thevar", "Nadar", "Mudaliar", "Pillai", "Naidu", "Yadav", "Other"]
+  const occupations = ["Software Engineer", "Doctor", "Engineer - Non IT", "Teacher / Professor", "Business Owner", "Banker / Finance", "Government Service", "Defense", "Lawyer", "Other"]
+  const incomes = INCOME_BANDS
+  const diets = DIETS
+  const stars = STARS
 
   return (
     <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 md:py-8">
@@ -181,7 +180,7 @@ function DiscoverPage() {
           <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Search & browse</p>
           <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">Discover</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Namaste, {firstName}. Apply a filter and results update instantly — no search button.
+            Namaste, {firstName}. Apply a filter and results update instantly  no search button.
           </p>
         </div>
         <div className="hidden gap-2 sm:flex">
@@ -200,25 +199,25 @@ function DiscoverPage() {
             </Link>
           ))}
         </div>
-      </div>
+        </div>
 
-      {pending && (
+        {pending && (
         <div className="mb-5 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-[#fff8ef] shadow-sm">
           <div className="flex items-start gap-3 p-3.5 sm:p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
-              <Clock3 className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-semibold text-amber-950">Your profile is under review</p>
-              <p className="mt-0.5 text-sm text-amber-900/75">
-                Photos stay private until approval — usually within {VERIFICATION_SLA_HOURS} hours.
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+                  <Clock3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-950">Your profile is under review</p>
+                  <p className="mt-0.5 text-sm text-amber-900/75">
+                Photos stay private until approval  usually within {VERIFICATION_SLA_HOURS} hours.
               </p>
-            </div>
-          </div>
-        </div>
+                  </div>
+                </div>
+              </div>
       )}
 
-      {/* Quick search — 3 fields, live */}
+      {/* Quick search  3 fields, live */}
       <section className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-3">
           <label className="block">
@@ -261,7 +260,7 @@ function DiscoverPage() {
               className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
             >
               <option value="">Any city</option>
-              {cities.map((city) => (
+              {cities.map((city: any) => (
                 <option key={city} value={city}>
                   {city}
                 </option>
@@ -276,14 +275,14 @@ function DiscoverPage() {
               className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
             >
               <option value="">Any community</option>
-              {communities.map((c) => (
+              {communities.map((c: any) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
               ))}
             </select>
           </label>
-        </div>
+          </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" variant="soft" size="sm" onClick={applyPreferences}>
@@ -312,7 +311,7 @@ function DiscoverPage() {
               className="h-9 rounded-full border border-border bg-background px-3 text-sm"
               defaultValue=""
               onChange={(e) => {
-                const item = saved.find((s) => s.id === e.target.value)
+                const item = saved.find((s: any) => s.id === e.target.value)
                 if (!item) return
                 setQuick({ ageMin: item.ageMin, ageMax: item.ageMax, city: item.city, community: item.community, tab: "all" })
               }}
@@ -321,7 +320,7 @@ function DiscoverPage() {
               <option value="" disabled>
                 Saved searches
               </option>
-              {saved.map((s) => (
+              {saved.map((s: any) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
@@ -335,8 +334,8 @@ function DiscoverPage() {
           >
             Clear all
           </button>
-        </div>
-      </section>
+          </div>
+        </section>
 
       {paywall && (
         <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-secondary/40 bg-[#fff8ef] p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -382,31 +381,37 @@ function DiscoverPage() {
       </div>
 
       <p className="mb-3 text-sm text-muted-foreground">
-        <span className="font-semibold text-primary">{visibleMatches.length}</span> profiles · sorted by match score
+        {isSearchLoading ? (
+          <span>Loading profiles...</span>
+        ) : (
+          <>
+            <span className="font-semibold text-primary">{totalCount}</span> profiles found
+          </>
+        )}
       </p>
 
       <div className="space-y-3">
-        {visibleMatches.map((match, index) => (
-          <MatchListCard
-            key={match.id}
-            match={match}
+        {visibleMatches.map((match: any, index: any) => (
+            <MatchListCard
+              key={match.id}
+              match={match}
             featured={index === 0 && query.tab === "all"}
-            priority={index === 0}
-            onSkip={(id) => skipMutation.mutate(id)}
-            onConnect={(id) => connectMutation.mutate(id)}
-          />
-        ))}
-        {visibleMatches.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
-            <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
+              priority={index === 0}
+            onSkip={(id: any) => skipMutation.mutate(id)}
+            onConnect={(id: any) => connectMutation.mutate(id)}
+            />
+          ))}
+          {visibleMatches.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+              <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
             <p className="mt-3 font-semibold">No profiles for this search</p>
-            <p className="mt-1 text-sm text-muted-foreground">Widen age, city, or community — results update as you adjust.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Widen age, city, or community  results update as you adjust.</p>
             <Button
               className="mt-4"
               onClick={() => {
-                clearSkipped()
                 queryClient.setQueryData(queryKeys.skipped, [])
                 setQuery(DEFAULT_DISCOVER)
+                setPage(1)
               }}
             >
               Reset search
@@ -414,6 +419,20 @@ function DiscoverPage() {
           </div>
         )}
       </div>
+
+      {visibleMatches.length > 0 && totalCount > visibleMatches.length && (
+        <div className="mt-6 flex items-center justify-center gap-4">
+          <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+            Previous
+          </Button>
+          <span className="text-sm font-medium text-muted-foreground">
+            Page {page} of {Math.ceil(totalCount / 10)}
+          </span>
+          <Button variant="outline" disabled={page * 10 >= totalCount} onClick={() => setPage(p => p + 1)}>
+            Next
+          </Button>
+        </div>
+      )}
 
       {moreOpen && paid && (
         <div className="fixed inset-0 z-[60] flex justify-end bg-black/40" onClick={() => setMoreOpen(false)}>
@@ -462,7 +481,7 @@ function DiscoverPage() {
               ))}
             </FilterSection>
             <FilterSection title="Occupation">
-              {occupations.map((o) => (
+              {occupations.map((o: any) => (
                 <CheckItem
                   key={o}
                   label={o}
@@ -482,7 +501,7 @@ function DiscoverPage() {
               ))}
             </FilterSection>
             <FilterSection title="Smoking">
-              {["No", "Occasionally", "Yes"].map((s) => (
+              {["No", "Occasionally", "Yes"].map((s: any) => (
                 <CheckItem
                   key={s}
                   label={s}
@@ -492,7 +511,7 @@ function DiscoverPage() {
               ))}
             </FilterSection>
             <FilterSection title="Drinking">
-              {["No", "Occasionally", "Yes"].map((s) => (
+              {["No", "Occasionally", "Yes"].map((s: any) => (
                 <CheckItem
                   key={s}
                   label={s}
@@ -502,7 +521,7 @@ function DiscoverPage() {
               ))}
             </FilterSection>
             <FilterSection title="Manglik status">
-              {["Yes", "No", "Don't know"].map((s) => (
+              {["Yes", "No", "Don't know"].map((s: any) => (
                 <CheckItem
                   key={s}
                   label={s}
@@ -512,7 +531,7 @@ function DiscoverPage() {
               ))}
             </FilterSection>
             <FilterSection title="Horoscope star">
-              {stars.map((s) => (
+              {stars.map((s: any) => (
                 <CheckItem
                   key={s}
                   label={s}
@@ -574,8 +593,8 @@ function DiscoverPage() {
               </Button>
             </div>
           </div>
-        </div>
+          </div>
       )}
-    </main>
+      </main>
   )
 }

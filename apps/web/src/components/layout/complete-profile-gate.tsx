@@ -1,17 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { CompletenessRing } from "@/components/profile/completeness-ring"
+import { useProfileQuery } from "@/hooks/queries"
+import { ChevronRight, Lock } from "lucide-react"
 import {
   PROFILE_COMPLETE_THRESHOLD,
   getProfileActions,
+  getProfileCompletenessStats,
   isProfileComplete,
+  isVerified,
 } from "@/lib/portal-access"
-import { profileCompleteness } from "@/lib/user-activity"
-import { useProfileQuery } from "@/hooks/queries"
-import { ChevronRight, Lock } from "lucide-react"
+import { CompletenessRing } from "@/components/profile/completeness-ring"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 export function CompleteProfileGate({
   section = "this section",
@@ -19,13 +20,16 @@ export function CompleteProfileGate({
   section?: string
 }) {
   const { data: profile = null } = useProfileQuery()
-  const completeness = profile ? profileCompleteness(profile) : 0
-  const verified = profile?.verificationStatus === "verified"
+  const completenessStats = getProfileCompletenessStats(profile)
+  const completeness = completenessStats.percentage
+  const verified = isVerified(profile?.verificationStatus)
+  const rejected = profile?.verificationStatus === "rejected"
   const complete = isProfileComplete(profile)
   const nextActions = getProfileActions(profile).filter((a) => !a.done).slice(0, 4)
 
-  const reason =
-    !complete && !verified
+  const reason = rejected
+    ? `Verification was rejected. Re-upload your selfie or ID, then finish your profile to open ${section}.`
+    : !complete && !verified
       ? `Finish your profile and get verified to open ${section}.`
       : !complete
         ? `Reach ${PROFILE_COMPLETE_THRESHOLD}% complete to open ${section}.`
@@ -43,6 +47,9 @@ export function CompleteProfileGate({
         <CompletenessRing percentage={completeness} size={96} strokeWidth={8} />
       </div>
       <p className="mt-3 text-sm font-semibold text-foreground">{completeness}% complete</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {completenessStats.filled} of {completenessStats.total} details filled
+      </p>
 
       {nextActions.length > 0 && (
         <ul className="mt-5 flex flex-wrap justify-center gap-2">
@@ -56,9 +63,10 @@ export function CompleteProfileGate({
         </ul>
       )}
 
-      <Link href="/profile/edit" className="mt-6">
+      <Link href={rejected ? "/profile/verify" : "/profile/edit"} className="mt-6">
         <Button>
-          Complete profile <ChevronRight className="ml-1 h-4 w-4" />
+          {rejected ? "Re-upload verification" : "Complete profile"}{" "}
+          <ChevronRight className="ml-1 h-4 w-4" />
         </Button>
       </Link>
       <Link href="/home" className="mt-3 text-sm font-semibold text-primary hover:underline">

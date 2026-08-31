@@ -3,19 +3,29 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { getMediaUrl } from "@/lib/utils"
+import { apiClient } from "@/lib/api-client"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { DateOfBirthPicker } from "@/components/profile/date-of-birth-picker"
+import { MultiSelect } from "@/components/profile/multi-select"
+import { SearchableSelect } from "@/components/profile/searchable-select"
 import {
   emptySignupData,
   type SignupData,
@@ -33,21 +43,47 @@ import {
   STARS,
   RASHIS,
 } from "@/lib/profile-store"
-import { useProfileQuery, useSaveProfileMutation } from "@/hooks/queries"
+import {
+  useProfileQuery,
+  useUpdateProfileMutation,
+  useAddPhotoMutation,
+  useDeletePhotoMutation,
+  useReorderPhotosMutation,
+} from "@/hooks/queries"
 import { profileEditSchema } from "@/lib/validation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, Camera, Check, GripVertical, Star, Trash2, Upload, X } from "lucide-react"
+import { ArrowLeft, Camera, Check, ExternalLink, Eye, FileText, GripVertical, Star, Trash2, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const ABOUT_MAX = 300
 const MAX_PHOTOS = 10
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+type PhotoItem = {
+  id: string
+  url: string
+  canReorder: boolean
+}
+
+function Field({
+  label,
+  required,
+  error,
+  children,
+}: {
+  label: string
+  required?: boolean
+  error?: string
+  children: React.ReactNode
+}) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{label}</Label>
+      <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        {label}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
+      </Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }
@@ -61,27 +97,68 @@ function EditSection({ id, title, children }: { id: string; title: string; child
   )
 }
 
+function fieldError(errors: Record<string, unknown>, key: string): string | undefined {
+  const err = errors[key] as { message?: string } | undefined
+  return err?.message
+}
+
 export default function ProfileEditPage() {
   const router = useRouter()
   const profileQuery = useProfileQuery()
-  const saveMutation = useSaveProfileMutation()
+  const updateMutation = useUpdateProfileMutation()
+  const addPhotoMutation = useAddPhotoMutation()
+  const deletePhotoMutation = useDeletePhotoMutation()
+  const reorderPhotosMutation = useReorderPhotosMutation()
+
   const form = useForm({
     resolver: zodResolver(profileEditSchema),
     values: profileQuery.data ?? emptySignupData(),
   })
   const data = form.watch() as SignupData
+  const { errors } = form.formState
   const [saved, setSaved] = React.useState(false)
   const [dragIndex, setDragIndex] = React.useState<number | null>(null)
   const fileRef = React.useRef<HTMLInputElement>(null)
+  const horoscopeRef = React.useRef<HTMLInputElement>(null)
+
+  const photoItems = React.useMemo<PhotoItem[]>(() => {
+    if (data.photoObjects?.length) {
+      return data.photoObjects.map((photo: { id?: string; url?: string; s3Key?: string }, index: number) => ({
+        id: photo.id || `obj-${index}`,
+        url: photo.url || photo.s3Key || "",
+        canReorder: Boolean(photo.id),
+      }))
+    }
+    if (data.photos?.length) {
+      return data.photos
+        .filter(Boolean)
+        .map((url: string, index: number) => ({
+          id: `local-${index}`,
+          url,
+          canReorder: false,
+        }))
+    }
+    return []
+  }, [data.photoObjects, data.photos])
+
+  const pdfPreviewUrl = data.horoscopeS3Key ? getMediaUrl(data.horoscopeS3Key) : null
 
   const update = (fields: Partial<SignupData>) => {
     for (const [key, value] of Object.entries(fields)) {
-      form.setValue(key as keyof SignupData, value as never, { shouldDirty: true })
+      form.setValue(key as keyof SignupData, value as never, { shouldDirty: true, shouldValidate: true })
     }
   }
 
   const onSave = form.handleSubmit((values) => {
-    saveMutation.mutate({ ...(profileQuery.data ?? emptySignupData()), ...values } as SignupData, {
+    const dirtyFields = form.formState.dirtyFields
+    const delta: Record<string, unknown> = {}
+    for (const key of Object.keys(dirtyFields)) {
+      if (key !== "photos" && key !== "photoS3Keys" && key !== "photoObjects") {
+        delta[key] = (values as Record<string, unknown>)[key]
+      }
+    }
+
+    updateMutation.mutate(delta, {
       onSuccess: () => {
         setSaved(true)
         window.setTimeout(() => router.push("/profile"), 600)
@@ -89,35 +166,78 @@ export default function ProfileEditPage() {
     })
   })
 
-  const onFiles = (files: FileList | null) => {
+  const onFiles = async (files: FileList | null) => {
     if (!files) return
-    const remaining = MAX_PHOTOS - data.photos.length
-    Array.from(files)
-      .slice(0, remaining)
-      .forEach((file) => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          const url = String(reader.result)
-          form.setValue("photos", [...(data.photos ?? []), url], { shouldDirty: true })
-        }
-        reader.readAsDataURL(file)
+    const remaining = MAX_PHOTOS - photoItems.length
+    const filesToUpload = Array.from(files).slice(0, remaining)
+
+    for (const file of filesToUpload) {
+      try {
+        const { uploadUrl, s3Key } = await apiClient.media.getUploadUrl({
+          purpose: "profile_photo",
+          contentType: file.type || "image/jpeg",
+          fileSize: file.size,
+        })
+
+        await apiClient.media.uploadFileToS3(uploadUrl, file, file.type || "image/jpeg")
+        await addPhotoMutation.mutateAsync(s3Key)
+      } catch (err) {
+        console.error("[Media] S3 upload failed:", err)
+        alert("Failed to upload photo. Please check your AWS credentials or network.")
+      }
+    }
+  }
+
+  const onHoroscopeFile = async (files: FileList | null) => {
+    const file = files?.[0]
+    if (!file) return
+    if (file.type !== "application/pdf") {
+      alert("Please upload a PDF file.")
+      return
+    }
+    try {
+      const { uploadUrl, s3Key } = await apiClient.media.getUploadUrl({
+        purpose: "horoscope",
+        contentType: "application/pdf",
+        fileSize: file.size,
       })
+      await apiClient.media.uploadFileToS3(uploadUrl, file, "application/pdf")
+      update({
+        horoscopeName: file.name,
+        horoscopeSize: file.size,
+        horoscopeS3Key: s3Key,
+      })
+    } catch (err) {
+      console.error("[Media] Horoscope upload failed:", err)
+      alert("Failed to upload horoscope PDF.")
+    }
   }
 
-  const setPrimary = (index: number) => {
-    update({ photos: [data.photos[index], ...data.photos.filter((_, i) => i !== index)] })
+  const setPrimary = async (index: number) => {
+    await reorder(index, 0)
   }
 
-  const deletePhoto = (index: number) => {
-    update({ photos: data.photos.filter((_, i) => i !== index) })
+  const deletePhoto = async (index: number) => {
+    const photo = photoItems[index]
+    if (photo?.canReorder && !photo.id.startsWith("local-")) {
+      await deletePhotoMutation.mutateAsync(photo.id)
+      return
+    }
+    const nextPhotos = data.photos.filter((_, i) => i !== index)
+    const nextKeys = data.photoS3Keys.filter((_, i) => i !== index)
+    update({ photos: nextPhotos, photoS3Keys: nextKeys })
   }
 
-  const reorder = (from: number, to: number) => {
+  const reorder = async (from: number, to: number) => {
     if (from === to) return
-    const next = [...data.photos]
+    const next = [...photoItems]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    update({ photos: next })
+
+    const serverIds = next.map((p) => p.id).filter((id) => !id.startsWith("local-") && !id.startsWith("obj-"))
+    if (serverIds.length === next.length && serverIds.length > 0) {
+      await reorderPhotosMutation.mutateAsync(serverIds)
+    }
   }
 
   if (profileQuery.isPending) {
@@ -140,50 +260,45 @@ export default function ProfileEditPage() {
         </Link>
         <div>
           <h1 className="font-serif text-2xl font-bold">Edit profile</h1>
-          <p className="text-sm text-muted-foreground">Changes save on this device for now</p>
+          <p className="text-sm text-muted-foreground">Fields marked * are required</p>
         </div>
       </div>
 
       <EditSection id="basics" title="Basic info">
-        <Field label="Full name">
+        <Field label="Full name" required error={fieldError(errors, "fullName")}>
           <Input value={data.fullName} onChange={(e) => update({ fullName: e.target.value })} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Gender">
-            <Select value={data.gender || undefined} onValueChange={(v) => update({ gender: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select gender" /></SelectTrigger>
-              <SelectContent>
-                {["Male", "Female", "Other"].map((g) => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field label="Gender" required error={fieldError(errors, "gender")}>
+            <SearchableSelect
+              value={data.gender || undefined}
+              onValueChange={(v) => update({ gender: v })}
+              options={["Male", "Female", "Other"]}
+              placeholder="Select gender"
+              searchPlaceholder="Search gender…"
+            />
           </Field>
-          <Field label="Marital status">
-            <Select value={data.maritalStatus || undefined} onValueChange={(v) => update({ maritalStatus: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select marital status" /></SelectTrigger>
-              <SelectContent>
-                {MARITAL_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field label="Marital status" required error={fieldError(errors, "maritalStatus")}>
+            <SearchableSelect
+              value={data.maritalStatus || undefined}
+              onValueChange={(v) => update({ maritalStatus: v })}
+              options={MARITAL_STATUSES}
+              placeholder="Select marital status"
+              searchPlaceholder="Search status…"
+            />
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Day">
-            <Input value={data.dobDay} onChange={(e) => update({ dobDay: e.target.value })} placeholder="DD" />
-          </Field>
-          <Field label="Month">
-            <Input value={data.dobMonth} onChange={(e) => update({ dobMonth: e.target.value })} placeholder="MM" />
-          </Field>
-          <Field label="Year">
-            <Input value={data.dobYear} onChange={(e) => update({ dobYear: e.target.value })} placeholder="YYYY" />
-          </Field>
-        </div>
+        <Field label="Date of birth" required error={fieldError(errors, "dobYear") || fieldError(errors, "dobDay")}>
+          <DateOfBirthPicker
+            dobDay={data.dobDay}
+            dobMonth={data.dobMonth}
+            dobYear={data.dobYear}
+            onChange={(parts) => update(parts)}
+          />
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Height">
-            <Input value={data.height} onChange={(e) => update({ height: e.target.value })} placeholder="e.g. 5'4&quot;" />
+            <Input value={data.height} onChange={(e) => update({ height: e.target.value })} placeholder="e.g. 170 cm" />
           </Field>
           <Field label="Weight">
             <Input value={data.weight} onChange={(e) => update({ weight: e.target.value })} placeholder="e.g. 58 kg" />
@@ -191,24 +306,22 @@ export default function ProfileEditPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Complexion">
-            <Select value={data.complexion || undefined} onValueChange={(v) => update({ complexion: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select complexion" /></SelectTrigger>
-              <SelectContent>
-                {COMPLEXIONS.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={data.complexion || undefined}
+              onValueChange={(v) => update({ complexion: v })}
+              options={COMPLEXIONS}
+              placeholder="Select complexion"
+              searchPlaceholder="Search…"
+            />
           </Field>
           <Field label="Diet">
-            <Select value={data.diet || undefined} onValueChange={(v) => update({ diet: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select diet" /></SelectTrigger>
-              <SelectContent>
-                {DIETS.map((d) => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={data.diet || undefined}
+              onValueChange={(v) => update({ diet: v })}
+              options={DIETS}
+              placeholder="Select diet"
+              searchPlaceholder="Search…"
+            />
           </Field>
         </div>
         <Field label="Disability (optional)">
@@ -218,15 +331,14 @@ export default function ProfileEditPage() {
 
       <EditSection id="community" title="Community details">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Religion">
-            <Select value={data.religion || undefined} onValueChange={(v) => update({ religion: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select religion" /></SelectTrigger>
-              <SelectContent>
-                {RELIGIONS.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field label="Religion" required error={fieldError(errors, "religion")}>
+            <SearchableSelect
+              value={data.religion || undefined}
+              onValueChange={(v) => update({ religion: v })}
+              options={RELIGIONS}
+              placeholder="Select religion"
+              searchPlaceholder="Search religion…"
+            />
           </Field>
           <Field label="Caste / community">
             <Input value={data.caste} onChange={(e) => update({ caste: e.target.value })} placeholder="e.g. Iyer" />
@@ -242,48 +354,41 @@ export default function ProfileEditPage() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Star / nakshatra">
-            <Select value={data.star || undefined} onValueChange={(v) => update({ star: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select star" /></SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>27 Nakshatras</SelectLabel>
-                  {STARS.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={data.star || undefined}
+              onValueChange={(v) => update({ star: v })}
+              options={STARS}
+              placeholder="Select star"
+              searchPlaceholder="Search nakshatra…"
+            />
           </Field>
           <Field label="Rashi">
-            <Select value={data.rashi || undefined} onValueChange={(v) => update({ rashi: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select rashi" /></SelectTrigger>
-              <SelectContent>
-                {RASHIS.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={data.rashi || undefined}
+              onValueChange={(v) => update({ rashi: v })}
+              options={RASHIS.map((r) => ({ value: r.value, label: r.label }))}
+              placeholder="Select rashi"
+              searchPlaceholder="Search rashi…"
+            />
           </Field>
         </div>
         <Field label="Manglik status">
-          <Select value={data.manglik || undefined} onValueChange={(v) => update({ manglik: v })}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Select Manglik status" /></SelectTrigger>
-            <SelectContent>
-              {MANGLIK_OPTIONS.map((m) => (
-                <SelectItem key={m} value={m}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={data.manglik || undefined}
+            onValueChange={(v) => update({ manglik: v })}
+            options={MANGLIK_OPTIONS}
+            placeholder="Select Manglik status"
+            searchPlaceholder="Search…"
+          />
         </Field>
-        <Field label="Mother tongue">
-          <Select value={data.motherTongue || undefined} onValueChange={(v) => update({ motherTongue: v })}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Select language" /></SelectTrigger>
-            <SelectContent>
-              {MOTHER_TONGUES.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Field label="Mother tongue" required error={fieldError(errors, "motherTongue")}>
+          <SearchableSelect
+            value={data.motherTongue || undefined}
+            onValueChange={(v) => update({ motherTongue: v })}
+            options={MOTHER_TONGUES}
+            placeholder="Select language"
+            searchPlaceholder="Search language…"
+          />
         </Field>
       </EditSection>
 
@@ -316,14 +421,13 @@ export default function ProfileEditPage() {
             <Input value={data.companyName} onChange={(e) => update({ companyName: e.target.value })} placeholder="e.g. Infosys" />
           </Field>
           <Field label="Annual income">
-            <Select value={data.annualIncome || undefined} onValueChange={(v) => update({ annualIncome: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select income band" /></SelectTrigger>
-              <SelectContent>
-                {INCOME_BANDS.map((band) => (
-                  <SelectItem key={band} value={band}>{band}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={data.annualIncome || undefined}
+              onValueChange={(v) => update({ annualIncome: v })}
+              options={INCOME_BANDS}
+              placeholder="Select income band"
+              searchPlaceholder="Search income…"
+            />
           </Field>
         </div>
       </EditSection>
@@ -331,24 +435,20 @@ export default function ProfileEditPage() {
       <EditSection id="family" title="Family details">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Family type">
-            <Select value={data.familyType || undefined} onValueChange={(v) => update({ familyType: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select family type" /></SelectTrigger>
-              <SelectContent>
-                {FAMILY_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={data.familyType || undefined}
+              onValueChange={(v) => update({ familyType: v })}
+              options={FAMILY_TYPES}
+              placeholder="Select family type"
+            />
           </Field>
           <Field label="Family status">
-            <Select value={data.familyStatus || undefined} onValueChange={(v) => update({ familyStatus: v })}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Select family status" /></SelectTrigger>
-              <SelectContent>
-                {FAMILY_STATUS.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={data.familyStatus || undefined}
+              onValueChange={(v) => update({ familyStatus: v })}
+              options={FAMILY_STATUS}
+              placeholder="Select family status"
+            />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -366,7 +466,7 @@ export default function ProfileEditPage() {
 
       <EditSection id="location" title="Location">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Current city">
+          <Field label="Current city" required error={fieldError(errors, "city")}>
             <Input value={data.city} onChange={(e) => update({ city: e.target.value })} placeholder="e.g. Chennai" />
           </Field>
           <Field label="State">
@@ -374,14 +474,12 @@ export default function ProfileEditPage() {
           </Field>
         </div>
         <Field label="Willing to relocate">
-          <Select value={data.willingToRelocate || undefined} onValueChange={(v) => update({ willingToRelocate: v })}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Select option" /></SelectTrigger>
-            <SelectContent>
-              {RELOCATE_OPTIONS.map((r) => (
-                <SelectItem key={r} value={r}>{r}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={data.willingToRelocate || undefined}
+            onValueChange={(v) => update({ willingToRelocate: v })}
+            options={RELOCATE_OPTIONS}
+            placeholder="Select option"
+          />
         </Field>
       </EditSection>
 
@@ -412,10 +510,13 @@ export default function ProfileEditPage() {
             <Input type="number" value={data.prefAgeMax} onChange={(e) => update({ prefAgeMax: Number(e.target.value) || 40 })} />
           </Field>
         </div>
-        <Field label="Preferred religions (comma separated)">
-          <Input
-            value={data.prefReligion.join(", ")}
-            onChange={(e) => update({ prefReligion: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+        <Field label="Preferred religions" required error={fieldError(errors, "prefReligion")}>
+          <MultiSelect
+            values={data.prefReligion}
+            onValuesChange={(values) => update({ prefReligion: values })}
+            options={RELIGIONS}
+            placeholder="Select religions"
+            searchPlaceholder="Search religions…"
           />
         </Field>
       </EditSection>
@@ -423,7 +524,7 @@ export default function ProfileEditPage() {
       <section id="photos" className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="font-serif text-lg font-bold">Photos</h2>
-          <span className="text-xs font-semibold text-muted-foreground">{data.photos.length} / {MAX_PHOTOS}</span>
+          <span className="text-xs font-semibold text-muted-foreground">{photoItems.length} / {MAX_PHOTOS}</span>
         </div>
         <p className="text-sm text-muted-foreground">
           First photo is your primary. Drag to reorder. Primary photo is reviewed by admin within 24 hours.
@@ -438,7 +539,7 @@ export default function ProfileEditPage() {
           onChange={(e) => onFiles(e.target.files)}
         />
 
-        {data.photos.length === 0 ? (
+        {photoItems.length === 0 ? (
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -449,10 +550,10 @@ export default function ProfileEditPage() {
           </button>
         ) : (
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-            {data.photos.map((photo, i) => (
+            {photoItems.map((photo, i) => (
               <div
-                key={i}
-                draggable
+                key={photo.id}
+                draggable={photo.canReorder}
                 onDragStart={() => setDragIndex(i)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
@@ -461,7 +562,7 @@ export default function ProfileEditPage() {
                 }}
                 className="group relative aspect-[3/4] overflow-hidden rounded-xl border-2 border-border bg-muted"
               >
-                <Image src={photo} alt={`Photo ${i + 1}`} fill className="object-cover" sizes="120px" />
+                <Image src={getMediaUrl(photo.url)} alt={`Photo ${i + 1}`} fill className="object-cover" sizes="120px" unoptimized />
                 {i === 0 && (
                   <span className="absolute left-1 top-1 rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold text-secondary-foreground">
                     <Star className="mr-0.5 inline h-2.5 w-2.5 fill-current" />Primary
@@ -490,12 +591,14 @@ export default function ProfileEditPage() {
                     </div>
                   )}
                 </div>
-                <span className="absolute bottom-1 left-1 cursor-grab rounded bg-black/40 px-1 text-white opacity-0 group-hover:opacity-100">
-                  <GripVertical className="h-3 w-3" />
-                </span>
+                {photo.canReorder && (
+                  <span className="absolute bottom-1 left-1 cursor-grab rounded bg-black/40 px-1 text-white opacity-0 group-hover:opacity-100">
+                    <GripVertical className="h-3 w-3" />
+                  </span>
+                )}
               </div>
             ))}
-            {data.photos.length < MAX_PHOTOS && (
+            {photoItems.length < MAX_PHOTOS && (
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
@@ -521,9 +624,63 @@ export default function ProfileEditPage() {
       </section>
 
       <EditSection id="horoscope" title="Horoscope details">
-        <p className="text-sm text-muted-foreground">
-          {data.horoscopeName ? `Uploaded: ${data.horoscopeName}` : "No horoscope PDF yet."}
-        </p>
+        {data.horoscopeName ? (
+          <div className="rounded-xl border border-border bg-muted/30 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold">{data.horoscopeName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {data.horoscopeSize ? `${(data.horoscopeSize / 1024 / 1024).toFixed(1)} MB · PDF` : "PDF uploaded"}
+                </p>
+              </div>
+            </div>
+            {pdfPreviewUrl && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="soft" size="sm">
+                      <Eye className="mr-1.5 h-4 w-4" />
+                      Preview PDF
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-h-[90vh] w-[min(96vw,720px)] max-w-none p-0">
+                    <DialogHeader className="border-b border-border px-4 py-3">
+                      <DialogTitle>{data.horoscopeName}</DialogTitle>
+                    </DialogHeader>
+                    <iframe
+                      src={pdfPreviewUrl}
+                      title={data.horoscopeName}
+                      className="h-[min(70vh,640px)] w-full border-0"
+                    />
+                  </DialogContent>
+                </Dialog>
+                <Link
+                  href={pdfPreviewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-9 items-center rounded-full border-2 border-border bg-card px-4 text-xs font-semibold hover:border-primary/30 hover:text-primary"
+                >
+                  <ExternalLink className="mr-1.5 h-4 w-4" />
+                  Open in new tab
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No horoscope PDF yet.</p>
+        )}
+
+        <input
+          ref={horoscopeRef}
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={(e) => onHoroscopeFile(e.target.files)}
+        />
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Birth time">
             <Input value={data.birthTime} onChange={(e) => update({ birthTime: e.target.value })} placeholder="e.g. 08:30 AM" />
@@ -532,24 +689,23 @@ export default function ProfileEditPage() {
             <Input value={data.birthPlace} onChange={(e) => update({ birthPlace: e.target.value })} placeholder="e.g. Chennai, TN" />
           </Field>
         </div>
-        <Field label="Horoscope PDF file name (demo)">
-          <Input
-            value={data.horoscopeName}
-            onChange={(e) => update({ horoscopeName: e.target.value, horoscopeSize: e.target.value ? 120000 : 0 })}
-            placeholder="my-jathagam.pdf"
-          />
-        </Field>
+        <Button type="button" variant="outline" onClick={() => horoscopeRef.current?.click()}>
+          <Upload className="mr-1.5 h-4 w-4" />
+          {data.horoscopeName ? "Replace horoscope PDF" : "Upload horoscope PDF"}
+        </Button>
       </EditSection>
 
       <div className="sticky bottom-20 z-20 flex gap-3 bg-background/90 py-3 backdrop-blur md:static md:bottom-auto md:bg-transparent md:py-0">
         <Button variant="outline" className="flex-1" onClick={() => router.push("/profile")}>
           Cancel
         </Button>
-        <Button className="flex-[1.4]" onClick={onSave}>
+        <Button className="flex-[1.4]" onClick={onSave} disabled={updateMutation.isPending}>
           {saved ? (
             <>
               <Check className="mr-1.5 h-4 w-4" /> Saved
             </>
+          ) : updateMutation.isPending ? (
+            "Saving…"
           ) : (
             "Save changes"
           )}

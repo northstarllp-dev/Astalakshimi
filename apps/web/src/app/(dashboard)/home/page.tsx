@@ -1,316 +1,376 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MatchThumbCard } from "@/components/dashboard/match-thumb-card"
-import { CompletenessRing } from "@/components/profile/completeness-ring"
+import { HomeMatchRow } from "@/components/dashboard/home-match-row"
+import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import {
   PROFILE_COMPLETE_THRESHOLD,
   canAccessFullPortal,
   getProfileActions,
-  getProfilesYouViewed,
-  getShortlistedYou,
-  getTopMatches,
-  getWhoViewedYou,
+  getProfileCompletenessStats,
+  isProfileComplete,
 } from "@/lib/portal-access"
-import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
-import { profileCompleteness } from "@/lib/user-activity"
-import { getMatchById } from "@/lib/matches"
-import { useInterestsQuery, useMarkVerifiedMutation, usePaidQuery, useProfileQuery } from "@/hooks/queries"
-import { cn } from "@/lib/utils"
 import {
-  Bookmark,
-  CheckCircle2,
-  ChevronRight,
-  Clock3,
-  Compass,
-  Eye,
-  Heart,
-  Lock,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react"
+  useActivitySummaryQuery,
+  useInterestsQuery,
+  useMarkVerifiedMutation,
+  useRejectVerificationMutation,
+  usePaidQuery,
+  useProfileQuery,
+  useTopMatchesQuery,
+} from "@/hooks/queries"
+import { cn, getMediaUrl } from "@/lib/utils"
+import { AlertCircle, ChevronRight, Clock3, Lock, ShieldCheck } from "lucide-react"
 
-type ActivityItem = {
-  id: string
-  name: string
-  photo: string
-  subtitle: string
-}
-
-function ActivityCard({
-  title,
+function InboxTile({
+  label,
   count,
-  icon: Icon,
-  items,
+  href,
   locked,
   lockHint,
-  href,
 }: {
-  title: string
+  label: string
   count: number
-  icon: React.ElementType
-  items: ActivityItem[]
-  locked: boolean
-  lockHint: string
   href: string
+  locked?: boolean
+  lockHint?: string
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <div className="flex items-center justify-between gap-2 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Icon className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-sm font-semibold">{title}</h2>
-            <p className="text-[11px] text-muted-foreground">{count} this week</p>
-          </div>
-        </div>
-        {locked ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-            <Lock className="h-3 w-3" /> Locked
-          </span>
-        ) : (
-          <Link href={href} className="text-xs font-semibold text-primary hover:underline">
-            See all
-          </Link>
-        )}
-      </div>
-      <div className="relative border-t border-border/70">
-        <ul className="flex gap-3 overflow-x-auto px-4 py-3 hide-scrollbar">
-          {items.map((item) => (
-            <li key={item.id} className="w-16 shrink-0 text-center">
-              <div className="relative mx-auto size-14 overflow-hidden rounded-full border-2 border-secondary/30 bg-muted">
-                {item.photo ? (
-                  <Image
-                    src={item.photo}
-                    alt={item.name}
-                    fill
-                    className={cn("object-cover object-[center_18%]", locked && "blur-[6px] scale-110")}
-                    sizes="56px"
-                  />
-                ) : null}
-              </div>
-              <p className={cn("mt-1 truncate text-[11px] font-medium", locked && "blur-[3px] select-none")}>
-                {item.name.split(" ")[0]}
-              </p>
-            </li>
-          ))}
-        </ul>
-        {locked && (
-          <Link
-            href={href}
-            className="absolute inset-0 flex items-center justify-center bg-card/55 px-4 backdrop-blur-[1px]"
-          >
-            <p className="rounded-full border border-secondary/40 bg-card/95 px-3 py-1.5 text-center text-xs font-semibold text-foreground shadow-sm">
-              {lockHint}
-            </p>
-          </Link>
-        )}
-      </div>
-    </section>
+    <Link
+      href={href}
+      prefetch={false}
+      className="flex min-h-[76px] flex-col justify-center border-border px-3 py-3 odd:border-r [&:nth-child(-n+2)]:border-b hover:bg-muted/40 sm:px-4 md:border-b-0 md:border-r md:last:border-r-0"
+    >
+      <p className="font-serif text-2xl font-semibold leading-none tabular-nums text-primary sm:text-[1.75rem]">
+        {locked ? "–" : count}
+      </p>
+      <p className="mt-1.5 flex items-center gap-1 text-[12px] leading-snug text-muted-foreground">
+        {locked ? <Lock className="h-3 w-3 shrink-0" aria-hidden /> : null}
+        {locked ? lockHint || label : label}
+      </p>
+    </Link>
   )
 }
 
 export default function HomePage() {
   const router = useRouter()
-  const { data: profile = null } = useProfileQuery()
+  const { data: profile = null, isLoading: profileLoading } = useProfileQuery()
   const { data: paid = false } = usePaidQuery()
   const { data: interests } = useInterestsQuery()
   const markVerified = useMarkVerifiedMutation()
-  const interestCount = interests?.pendingCount ?? 0
+  const rejectVerification = useRejectVerificationMutation()
+  const { data: topMatchesData, isLoading: matchesLoading } = useTopMatchesQuery()
+  const { data: activitySummary } = useActivitySummaryQuery()
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
-  const completeness = profile ? profileCompleteness(profile) : 0
+  const lookingFor =
+    profile?.gender === "Female" ? "grooms" : profile?.gender === "Male" ? "brides" : "matches"
   const pending = profile?.verificationStatus === "pending"
   const verified = profile?.verificationStatus === "verified"
+  const rejected = profile?.verificationStatus === "rejected"
+  const rejectionReason =
+    profile?.rejectionReason || "Your verification documents could not be approved."
   const unlocked = canAccessFullPortal(profile)
-  const nextActions = getProfileActions(profile).filter((a) => !a.done).slice(0, 4)
-  const topMatches = getTopMatches(4)
-  const viewers = getWhoViewedYou()
-  const youViewed = getProfilesYouViewed()
-  const shortlistedYou = getShortlistedYou()
-  const interestPeople = (interests?.received ?? [])
-    .filter((i) => i.status === "pending")
-    .map((i) => {
-      const match = getMatchById(i.profileId)
-      return {
-        id: i.profileId,
-        name: match?.fullName ?? "Member",
-        photo: match?.photos[0] ?? "",
-        subtitle: i.time,
-      }
-    })
+  const canSeeMore = isProfileComplete(profile)
+  const actions = getProfileActions(profile)
+  const completenessStats = getProfileCompletenessStats(profile)
+  const completeness = completenessStats.percentage
+  const nextActions = actions.filter((a) => !a.done).slice(0, 3)
+  const allMatches = topMatchesData || []
+  const previewMatches = allMatches.slice(0, 3)
+
+  const viewers = activitySummary?.viewers || []
+  const youViewed = activitySummary?.youViewed || []
+  const shortlistedYou = activitySummary?.shortlistedYou || []
+  const interestPeople =
+    activitySummary?.interestsReceived?.length > 0
+      ? activitySummary.interestsReceived
+      : (interests?.received ?? [])
+          .filter((i: any) => i.status === "pending")
+          .map((i: any) => ({
+            id: i.profileId,
+            name: i.profile?.fullName ?? "Member",
+            photo: i.profile?.photo ?? "",
+            subtitle: i.time,
+          }))
+  const interestCount = interests?.pendingCount ?? interestPeople.length
 
   return (
-    <main className="mx-auto max-w-5xl space-y-5 px-3 py-5 sm:px-4 md:py-8">
-      <div>
-        <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Namaste</p>
-        <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">
-          Welcome, {firstName}
-        </h1>
-        <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-          {unlocked
-            ? "Your matches and activity, in one place."
-            : "Your profile is just getting started. Finish it and get verified to open Discover."}
-        </p>
-      </div>
-
-      {!unlocked && profile && (
-        <section className="overflow-hidden rounded-2xl border border-secondary/40 bg-gradient-to-r from-[#fff8ef] to-card p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <CompletenessRing percentage={completeness} size={84} strokeWidth={8} />
-            <div className="min-w-0 flex-1">
-              <p className="font-serif text-lg font-bold">Profile {completeness}% complete</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Signup is kept short on purpose. Add the rest to reach {PROFILE_COMPLETE_THRESHOLD}% and
-                {verified ? " " : " get verified to "}unlock Discover, Interests, and full search.
-              </p>
-              {nextActions.length > 0 && (
-                <ul className="mt-3 flex flex-wrap gap-2">
-                  {nextActions.map((action) => (
-                    <Link key={action.id} href={action.href}>
-                      <Badge variant="outline" className="h-7 font-semibold">
-                        {action.label}
-                      </Badge>
-                    </Link>
-                  ))}
-                </ul>
-              )}
-              <Link href="/profile/edit" className="mt-3 inline-block">
-                <Button size="sm">
-                  Complete profile <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {unlocked && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
-            <CheckCircle2 className="h-4 w-4" />
-            Profile complete · Verified · Full portal open
-          </div>
-          <Link href="/dashboard">
-            <Button size="sm">
-              <Compass className="mr-1.5 h-3.5 w-3.5" /> Open Discover
-            </Button>
-          </Link>
-        </section>
-      )}
-
-      {pending && (
-        <section className="rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-[#fff8ef] p-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
-              <Clock3 className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-amber-950">Verification under review</p>
-              <p className="mt-0.5 text-sm text-amber-900/75">
-                Photos stay private until approval — usually within {VERIFICATION_SLA_HOURS} hours.
-                Discover and Interests will ask you to complete your profile until you are verified.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="mt-3 border-amber-300 bg-card"
-                onClick={() => markVerified.mutate()}
-              >
-                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Approve now (demo)
-              </Button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {!profile && (
-        <section className="rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center">
-          <p className="font-semibold">No profile in this session</p>
-          <p className="mt-1 text-sm text-muted-foreground">Create a profile to start matching.</p>
-          <Button className="mt-4" onClick={() => router.push("/register")}>
+    <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 md:py-6">
+      {!profile && !profileLoading ? (
+        <section className="border border-dashed border-border bg-card px-4 py-12 text-center">
+          <p className="font-serif text-xl font-semibold">No profile yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">Create a profile to see matches from your community.</p>
+          <Button className="mt-5 rounded-md" onClick={() => router.push("/register")}>
             Create profile
           </Button>
         </section>
-      )}
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+          <div className="min-w-0 space-y-4">
+            <div className="flex items-center gap-3">
+              {profile?.photos?.[0] ? (
+                <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border">
+                  <Image
+                    src={getMediaUrl(profile.photos[0])}
+                    alt=""
+                    fill
+                    className={cn("object-cover object-[center_18%]", pending && "blur-[2px]")}
+                    sizes="48px"
+                  />
+                </span>
+              ) : null}
+              <div className="min-w-0">
+                <h1 className="font-serif text-2xl font-semibold leading-tight md:text-[1.75rem]">
+                  How {lookingFor} appear to you
+                </h1>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  A short preview of three profiles. Complete {PROFILE_COMPLETE_THRESHOLD}% of your profile to see the rest
+                  {firstName !== "Member" ? `, ${firstName}` : ""}.
+                </p>
+              </div>
+            </div>
 
-      <section>
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">For you</p>
-            <h2 className="font-serif text-xl font-bold">Top matches</h2>
-            <p className="text-sm text-muted-foreground">Four profiles picked from your preferences.</p>
+            {pending ? (
+              <div className="flex items-start gap-3 border border-[#e8d4a8] bg-[#fff8ef] px-3 py-3 sm:px-4">
+                <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-[#8a6a12]" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">Verification under review</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Photos stay private until approval — usually within {VERIFICATION_SLA_HOURS} hours.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 rounded-md"
+                      onClick={() => markVerified.mutate()}
+                    >
+                      <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+                      Approve now (demo)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 rounded-md text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => rejectVerification.mutate()}
+                    >
+                      Simulate reject (demo)
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {rejected ? (
+              <div className="flex items-start gap-3 border border-destructive/25 bg-destructive/5 px-3 py-3 sm:px-4">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-destructive">Verification rejected</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">{rejectionReason}</p>
+                  <Link href="/profile/verify" className="mt-2 inline-block">
+                    <Button size="sm" className="h-8 rounded-md">
+                      Re-upload selfie / ID
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+
+            <section className="grid grid-cols-2 overflow-hidden rounded-md border border-border bg-card md:grid-cols-4">
+              <InboxTile
+                label="Interests received"
+                count={interestCount}
+                href="/interests"
+                locked={!unlocked}
+                lockHint="Complete profile"
+              />
+              <InboxTile
+                label="Who viewed you"
+                count={viewers.length}
+                href={paid ? "/notifications" : "/plans"}
+                locked={!unlocked || !paid}
+                lockHint={!paid ? "Premium" : "Complete profile"}
+              />
+              <InboxTile
+                label="Shortlisted you"
+                count={shortlistedYou.length}
+                href={paid ? "/interests?tab=shortlisted" : "/plans"}
+                locked={!unlocked || !paid}
+                lockHint={!paid ? "Premium" : "Complete profile"}
+              />
+              <InboxTile
+                label="You viewed"
+                count={youViewed.length}
+                href="/dashboard"
+                locked={!unlocked}
+                lockHint="Complete profile"
+              />
+            </section>
+
+            <section className="overflow-hidden rounded-md border border-border bg-card">
+              <div className="flex items-center justify-between border-b border-border px-3 py-2.5 sm:px-4">
+                <div>
+                  <h2 className="font-serif text-lg font-semibold">Sample {lookingFor}</h2>
+                  <p className="text-xs text-muted-foreground">
+                    This is how a bride or groom card looks  name, community, city, and education.
+                  </p>
+                </div>
+                {canSeeMore ? (
+                  <Link href="/dashboard" className="shrink-0 text-sm font-semibold text-primary hover:underline">
+                    See all
+                  </Link>
+                ) : (
+                  <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+                    {completeness}% / {PROFILE_COMPLETE_THRESHOLD}%
+                  </span>
+                )}
+              </div>
+
+              {matchesLoading ? (
+                <div className="space-y-0">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex gap-3 border-b border-border p-4 last:border-b-0">
+                      <div className="h-[148px] w-[112px] shrink-0 animate-pulse rounded-md bg-muted" />
+                      <div className="flex-1 space-y-2 py-1">
+                        <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+                        <div className="h-4 w-56 animate-pulse rounded bg-muted" />
+                        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : previewMatches.length === 0 ? (
+                <div className="px-4 py-10 text-center">
+                  <p className="text-sm font-semibold">No sample profiles yet</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Finish a few details so we can show how {lookingFor} will appear here.
+                  </p>
+                  <Link href="/profile/edit" className="mt-4 inline-block">
+                    <Button size="sm" className="rounded-md">
+                      Complete profile
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <ul>
+                    {previewMatches.map((match: any) => (
+                      <li key={match.id}>
+                        <HomeMatchRow match={match} />
+                      </li>
+                    ))}
+                  </ul>
+                  {!canSeeMore ? (
+                    <div className="border-t border-border bg-[#fff8ef] px-4 py-4 text-center sm:px-5">
+                      <p className="font-serif text-base font-semibold">More {lookingFor} are waiting</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Your profile is {completeness}% complete. Reach {PROFILE_COMPLETE_THRESHOLD}% to unlock Discover
+                        and see every matching profile  not just this preview.
+                      </p>
+                      <Link href="/profile/edit" className="mt-3 inline-block">
+                        <Button size="sm" className="rounded-md">
+                          Complete profile to see more
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </section>
           </div>
-          <Link href="/dashboard" className="text-xs font-semibold text-primary hover:underline">
-            See all
-          </Link>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {topMatches.map((match, i) => (
-            <MatchThumbCard key={match.id} match={match} priority={i === 0} />
-          ))}
-        </div>
-      </section>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ActivityCard
-          title="Who viewed you"
-          count={viewers.length}
-          icon={Eye}
-          items={viewers}
-          locked={!unlocked || !paid}
-          lockHint={!unlocked ? "Complete your profile" : "Premium members see who viewed you"}
-          href={!unlocked ? "/profile/edit" : paid ? "/notifications" : "/plans"}
-        />
-        <ActivityCard
-          title="Profiles you viewed"
-          count={youViewed.length}
-          icon={Compass}
-          items={youViewed}
-          locked={!unlocked}
-          lockHint="Complete your profile"
-          href="/dashboard"
-        />
-        <ActivityCard
-          title="Interests received"
-          count={interestCount || interestPeople.length}
-          icon={Heart}
-          items={interestPeople}
-          locked={!unlocked}
-          lockHint="Complete your profile"
-          href="/interests"
-        />
-        <ActivityCard
-          title="Shortlisted you"
-          count={shortlistedYou.length}
-          icon={Bookmark}
-          items={shortlistedYou}
-          locked={!unlocked || !paid}
-          lockHint={!unlocked ? "Complete your profile" : "Upgrade to see who shortlisted you"}
-          href={!unlocked ? "/interests?tab=shortlisted" : paid ? "/interests?tab=shortlisted" : "/plans"}
-        />
-      </div>
+          <aside className="space-y-4 lg:sticky lg:top-20">
+            <section className="overflow-hidden rounded-md border border-border bg-card">
+              <div className="border-b border-border px-4 py-3">
+                <p className="text-sm font-semibold">Your profile</p>
+              </div>
+              <div className="px-4 py-3">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span className="text-muted-foreground">Completeness</span>
+                  <span className="font-semibold tabular-nums">{completeness}%</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {completenessStats.filled} of {completenessStats.total} details filled
+                </p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${Math.min(100, completeness)}%` }}
+                  />
+                </div>
+                {verified ? (
+                  <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                    <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                    Photo verified
+                  </p>
+                ) : rejected ? (
+                  <p className="mt-2 text-xs text-destructive">
+                    Verification rejected — re-upload required
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {pending ? "Verification in progress" : "Get verified to appear higher in search"}
+                  </p>
+                )}
+                {nextActions.length > 0 ? (
+                  <ul className="mt-3 space-y-1.5">
+                    {nextActions.map((action) => (
+                      <li key={action.id}>
+                        <Link
+                          href={action.href}
+                          className="flex items-center justify-between text-sm text-primary hover:underline"
+                        >
+                          {action.label}
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {canSeeMore
+                      ? "You can now browse all matching profiles."
+                      : "Add a few more details to reach 80%."}
+                  </p>
+                )}
+                <Link href="/profile/edit" className="mt-3 block">
+                  <Button variant="outline" size="sm" className="w-full rounded-md">
+                    Edit profile
+                  </Button>
+                </Link>
+              </div>
+            </section>
 
-      <Link
-        href="/plans"
-        className="flex items-center gap-3 rounded-2xl border border-secondary/30 bg-gradient-to-r from-[#fff8ef] to-card p-4 shadow-sm"
-      >
-        <span className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Sparkles className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold">Membership plans</p>
-          <p className="text-sm text-muted-foreground">See who viewed you, shortlisted you, and more.</p>
+            <Link
+              href="/plans"
+              className="block rounded-md bg-primary px-4 py-4 text-primary-foreground"
+            >
+              <p className="font-serif text-lg font-semibold">See who viewed you</p>
+              <p className="mt-1 text-sm text-primary-foreground/80">
+                Premium members get visitor lists, extra contacts, and priority in search.
+              </p>
+              <span className="mt-3 inline-flex items-center text-sm font-semibold">
+                View plans <ChevronRight className="ml-0.5 h-4 w-4" />
+              </span>
+            </Link>
+
+            <section className="rounded-md border border-border bg-card px-4 py-3">
+              <p className="text-sm font-semibold">Need help?</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Assisted service can call families and introduce a match for you.
+              </p>
+              <Link href="/plans" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
+                Learn more
+              </Link>
+            </section>
+          </aside>
         </div>
-        <ChevronRight className="h-5 w-5 text-muted-foreground" />
-      </Link>
+      )}
     </main>
   )
 }

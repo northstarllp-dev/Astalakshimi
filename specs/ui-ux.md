@@ -43,7 +43,7 @@ Class: `.logo-gold-gradient`
 | Match score badge | `#10b981` (`bg-emerald-500`) on white text |
 | Under review | `#fef3c7` / `#92400e` (amber-50 / amber-800) |
 | Photo overlay gradient | `from-black/80` → transparent |
-| Overlay badge (legacy, do not use) | `bg-white/15` — too faint; use `#fffbf4` instead |
+| Overlay badge (legacy, do not use) | `bg-white/15`  too faint; use `#fffbf4` instead |
 
 ## Opacity recipes
 
@@ -106,7 +106,7 @@ Body: antialiased, `-webkit-text-size-adjust: 100%`.
 
 ## Buttons
 
-[`components/ui/button.tsx`](../apps/web/src/components/ui/button.tsx) — all **pills**.
+[`components/ui/button.tsx`](../apps/web/src/components/ui/button.tsx)  all **pills**.
 
 | Variant | Look |
 | --- | --- |

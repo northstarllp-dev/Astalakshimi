@@ -3,11 +3,11 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { BadgeCheck, ChevronLeft, ChevronRight, Heart, MapPin, Sparkles, Star } from "lucide-react"
+import { cn, getMediaUrl } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import type { MatchProfile } from "@/lib/matches"
-import { cn } from "@/lib/utils"
+import { BadgeCheck, ChevronLeft, ChevronRight, Heart, MapPin, Sparkles, Star } from "lucide-react"
+import { useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
 
 export function MatchListCard({
   match,
@@ -16,17 +16,30 @@ export function MatchListCard({
   onSkip,
   onConnect,
 }: {
-  match: MatchProfile
+  match: any
   featured?: boolean
   priority?: boolean
   onSkip: (id: string) => void
   onConnect?: (id: string) => void
 }) {
-  const education = match.education.split(/\s+/)[0]?.trim() ?? match.education
+  const education = (match.education || match.educationLevel || "").split(/\s+/)[0]?.trim() || match.education || match.educationLevel || "Not specified"
   const [connected, setConnected] = React.useState(false)
   const [activePhoto, setActivePhoto] = React.useState(0)
   const [paused, setPaused] = React.useState(false)
-  const photos = match.photos
+  const photos = match.photos || []
+
+  const { data: shortlistData = [] } = useShortlistQuery()
+  const toggleShortlistMutation = useToggleShortlistMutation()
+
+  const isShortlisted = shortlistData.some((item: any) =>
+    typeof item === "string" ? item === match.id : (item.id === match.id || item.profileId === match.id)
+  )
+
+  const handleToggleShortlist = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    toggleShortlistMutation.mutate(match.id)
+  }
 
   // Auto-cycle photos every 3 s, pause on hover / touch
   React.useEffect(() => {
@@ -65,16 +78,20 @@ export function MatchListCard({
             className="relative block aspect-[4/5] overflow-hidden md:aspect-auto md:min-h-[300px]"
           >
             <Image
-              src={photos[activePhoto] ?? photos[0]}
+              src={getMediaUrl(photos[activePhoto] ?? photos[0])}
               alt={`${match.fullName}, ${match.age}`}
               fill
               priority={priority}
-              className="object-cover object-[center_18%] transition-all duration-500"
+              className={cn(
+                "object-cover object-[center_18%] transition-all duration-500",
+                match.blurPhoto ? "blur-xl scale-110" : ""
+              )}
               sizes="(max-width: 768px) 100vw, 260px"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-black/20" />
 
-            {/* Photo badges — match % + verified only, stacked */}
+
+            {/* Photo badges  match % + verified only, stacked */}
             <div className="absolute left-2.5 top-2.5 flex flex-col items-start gap-1.5">
               <Badge className="border-transparent bg-emerald-500 text-[11px] font-bold text-white">
                 <Star className="fill-current" /> {match.matchPercent}%
@@ -88,6 +105,22 @@ export function MatchListCard({
                 </Badge>
               )}
             </div>
+
+            {/* Shortlist Star toggle button on photo */}
+            <button
+              type="button"
+              onClick={handleToggleShortlist}
+              disabled={toggleShortlistMutation.isPending}
+              aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+              className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition hover:bg-black/75 hover:scale-105 active:scale-95"
+            >
+              <Star
+                className={cn(
+                  "h-4 w-4 transition-colors",
+                  isShortlisted ? "fill-amber-400 text-amber-400" : "text-white"
+                )}
+              />
+            </button>
 
             {/* Name overlay */}
             <div className="absolute inset-x-0 bottom-0 p-3 pb-7 text-white md:p-3.5 md:pb-8">
@@ -107,9 +140,10 @@ export function MatchListCard({
           {/* Dots sit outside the Link so they are not nested in an <a> */}
           {photos.length > 1 && (
             <div className="absolute bottom-3 left-3 z-10 flex gap-1 md:bottom-3.5 md:left-3.5">
-              {photos.map((_, i) => (
+              {photos.map((_: any, i: number) => (
                 <button
                   key={i}
+
                   type="button"
                   onClick={() => setActivePhoto(i)}
                   aria-label={`Photo ${i + 1}`}

@@ -3,14 +3,14 @@
 import * as React from "react"
 import { usePathname } from "next/navigation"
 import { CompleteProfileGate } from "@/components/layout/complete-profile-gate"
-import { canAccessFullPortal } from "@/lib/portal-access"
 import { useProfileQuery } from "@/hooks/queries"
+import { canBrowseMatches } from "@/lib/portal-access"
 
 const SECTION_LABELS: Record<string, string> = {
   "/dashboard": "Discover",
   "/search": "search",
   "/interests": "Interests",
-  "/shortlist": "your shortlist",
+  "/shortlists": "your shortlists",
 }
 
 export function RequireFullPortal({ children }: { children: React.ReactNode }) {
@@ -18,7 +18,7 @@ export function RequireFullPortal({ children }: { children: React.ReactNode }) {
   const { data: profile = null, isPending } = useProfileQuery()
 
   if (isPending) return null
-  if (!canAccessFullPortal(profile)) {
+  if (!canBrowseMatches(profile)) {
     const section =
       Object.entries(SECTION_LABELS).find(([path]) => pathname.startsWith(path))?.[1] ?? "this section"
     return <CompleteProfileGate section={section} />
