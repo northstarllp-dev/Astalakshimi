@@ -24,6 +24,7 @@ export interface SendOtpRequest {
   phone: string;
   referredBy?: string;
   consentAccepted?: boolean;
+  type?: 'login' | 'register';
 }
 
 export interface VerifyOtpRequest {
