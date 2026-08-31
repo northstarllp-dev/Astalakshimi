@@ -266,12 +266,9 @@ export function useCreateAdminProfileMutation() {
 
       const s3Keys: string[] = []
       for (const file of photos) {
-        const contentType = file.type === "image/jpg" ? "image/jpeg" : file.type || "image/jpeg"
-        const { uploadUrl, s3Key } = await apiClient.admin.getPhotoUploadUrl(profile.id, {
-          contentType,
-          fileSize: file.size,
-        })
-        await apiClient.media.uploadFileToS3(uploadUrl, file, contentType)
+        const formData = new FormData()
+        formData.append("file", file)
+        const { s3Key } = await apiClient.admin.uploadPhoto(profile.id, formData)
         s3Keys.push(s3Key)
       }
       return apiClient.admin.attachPhotos(profile.id, s3Keys)

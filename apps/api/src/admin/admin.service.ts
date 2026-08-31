@@ -397,7 +397,7 @@ export class AdminService {
     return this.getProfile(profileId);
   }
 
-  async getPhotoUploadUrl(profileId: string, contentType: string, fileSize: number) {
+  async uploadAdminPhoto(profileId: string, buffer: Buffer, contentType: string, fileSize: number) {
     const [profile] = await this.db
       .select({ userId: profiles.userId })
       .from(profiles)
@@ -405,7 +405,16 @@ export class AdminService {
       .limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
 
-    return this.s3Provider.generateUploadUrl(profile.userId, 'profile_photo', contentType, fileSize);
+    const { s3Key, bucket } = await this.s3Provider.generateUploadUrl(
+      profile.userId,
+      'profile_photo',
+      contentType,
+      fileSize
+    );
+
+    await this.s3Provider.putObject(s3Key, buffer, contentType, bucket);
+    
+    return { s3Key };
   }
 
   async attachPhotos(profileId: string, s3Keys: string[]) {
