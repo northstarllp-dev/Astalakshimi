@@ -169,13 +169,11 @@ export default function MyProfilePage() {
                 <p className="font-serif text-sm font-bold">Profile completeness</p>
                 <p className="mt-0.5 text-xs text-muted-foreground leading-tight">
                   {completenessStats.filled} of {completenessStats.total} details filled.
-                  {completeness >= 90
-                    ? " Excellent — your profile stands out to families."
-                    : completeness >= 80
-                      ? " Profile complete. Discover opens after verification."
-                      : completeness >= 60
-                        ? " Good progress. Reach 80% to unlock Discover."
-                        : " Signup is short — add details to unlock matches."}
+                  {completenessStats.requiredComplete
+                    ? completeness >= 90
+                      ? " Excellent — your profile stands out to families."
+                      : " Required details are in. Discover is unlocked — add more to stand out."
+                    : " Fill required details to unlock Discover. Specialization and employer are optional."}
                 </p>
               </div>
             </div>

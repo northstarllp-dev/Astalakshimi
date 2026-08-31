@@ -86,6 +86,13 @@ export const profileEditSchema = z
     religion: z.string().min(1, "Religion is required."),
     motherTongue: z.string().min(1, "Mother tongue is required."),
     city: z.string().trim().min(2, "City is required."),
+    education: z.string().optional(),
+    otherEducation: z.string().optional(),
+    degree: z.string().optional(),
+    occupation: z.string().optional(),
+    otherOccupation: z.string().optional(),
+    profession: z.string().optional(),
+    annualIncome: z.string().optional(),
     prefReligion: z.array(z.string()).min(1, "Select at least one preferred religion."),
     aboutMe: z.string().max(300, "Keep this under 300 characters."),
     prefAgeMin: z.number().int().min(18).max(80),
@@ -105,6 +112,28 @@ export const profileEditSchema = z
     const age = dobAge(value.dobDay, value.dobMonth, value.dobYear, value.gender)
     if (!age.ok) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: age.message, path: ["dobYear"] })
+    }
+    const hasText = (v: unknown) => typeof v === "string" && v.trim().length > 0
+    if (!hasText(value.education) && !hasText(value.otherEducation) && !hasText(value.degree)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Highest education is required.",
+        path: ["education"],
+      })
+    }
+    if (!hasText(value.occupation) && !hasText(value.otherOccupation) && !hasText(value.profession)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Occupation is required.",
+        path: ["occupation"],
+      })
+    }
+    if (!hasText(value.annualIncome)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Annual income is required.",
+        path: ["annualIncome"],
+      })
     }
   })
 
