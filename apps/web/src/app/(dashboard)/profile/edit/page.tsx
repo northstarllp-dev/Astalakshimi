@@ -176,10 +176,10 @@ export default function ProfileEditPage() {
   }
 
   const onSave = form.handleSubmit((values) => {
-    const dirtyFields = form.formState.dirtyFields
     const delta: Record<string, unknown> = {}
-    for (const key of Object.keys(dirtyFields)) {
-      if (key !== "photos" && key !== "photoS3Keys" && key !== "photoObjects") {
+    const excludeKeys = new Set(["photos", "photoS3Keys", "photoObjects", "selfiePhoto", "govtIdPhoto"])
+    for (const key of Object.keys(values)) {
+      if (!excludeKeys.has(key)) {
         delta[key] = (values as Record<string, unknown>)[key]
       }
     }

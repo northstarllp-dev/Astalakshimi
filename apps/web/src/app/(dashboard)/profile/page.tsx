@@ -11,6 +11,7 @@ import { useProfileQuery } from "@/hooks/queries"
 import { emptySignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
 import { getProfileCompletenessStats, getRequiredFieldEditHash } from "@/lib/portal-access"
+import { apiClient } from "@/lib/api-client"
 import {
   Camera,
   CheckCircle2,
@@ -20,7 +21,9 @@ import {
   IdCard,
   Pencil,
   Phone,
+  Settings,
   ShieldCheck,
+  LogOut,
   Sparkles,
   Users,
   XCircle,
@@ -147,17 +150,28 @@ export default function MyProfilePage() {
             </div>
             
             {/* Quick Actions moved to the side on desktop */}
-            <div className="flex shrink-0 items-center gap-2 pb-1">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 pb-1">
               <Link href="/profile/edit">
                 <Button variant="outline" size="sm" className="h-9">
                   <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit Profile
                 </Button>
               </Link>
               <Link href="/settings">
-                <Button variant="secondary" size="sm" className="h-9 w-9 px-0" aria-label="Privacy Settings">
-                  <ShieldCheck className="h-4 w-4" />
+                <Button variant="outline" size="sm" className="h-9 w-9 px-0 text-primary hover:bg-primary/10 hover:text-primary border-primary/20" aria-label="Settings">
+                  <Settings className="h-4 w-4" />
                 </Button>
               </Link>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-9 text-primary hover:bg-primary/10 hover:text-primary border-primary/20" 
+                onClick={async () => {
+                  await apiClient.auth.logout()
+                  window.location.href = "/"
+                }}
+              >
+                <LogOut className="mr-1.5 h-3.5 w-3.5" /> Log out
+              </Button>
             </div>
           </div>
 
