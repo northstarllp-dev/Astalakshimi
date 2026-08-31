@@ -109,7 +109,7 @@ export default function AdminProfileReviewPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <ReviewPane title="Photos" icon={Check}>
           <div className="grid grid-cols-2 gap-2">
-            {profile.photos.map((photo) => (
+            {profile.photos.map((photo: { id: string; url: string; status: string }) => (
               <div key={photo.id} className="relative aspect-[3/4] overflow-hidden rounded-xl border border-border">
                 <Image src={photo.url} alt="" fill className="object-cover" sizes="200px" />
                 <span
