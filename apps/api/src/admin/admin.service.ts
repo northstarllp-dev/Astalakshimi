@@ -68,14 +68,20 @@ export class AdminService {
   }
 
   async updateVerificationStatus(profileId: string, status: 'verified' | 'rejected', rejectionReason?: string) {
-    const [updated] = await this.db
+    let [updated] = await this.db
       .update(verifications)
       .set({ status, rejectionReason })
       .where(eq(verifications.profileId, profileId))
       .returning();
 
     if (!updated) {
-      throw new NotFoundException('Verification request not found for this profile');
+      const [inserted] = await this.db.insert(verifications).values({
+        profileId,
+        status,
+        rejectionReason,
+        method: 'govt_id',
+      }).returning();
+      updated = inserted;
     }
 
     const [profile] = await this.db.select({ userId: profiles.userId }).from(profiles).where(eq(profiles.id, profileId));
