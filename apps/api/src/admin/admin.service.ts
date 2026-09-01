@@ -68,14 +68,20 @@ export class AdminService {
   }
 
   async updateVerificationStatus(profileId: string, status: 'verified' | 'rejected', rejectionReason?: string) {
-    const [updated] = await this.db
+    let [updated] = await this.db
       .update(verifications)
       .set({ status, rejectionReason })
       .where(eq(verifications.profileId, profileId))
       .returning();
 
     if (!updated) {
-      throw new NotFoundException('Verification request not found for this profile');
+      const [inserted] = await this.db.insert(verifications).values({
+        profileId,
+        status,
+        rejectionReason,
+        method: 'govt_id',
+      }).returning();
+      updated = inserted;
     }
 
     const [profile] = await this.db.select({ userId: profiles.userId }).from(profiles).where(eq(profiles.id, profileId));
@@ -99,49 +105,42 @@ export class AdminService {
   async getAllProfiles() {
     const records = await this.db
       .select({
-        id: profiles.id,
-        userId: profiles.userId,
-        fullName: profiles.fullName,
-        gender: profiles.gender,
-        city: profiles.city,
-        religion: profiles.religion,
-        caste: profiles.caste,
-        motherTongue: profiles.motherTongue,
-        aboutMe: profiles.aboutMe,
+        profile: profiles,
         phone: users.phone,
         accountStatus: users.status,
         verificationStatus: verifications.status,
         submittedAt: verifications.updatedAt,
-        createdAt: profiles.createdAt,
       })
       .from(profiles)
       .innerJoin(users, eq(profiles.userId, users.id))
-      .leftJoin(verifications, eq(profiles.id, verifications.profileId));
+      .leftJoin(verifications, eq(profiles.id, verifications.profileId))
+      .orderBy(sql`"profiles"."created_at" DESC`);
 
     if (!records.length) return [];
 
-    const profileIds = records.map((r) => r.id);
+    const profileIds = records.map((r) => r.profile.id);
 
-    const [dbPhotos, dbHoroscopes, activeSubs] = await Promise.all([
+    const [dbPhotos, dbHoroscopes, dbFamily, dbLifestyle, dbPreferences, activeSubs] = await Promise.all([
       this.db
-        .select({
-          profileId: profilePhotos.profileId,
-          id: profilePhotos.id,
-          s3Key: profilePhotos.s3Key,
-          isPrimary: profilePhotos.isPrimary,
-          displayOrder: profilePhotos.displayOrder,
-          status: profilePhotos.status,
-        })
+        .select()
         .from(profilePhotos)
         .where(inArray(profilePhotos.profileId, profileIds)),
       this.db
-        .select({
-          profileId: horoscopes.profileId,
-          birthTime: horoscopes.birthTime,
-          birthPlace: horoscopes.birthPlace,
-        })
+        .select()
         .from(horoscopes)
         .where(inArray(horoscopes.profileId, profileIds)),
+      this.db
+        .select()
+        .from(familyDetails)
+        .where(inArray(familyDetails.profileId, profileIds)),
+      this.db
+        .select()
+        .from(lifestyleInterests)
+        .where(inArray(lifestyleInterests.profileId, profileIds)),
+      this.db
+        .select()
+        .from(partnerPreferences)
+        .where(inArray(partnerPreferences.profileId, profileIds)),
       this.db
         .select({ userId: subscriptions.userId })
         .from(subscriptions)
@@ -156,38 +155,40 @@ export class AdminService {
     }
 
     const horoscopeByProfile = new Map(dbHoroscopes.map((h) => [h.profileId, h]));
+    const familyByProfile = new Map(dbFamily.map((f) => [f.profileId, f]));
+    const lifestyleByProfile = new Map(dbLifestyle.map((l) => [l.profileId, l]));
+    const prefByProfile = new Map(dbPreferences.map((p) => [p.profileId, p]));
     const activeUserIds = new Set(activeSubs.map((s) => s.userId));
 
     return records.map((r) => {
-      const profilePhotosList = (photosByProfile.get(r.id) ?? []).sort(
+      const p = r.profile;
+      const profilePhotosList = (photosByProfile.get(p.id) ?? []).sort(
         (a, b) => a.displayOrder - b.displayOrder,
       );
-      const horoscope = horoscopeByProfile.get(r.id);
+      const horoscope = horoscopeByProfile.get(p.id);
       const verificationStatus = r.verificationStatus || 'idle';
 
       return {
-        id: r.id,
-        fullName: r.fullName,
-        gender: r.gender,
-        city: r.city,
+        id: p.id,
+        fullName: p.fullName,
+        gender: p.gender,
+        city: p.city,
         phone: r.phone,
         verificationStatus,
         accountStatus: r.accountStatus,
         createdBy: 'self' as const,
-        submittedAt: r.submittedAt || r.createdAt,
-        activeSubscription: activeUserIds.has(r.userId),
+        submittedAt: r.submittedAt || p.createdAt,
+        activeSubscription: activeUserIds.has(p.userId),
         completeness: calculateProfileCompleteness({
-          fullName: r.fullName,
-          phone: r.phone,
-          city: r.city,
-          religion: r.religion,
-          caste: r.caste,
-          motherTongue: r.motherTongue,
-          aboutMe: r.aboutMe,
+          profile: p,
+          userPhone: r.phone,
+          family: familyByProfile.get(p.id),
+          lifestyle: lifestyleByProfile.get(p.id),
+          horoscope: horoscope,
+          preferences: prefByProfile.get(p.id),
           photoCount: profilePhotosList.length,
-          birthTime: horoscope?.birthTime,
-          birthPlace: horoscope?.birthPlace,
           verificationStatus,
+          submittedAt: r.submittedAt || p.createdAt,
         }),
         photos: profilePhotosList.map((ph) => ({
           id: ph.id,
@@ -210,9 +211,12 @@ export class AdminService {
     const verificationRecords = await this.db.select().from(verifications).where(eq(verifications.profileId, profileId));
     const v = verificationRecords[0];
 
-    const [dbPhotos, horoscopeRecords, activeSub] = await Promise.all([
+    const [dbPhotos, horoscopeRecords, familyRecords, lifestyleRecords, prefRecords, activeSub] = await Promise.all([
       this.db.select().from(profilePhotos).where(eq(profilePhotos.profileId, profileId)),
       this.db.select().from(horoscopes).where(eq(horoscopes.profileId, profileId)),
+      this.db.select().from(familyDetails).where(eq(familyDetails.profileId, profileId)),
+      this.db.select().from(lifestyleInterests).where(eq(lifestyleInterests.profileId, profileId)),
+      this.db.select().from(partnerPreferences).where(eq(partnerPreferences.profileId, profileId)),
       this.db
         .select({ userId: subscriptions.userId })
         .from(subscriptions)
@@ -231,6 +235,10 @@ export class AdminService {
       .sort((a, b) => a.displayOrder - b.displayOrder);
 
     const h = horoscopeRecords[0];
+    const fam = familyRecords[0];
+    const ls = lifestyleRecords[0];
+    const pref = prefRecords[0];
+    
     const dobParts = p.dob ? String(p.dob).split('-') : [];
     const verificationStatus = v?.status || 'idle';
 
@@ -249,38 +257,25 @@ export class AdminService {
       dobMonth: dobParts[1] || '01',
       dobYear: dobParts[0] || '2000',
       maritalStatus: p.maritalStatus,
-      brothersCount: 0,
-      sistersCount: 0,
-      aboutMe: p.aboutMe || '',
-      verificationMethod: v?.method || '',
-      verificationStatus,
-      selfieS3Key: v?.selfieS3Key,
-      govtIdType: v?.govtIdType,
-      govtIdS3Key: v?.govtIdS3Key,
-      horoscopeName: h?.horoscopeFileName || '',
-      birthTime: h?.birthTime || '',
-      birthPlace: h?.birthPlace || '',
-      rashi: h?.rashi || '',
-      star: h?.nakshatra || '',
-      manglik: h?.manglik || '',
-      photos: mappedPhotos,
+      brothersCount: fam?.brothersCount || 0,
+      sistersCount: fam?.sistersCount || 0,
+      aboutMe: p.aboutMe,
       completeness: calculateProfileCompleteness({
-        fullName: p.fullName,
-        phone: u.phone,
-        city: p.city,
-        religion: p.religion,
-        caste: p.caste,
-        motherTongue: p.motherTongue,
-        aboutMe: p.aboutMe,
+        profile: p,
+        userPhone: u.phone,
+        family: fam,
+        lifestyle: ls,
+        horoscope: h,
+        preferences: pref,
         photoCount: mappedPhotos.length,
-        birthTime: h?.birthTime,
-        birthPlace: h?.birthPlace,
         verificationStatus,
+        submittedAt: v?.updatedAt || p.createdAt,
       }),
       createdBy: 'self' as const,
       accountStatus: u.status,
+      verificationStatus,
       submittedAt: v?.updatedAt || p.createdAt,
-      activeSubscription: activeSub.some((s) => s.userId === p.userId),
+      activeSubscription: activeSub.length > 0,
     };
   }
 
@@ -409,7 +404,7 @@ export class AdminService {
     return this.getProfile(profileId);
   }
 
-  async getPhotoUploadUrl(profileId: string, contentType: string, fileSize: number) {
+  async uploadAdminPhoto(profileId: string, buffer: Buffer, contentType: string, fileSize: number) {
     const [profile] = await this.db
       .select({ userId: profiles.userId })
       .from(profiles)
@@ -417,7 +412,16 @@ export class AdminService {
       .limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
 
-    return this.s3Provider.generateUploadUrl(profile.userId, 'profile_photo', contentType, fileSize);
+    const { s3Key, bucket } = await this.s3Provider.generateUploadUrl(
+      profile.userId,
+      'profile_photo',
+      contentType,
+      fileSize
+    );
+
+    await this.s3Provider.putObject(s3Key, buffer, contentType, bucket);
+    
+    return { s3Key };
   }
 
   async attachPhotos(profileId: string, s3Keys: string[]) {

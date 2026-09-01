@@ -152,7 +152,12 @@ class ApiClient {
         return;
       }
 
-      const response = await fetch(uploadUrl, {
+      let finalUrl = uploadUrl;
+      if (finalUrl.startsWith('/api/media/demo-upload')) {
+        finalUrl = `/api/proxy${finalUrl.replace('/api/media', '/media')}`;
+      }
+
+      const response = await fetch(finalUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': contentType,
@@ -606,14 +611,10 @@ class ApiClient {
         body: JSON.stringify(data),
       }),
 
-    getPhotoUploadUrl: (profileId: string, data: { contentType: string; fileSize: number }) =>
-      this.request<{ uploadUrl: string; s3Key: string }>('/admin/profiles/' + profileId + '/upload-url', {
+    uploadPhoto: (profileId: string, data: FormData) =>
+      this.request<{ s3Key: string; id: string }>(`/admin/profiles/${profileId}/upload`, {
         method: 'POST',
-        body: JSON.stringify({
-          purpose: 'profile_photo',
-          contentType: data.contentType,
-          fileSize: data.fileSize,
-        }),
+        body: data,
       }),
 
     attachPhotos: (profileId: string, s3Keys: string[]) =>

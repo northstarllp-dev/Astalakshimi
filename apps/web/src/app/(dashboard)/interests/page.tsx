@@ -38,6 +38,7 @@ import {
   Users,
   ShieldCheck,
   Loader2,
+  UserRound,
 } from "lucide-react"
 
 // ──────────────────────────────────────────────
@@ -290,20 +291,14 @@ function EmptyState({
 // ──────────────────────────────────────────────
 function ReceivedTab({
   items,
-  notes,
   onAccept,
   onDecline,
-  onIgnore,
   onBlock,
-  onNoteOpen,
 }: {
   items: InterestItem[]
-  notes: PrivateNotes
   onAccept: (profileId: string) => void
   onDecline: (profileId: string) => void
-  onIgnore: (profileId: string) => void
   onBlock: (profileId: string) => void
-  onNoteOpen: (profileId: string) => void
 }) {
   const pending = items.filter((i) => i.status === "pending")
   const actioned = items.filter((i) => i.status !== "pending")
@@ -329,12 +324,9 @@ function ReceivedTab({
               <ReceivedCard
                 key={item.id}
                 item={item}
-                note={notes[item.profileId]}
                 onAccept={onAccept}
                 onDecline={onDecline}
-                onIgnore={onIgnore}
                 onBlock={onBlock}
-                onNoteOpen={onNoteOpen}
               />
             ))}
           </div>
@@ -348,12 +340,9 @@ function ReceivedTab({
               <ReceivedCard
                 key={item.id}
                 item={item}
-                note={notes[item.profileId]}
                 onAccept={onAccept}
                 onDecline={onDecline}
-                onIgnore={onIgnore}
                 onBlock={onBlock}
-                onNoteOpen={onNoteOpen}
               />
             ))}
           </div>
@@ -365,20 +354,14 @@ function ReceivedTab({
 
 function ReceivedCard({
   item,
-  note,
   onAccept,
   onDecline,
-  onIgnore,
   onBlock,
-  onNoteOpen,
 }: {
   item: InterestItem
-  note?: string
   onAccept: (id: string) => void
   onDecline: (id: string) => void
-  onIgnore: (id: string) => void
   onBlock: (id: string) => void
-  onNoteOpen: (id: string) => void
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const isPending = item.status === "pending"
@@ -395,25 +378,6 @@ function ReceivedCard({
             <div className="flex shrink-0 items-center gap-1.5">
               <StatusBadge status={item.status} />
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((v) => !v)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted"
-                  aria-label="More options"
-                >
-                  <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                </button>
-                {menuOpen && (
-                  <>
-                    <button type="button" className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} aria-label="Close menu" />
-                    <div className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-xl border border-border bg-card p-1 shadow-lg">
-                      <MenuAction icon={NotebookPen} label={note ? "Edit note" : "Add private note"} onClick={() => { setMenuOpen(false); onNoteOpen(item.profileId) }} />
-                      <MenuAction icon={Ban} label="Block profile" onClick={() => { setMenuOpen(false); onBlock(item.profileId) }} destructive />
-                    </div>
-                  </>
-                )}
-              </div>
             </div>
           </div>
 
@@ -423,49 +387,51 @@ function ReceivedCard({
             </p>
           )}
 
-          {note && (
-            <button
-              type="button"
-              onClick={() => onNoteOpen(item.profileId)}
-              className="mt-1.5 flex items-center gap-1 rounded-md bg-secondary/10 px-2 py-1 text-[10px] font-semibold text-secondary hover:bg-secondary/20"
-            >
-              <NotebookPen className="h-3 w-3" />
-              {note.length > 40 ? note.slice(0, 40) + "…" : note}
-            </button>
-          )}
-
-          {isPending && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                className="h-8 gap-1 px-3 text-xs bg-primary text-primary-foreground"
-                onClick={() => onAccept(item.profileId)}
-              >
-                <Check className="h-3.5 w-3.5" /> Accept
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 gap-1 px-3 text-xs"
-                onClick={() => onDecline(item.profileId)}
-              >
-                <X className="h-3.5 w-3.5" /> Decline
-              </Button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {isPending && (
+              <>
+                <Button
+                  size="sm"
+                  className="h-8 gap-1 px-3 text-xs bg-primary text-primary-foreground"
+                  onClick={() => onAccept(item.profileId)}
+                >
+                  <Check className="h-3.5 w-3.5" /> Accept
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1 px-3 text-xs"
+                  onClick={() => onDecline(item.profileId)}
+                >
+                  <X className="h-3.5 w-3.5" /> Decline
+                </Button>
+              </>
+            )}
+            {item.status === "accepted" && (
+              <Link href="/inbox">
+                <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 px-3 text-xs hover:bg-emerald-700 text-white">
+                  <MessageSquarePlus className="h-3.5 w-3.5" /> Go to chat
+                </Button>
+              </Link>
+            )}
+            <Link href={`/profiles/${item.profileId}`}>
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-8 gap-1 border border-border px-3 text-xs text-muted-foreground"
-                onClick={() => onIgnore(item.profileId)}
               >
-                <EyeOff className="h-3.5 w-3.5" /> Ignore
+                <UserRound className="h-3.5 w-3.5" /> View
               </Button>
-            </div>
-          )}
-          {item.status === "accepted" && (
-            <Link href="/inbox" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline">
-              <MessageSquarePlus className="h-3.5 w-3.5" /> Go to chat
             </Link>
-          )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 gap-1 border border-border px-3 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() => onBlock(item.profileId)}
+            >
+              <Ban className="h-3.5 w-3.5" /> Block
+            </Button>
+          </div>
         </div>
       </div>
     </article>
@@ -477,14 +443,12 @@ function ReceivedCard({
 // ──────────────────────────────────────────────
 function SentTab({
   items,
-  notes,
   onWithdraw,
-  onNoteOpen,
+  onBlock,
 }: {
   items: InterestItem[]
-  notes: PrivateNotes
   onWithdraw: (profileId: string) => void
-  onNoteOpen: (profileId: string) => void
+  onBlock: (profileId: string) => void
 }) {
   if (items.length === 0) {
     return (
@@ -514,17 +478,6 @@ function SentTab({
                 </div>
               </div>
 
-              {notes[item.profileId] && (
-                <button
-                  type="button"
-                  onClick={() => onNoteOpen(item.profileId)}
-                  className="mt-1.5 flex items-center gap-1 rounded-md bg-secondary/10 px-2 py-1 text-[10px] font-semibold text-secondary hover:bg-secondary/20"
-                >
-                  <NotebookPen className="h-3 w-3" />
-                  {notes[item.profileId].length > 40 ? notes[item.profileId].slice(0, 40) + "…" : notes[item.profileId]}
-                </button>
-              )}
-
               <div className="mt-3 flex flex-wrap gap-2">
                 {item.status === "pending" && (
                   <Button
@@ -537,18 +490,31 @@ function SentTab({
                   </Button>
                 )}
                 {item.status === "accepted" && (
-                  <Link href="/inbox" className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline">
-                    <MessageSquarePlus className="h-3.5 w-3.5" /> Go to chat
+                  <Link href="/inbox">
+                    <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 px-3 text-xs hover:bg-emerald-700 text-white">
+                      <MessageSquarePlus className="h-3.5 w-3.5" /> Go to chat
+                    </Button>
                   </Link>
                 )}
-                <button
-                  type="button"
-                  onClick={() => onNoteOpen(item.profileId)}
-                  className="h-8 rounded-lg px-3 text-xs font-semibold text-muted-foreground hover:bg-muted"
-                >
-                  <NotebookPen className="mr-1 inline h-3 w-3" />
-                  {notes[item.profileId] ? "Edit note" : "Add note"}
-                </button>
+                <Link href={`/profiles/${item.profileId}`}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 gap-1 border border-border px-3 text-xs text-muted-foreground hover:bg-muted"
+                  >
+                    <UserRound className="h-3.5 w-3.5" /> View
+                  </Button>
+                </Link>
+                {item.status === "accepted" && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 gap-1 border border-border px-3 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                    onClick={() => onBlock(item.profileId)}
+                  >
+                    <Ban className="h-3.5 w-3.5" /> Block
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -696,24 +662,27 @@ function BlockedTab({
       </p>
       <div className="space-y-3">
         {items.map((item) => (
-          <article key={item.blockedId} className="royal-card p-3.5 sm:p-4 opacity-75">
+          <article key={item.blockedId} className="relative overflow-hidden rounded-2xl border border-destructive/20 bg-destructive/5 p-3.5 sm:p-4 grayscale-[50%] transition-all hover:grayscale-0">
             <div className="flex gap-3">
               <div className="relative shrink-0">
-                <ProfileAvatar profile={item as any} size={48} />
-                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive ring-2 ring-card">
-                  <Ban className="h-2.5 w-2.5 text-white" />
+                <ProfileAvatar profile={item as any} size={56} />
+                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive ring-2 ring-background">
+                  <Ban className="h-3 w-3 text-white" />
                 </span>
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-foreground">
-                  {item.fullName || `Blocked Profile (${item.profileId.slice(0, 8)})`}
-                </p>
+                <div className="flex items-start justify-between">
+                  <p className="truncate font-serif text-base font-bold text-foreground">
+                    {item.fullName || `Blocked Profile (${item.profileId.slice(0, 8)})`}
+                  </p>
+                  <Badge variant="destructive" className="text-[10px] uppercase tracking-wide">Blocked</Badge>
+                </div>
                 <button
                   type="button"
                   onClick={() => onUnblock(item.profileId)}
-                  className="mt-2 flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                  className="mt-3 flex items-center gap-1.5 rounded-md bg-background px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm border border-border hover:bg-muted"
                 >
-                  <Trash2 className="h-3.5 w-3.5" /> Unblock
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Unblock Profile
                 </button>
               </div>
             </div>
@@ -777,11 +746,6 @@ function InterestsPageInner() {
     }
   }
 
-
-  const handleIgnore = (profileId: string) => {
-    // Local ignore handler
-    invalidate()
-  }
 
   const handleBlock = async (profileId: string) => {
     try {
@@ -876,20 +840,16 @@ function InterestsPageInner() {
           {activeTab === "received" && (
             <ReceivedTab
               items={received}
-              notes={notes}
               onAccept={handleAccept}
               onDecline={handleDecline}
-              onIgnore={handleIgnore}
               onBlock={handleBlock}
-              onNoteOpen={setNoteTarget}
             />
           )}
           {activeTab === "sent" && (
             <SentTab
               items={sent}
-              notes={notes}
               onWithdraw={handleWithdraw}
-              onNoteOpen={setNoteTarget}
+              onBlock={handleBlock}
             />
           )}
           {activeTab === "shortlisted" && (

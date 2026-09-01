@@ -21,7 +21,8 @@ import {
   Heart,
   Loader2,
   LockKeyholeOpen,
-  UserRound
+  UserRound,
+  Lock
 } from "lucide-react"
 
 // ──────────────────────────────────────────────
@@ -235,6 +236,20 @@ function MutualTab({
                       View profile
                     </Button>
                   </Link>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-8 gap-1.5 px-3 text-xs bg-primary/10 text-primary hover:bg-primary/20 font-semibold"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(
+                          new CustomEvent("TRIGGER_CONTACT_PAYWALL", { detail: { targetProfileId: item.profileId } })
+                        )
+                      }
+                    }}
+                  >
+                    <Lock className="h-3.5 w-3.5" /> Unlock Contact
+                  </Button>
                 </div>
               </div>
             </div>

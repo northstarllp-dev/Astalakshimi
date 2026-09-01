@@ -184,7 +184,7 @@ export default function AdminProfileReviewPage() {
         )}
       </section>
 
-      {profile.verificationStatus === "pending" && (
+      {["pending", "idle"].includes(profile.verificationStatus) && (
         <footer className="sticky bottom-4 rounded-2xl border border-secondary/30 bg-[#fffbf4]/95 p-4 shadow-lg backdrop-blur">
           {!showReject ? (
             <div className="flex flex-wrap gap-2">

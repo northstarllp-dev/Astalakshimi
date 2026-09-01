@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AdminService } from './admin.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
@@ -44,12 +45,14 @@ export class AdminController {
     return this.adminService.createProfile(body);
   }
 
-  @Post('profiles/:profileId/upload-url')
-  getPhotoUploadUrl(
+  @Post('profiles/:profileId/upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  uploadAdminPhoto(
     @Param('profileId') profileId: string,
-    @Body(new ZodValidationPipe(presignedUploadSchema)) body: PresignedUploadInput,
+    @UploadedFile() file: any,
   ) {
-    return this.adminService.getPhotoUploadUrl(profileId, body.contentType, body.fileSize);
+    if (!file) throw new BadRequestException('No file provided');
+    return this.adminService.uploadAdminPhoto(profileId, file.buffer, file.mimetype, file.size);
   }
 
   @Post('profiles/:profileId/photos')

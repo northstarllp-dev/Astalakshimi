@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import imageCompression from "browser-image-compression"
 import {
   actionReport,
   adminLogin,
@@ -265,13 +266,20 @@ export function useCreateAdminProfileMutation() {
       if (photos.length === 0) return profile
 
       const s3Keys: string[] = []
-      for (const file of photos) {
-        const contentType = file.type === "image/jpg" ? "image/jpeg" : file.type || "image/jpeg"
-        const { uploadUrl, s3Key } = await apiClient.admin.getPhotoUploadUrl(profile.id, {
-          contentType,
-          fileSize: file.size,
-        })
-        await apiClient.media.uploadFileToS3(uploadUrl, file, contentType)
+      for (let file of photos) {
+        try {
+          const options = {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+          }
+          file = await imageCompression(file, options) as File
+        } catch (err) {
+          console.error("Image compression error:", err)
+        }
+        const formData = new FormData()
+        formData.append("file", file)
+        const { s3Key } = await apiClient.admin.uploadPhoto(profile.id, formData)
         s3Keys.push(s3Key)
       }
       return apiClient.admin.attachPhotos(profile.id, s3Keys)
