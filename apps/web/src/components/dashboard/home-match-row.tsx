@@ -8,16 +8,9 @@ import { cn, getMediaUrl } from "@/lib/utils"
 import { useSendInterestMutation, useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
 import { BadgeCheck, Bookmark, Heart } from "lucide-react"
 
-function formatHeight(cm?: number | string | null) {
-  const n = Number(cm)
-  if (!n || Number.isNaN(n)) return ""
-  const totalInches = n / 2.54
-  const feet = Math.floor(totalInches / 12)
-  const inches = Math.round(totalInches % 12)
-  return `${feet}'${inches}"`
-}
+import { formatHeightFromCm } from "@/lib/input-units"
 
-function metaLine(parts: Array<string | undefined | null>) {
+function metaLine(parts: Array<string | null | undefined>) {
   return parts.filter((p) => p && String(p).trim()).join(" · ")
 }
 
@@ -38,7 +31,7 @@ export function HomeMatchRow({
   )
 
   const photo = match.photos?.[0]
-  const height = match.height || formatHeight(match.heightCm)
+  const height = match.height || formatHeightFromCm(match.heightCm)
   const profession = match.profession || match.occupation
   const education = match.degree || match.education || match.educationLevel
   const community = metaLine([match.religion, match.caste, match.motherTongue])

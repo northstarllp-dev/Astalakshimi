@@ -21,6 +21,10 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { BlocksModule } from './blocks/blocks.module';
 import { ContactsModule } from './contacts/contacts.module';
+import { LocationsModule } from './locations/locations.module';
+import { EducationsModule } from './educations/educations.module';
+import { CareersModule } from './careers/careers.module';
+import { CommunitiesModule } from './communities/communities.module';
 
 @Module({
   imports: [
@@ -49,6 +53,10 @@ import { ContactsModule } from './contacts/contacts.module';
     ChatModule,
     BlocksModule,
     ContactsModule,
+    LocationsModule,
+    EducationsModule,
+    CareersModule,
+    CommunitiesModule,
   ],
 })
 export class AppModule {}

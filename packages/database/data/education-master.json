@@ -1,0 +1,155 @@
+{
+  "levels": [
+    { "name": "Below 10th", "aliases": ["Below Matriculation", "Under 10th"] },
+    { "name": "10th", "aliases": ["10th Pass", "SSLC", "Matriculation", "Class 10"] },
+    { "name": "12th", "aliases": ["12th Pass", "HSC", "Intermediate", "Class 12", "PUC"] },
+    { "name": "ITI", "aliases": ["Industrial Training Institute"] },
+    { "name": "Diploma", "aliases": ["Polytechnic", "Diploma in Engineering"] },
+    { "name": "B.A.", "aliases": ["BA", "Bachelor of Arts"] },
+    { "name": "B.Com", "aliases": ["BCom", "Bachelor of Commerce"] },
+    { "name": "B.Sc", "aliases": ["BSc", "Bachelor of Science"] },
+    { "name": "B.Tech", "aliases": ["BTech", "B Tech", "Bachelor of Technology"] },
+    { "name": "B.E.", "aliases": ["BE", "B E", "Bachelor of Engineering"] },
+    { "name": "BBA", "aliases": ["Bachelor of Business Administration"] },
+    { "name": "BCA", "aliases": ["Bachelor of Computer Applications"] },
+    { "name": "B.Arch", "aliases": ["BArch", "Bachelor of Architecture"] },
+    { "name": "B.Des", "aliases": ["BDes", "Bachelor of Design"] },
+    { "name": "B.Ed", "aliases": ["BEd", "Bachelor of Education"] },
+    { "name": "B.Pharma", "aliases": ["BPharm", "Bachelor of Pharmacy"] },
+    { "name": "BDS", "aliases": ["Bachelor of Dental Surgery"] },
+    { "name": "BPT", "aliases": ["Bachelor of Physiotherapy"] },
+    { "name": "BAMS", "aliases": ["Bachelor of Ayurvedic Medicine and Surgery"] },
+    { "name": "BHMS", "aliases": ["Bachelor of Homeopathic Medicine and Surgery"] },
+    { "name": "B.L / LLB", "aliases": ["BL", "LLB", "Bachelor of Laws", "Law Degree"] },
+    { "name": "MBBS", "aliases": ["Bachelor of Medicine and Bachelor of Surgery"] },
+    { "name": "M.A.", "aliases": ["MA", "Master of Arts"] },
+    { "name": "M.Com", "aliases": ["MCom", "Master of Commerce"] },
+    { "name": "M.Sc", "aliases": ["MSc", "Master of Science"] },
+    { "name": "M.Tech", "aliases": ["MTech", "M Tech", "Master of Technology"] },
+    { "name": "MBA", "aliases": ["Master of Business Administration"] },
+    { "name": "PGDM", "aliases": ["Post Graduate Diploma in Management"] },
+    { "name": "MCA", "aliases": ["Master of Computer Applications"] },
+    { "name": "PGDCA", "aliases": ["Post Graduate Diploma in Computer Applications"] },
+    { "name": "M.Ed", "aliases": ["MEd", "Master of Education"] },
+    { "name": "M.Phil", "aliases": ["MPhil", "Master of Philosophy"] },
+    { "name": "M.Des", "aliases": ["MDes", "Master of Design"] },
+    { "name": "M.Arch", "aliases": ["MArch", "Master of Architecture"] },
+    { "name": "M.Pharma", "aliases": ["MPharm", "Master of Pharmacy"] },
+    { "name": "MS (Surgery)", "aliases": ["MS", "Master of Surgery"] },
+    { "name": "MD", "aliases": ["Doctor of Medicine"] },
+    { "name": "DM", "aliases": ["Doctorate of Medicine", "Super Speciality"] },
+    { "name": "LLM", "aliases": ["Master of Laws"] },
+    { "name": "PhD", "aliases": ["Ph.D", "Doctorate", "Doctor of Philosophy"] },
+    { "name": "CA", "aliases": ["Chartered Accountant"] },
+    { "name": "ICWA / CMA", "aliases": ["ICWA", "CMA", "Cost Accountant", "Institute of Cost Accountants"] },
+    { "name": "CS", "aliases": ["Company Secretary", "ICSI"] },
+    { "name": "CFA", "aliases": ["Chartered Financial Analyst"] },
+    { "name": "Other Degree", "aliases": ["Other Graduate", "Other Bachelor"] },
+    { "name": "Other Diploma", "aliases": ["Certificate Course"] },
+    { "name": "Trade School", "aliases": ["Vocational Training", "Trade Certificate"] }
+  ],
+  "specializations": {
+    "B.Tech": [
+      "Computer Science", "Information Technology", "Electronics & Communication",
+      "Electrical Engineering", "Mechanical Engineering", "Civil Engineering",
+      "Chemical Engineering", "Biotechnology", "Aerospace Engineering",
+      "Automobile Engineering", "Instrumentation", "Industrial Engineering",
+      "Textile Engineering", "Mining Engineering", "Petroleum Engineering"
+    ],
+    "B.E.": [
+      "Computer Science", "Information Technology", "Electronics & Communication",
+      "Electrical Engineering", "Mechanical Engineering", "Civil Engineering",
+      "Chemical Engineering", "Biotechnology", "Instrumentation"
+    ],
+    "M.Tech": [
+      "Computer Science", "Information Technology", "Electronics & Communication",
+      "Electrical Engineering", "Mechanical Engineering", "Civil Engineering",
+      "Structural Engineering", "Data Science", "VLSI Design",
+      "Machine Learning", "Power Systems", "Communication Systems"
+    ],
+    "B.Sc": [
+      "Physics", "Chemistry", "Mathematics", "Biology", "Computer Science",
+      "Statistics", "Microbiology", "Biotechnology", "Zoology", "Botany",
+      "Agriculture", "Nursing", "IT"
+    ],
+    "M.Sc": [
+      "Physics", "Chemistry", "Mathematics", "Biology", "Computer Science",
+      "Statistics", "Microbiology", "Biotechnology", "Data Science",
+      "Environmental Science", "Biochemistry", "Genetics"
+    ],
+    "B.A.": [
+      "English", "Tamil", "Hindi", "History", "Economics", "Political Science",
+      "Sociology", "Psychology", "Geography", "Philosophy", "Journalism",
+      "Public Administration"
+    ],
+    "M.A.": [
+      "English", "Tamil", "Hindi", "History", "Economics", "Political Science",
+      "Sociology", "Psychology", "Geography", "Philosophy", "Journalism",
+      "Mass Communication", "Public Administration"
+    ],
+    "B.Com": ["Commerce", "Accounting", "Finance", "Banking", "Taxation", "Computer Applications"],
+    "M.Com": ["Commerce", "Accounting", "Finance", "Banking", "Taxation"],
+    "MBA": [
+      "Finance", "Marketing", "Human Resources", "Operations",
+      "Business Analytics", "International Business", "Information Technology",
+      "Entrepreneurship", "Supply Chain Management", "Healthcare Management"
+    ],
+    "PGDM": [
+      "Finance", "Marketing", "Human Resources", "Operations",
+      "Business Analytics", "International Business"
+    ],
+    "MCA": [
+      "Computer Applications", "Software Engineering",
+      "Data Science", "Artificial Intelligence", "Networking"
+    ],
+    "BCA": [
+      "Computer Applications", "Software Engineering",
+      "Information Technology", "Web Development"
+    ],
+    "MBBS": [
+      "General Medicine", "Pediatrics", "Surgery", "Gynecology",
+      "Orthopedics", "Dermatology", "ENT", "Ophthalmology"
+    ],
+    "MD": [
+      "General Medicine", "Pediatrics", "Surgery", "Gynecology",
+      "Orthopedics", "Dermatology", "Radiology", "Anesthesiology",
+      "Pathology", "Psychiatry", "Community Medicine"
+    ],
+    "MS (Surgery)": [
+      "General Surgery", "Orthopedics", "Ophthalmology", "ENT",
+      "Obstetrics & Gynecology", "Neurosurgery", "Cardiothoracic Surgery"
+    ],
+    "BDS": [
+      "Orthodontics", "Oral Surgery", "Prosthodontics",
+      "Periodontics", "Endodontics", "Conservative Dentistry"
+    ],
+    "B.Pharma": [
+      "Pharmaceutical Chemistry", "Pharmacology", "Pharmaceutics",
+      "Pharmacognosy", "Hospital Pharmacy"
+    ],
+    "B.Arch": [
+      "Architecture", "Urban Design", "Landscape Architecture",
+      "Interior Architecture"
+    ],
+    "Diploma": [
+      "Mechanical Engineering", "Civil Engineering", "Electrical Engineering",
+      "Electronics", "Computer Science", "Automobile", "Architecture"
+    ],
+    "ITI": [
+      "Electrician", "Fitter", "Welder", "Mechanic",
+      "Electronics Mechanic", "Plumber", "Turner", "COPA"
+    ],
+    "PhD": [
+      "Engineering", "Science", "Commerce", "Arts",
+      "Management", "Medicine", "Law", "Education"
+    ],
+    "B.L / LLB": [
+      "Corporate Law", "Criminal Law", "Civil Law", "Constitutional Law",
+      "International Law", "Labour Law", "Tax Law"
+    ],
+    "LLM": [
+      "Corporate Law", "Criminal Law", "Constitutional Law",
+      "International Law", "Intellectual Property", "Human Rights"
+    ]
+  }
+}

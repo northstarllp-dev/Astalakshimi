@@ -35,11 +35,16 @@ export interface Profile {
   subcaste?: string | null;
   gotra?: string | null;
   motherTongue: string;
+  educationId?: number | null;
+  specializationId?: number | null;
+  specializationName?: string | null;
   educationLevel?: EducationLevel | null;
   degree?: string | null;
   collegeName?: string | null;
   employmentStatus?: EmploymentStatus | null;
   profession?: string | null;
+  occupationId?: number | null;
+  companyId?: number | null;
   companyName?: string | null;
   companySector?: CompanySector | null;
   annualIncome?: string | null;
@@ -154,11 +159,15 @@ export interface CompleteRegistrationPayload {
   motherTongue: string;
 
   // Step 4: Education & Career
+  educationId?: number;
+  specializationId?: number;
   educationLevel?: EducationLevel;
   degree?: string;
   collegeName?: string;
   employmentStatus?: EmploymentStatus;
   profession?: string;
+  occupationId?: number;
+  companyId?: number;
   companyName?: string;
   companySector?: CompanySector;
   annualIncome?: string;

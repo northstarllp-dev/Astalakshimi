@@ -190,4 +190,8 @@ export const updateProfileSchema = z.object({
   manglik: manglikStatusSchema.optional(),
   rashi: z.string().optional(),
   nakshatra: z.string().optional(),
+  educationId: z.number().int().positive().optional(),
+  specializationId: z.number().int().positive().optional(),
+  occupationId: z.number().int().positive().optional(),
+  companyId: z.number().int().positive().optional(),
 });

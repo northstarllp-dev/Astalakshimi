@@ -11,9 +11,11 @@ import {
 import { cn } from "@/lib/utils"
 import {
   convertWeightAmount,
+  displayHeight,
   formatBirthTime,
   formatWeight,
   maskClockInput,
+  maskHeightInput,
   maskWeightInput,
   parseBirthTime,
   parseWeight,
@@ -152,6 +154,31 @@ export function WeightInput({
         onChange(formatWeight(convertWeightAmount(amount, unit, to), to))
       }}
       unitAriaLabel="Weight unit"
+    />
+  )
+}
+
+export function HeightInput({
+  value,
+  onChange,
+  className,
+}: {
+  value: string
+  onChange: (value: string) => void
+  className?: string
+}) {
+  const shown = displayHeight(value)
+
+  return (
+    <InputWithUnit
+      value={shown}
+      onChange={(next) => onChange(maskHeightInput(next))}
+      placeholder={`5'11"`}
+      inputMode="numeric"
+      maxLength={6}
+      aria-label="Height"
+      unit={`ft'in"`}
+      className={className}
     />
   )
 }

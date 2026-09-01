@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { displayHeight } from "@/lib/input-units"
 import { getMediaUrl } from "@/lib/utils"
 import { useProfileQuery } from "@/hooks/queries"
 import { emptySignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
@@ -312,7 +313,7 @@ export default function MyProfilePage() {
                   <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <GridItem label="Gender" value={data.gender} />
                     <GridItem label="Marital status" value={data.maritalStatus} />
-                    <GridItem label="Height" value={data.height} />
+                    <GridItem label="Height" value={displayHeight(data.height)} />
                     <GridItem label="Complexion" value={data.complexion} />
                     <GridItem label="Diet" value={data.diet} />
                     <GridItem label="Profile for" value={data.profileFor} />
@@ -332,7 +333,14 @@ export default function MyProfilePage() {
                     </Link>
                   </div>
                   <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <GridItem label="Education" value={data.otherEducation || data.education} />
+                    <GridItem
+                      label="Education"
+                      value={
+                        [data.education, data.educationStream].filter(Boolean).join(" · ") ||
+                        data.otherEducation ||
+                        "—"
+                      }
+                    />
                     <GridItem label="Occupation" value={data.otherOccupation || data.occupation} />
                     <GridItem label="Company" value={data.companyName} />
                     <GridItem label="Income" value={data.annualIncome} />

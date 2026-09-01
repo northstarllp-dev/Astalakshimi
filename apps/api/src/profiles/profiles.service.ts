@@ -3,6 +3,8 @@ import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { BlocksService } from '../blocks/blocks.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { EducationsService } from '../educations/educations.service';
+import { CareersService } from '../careers/careers.service';
 import {
   profiles,
   users,
@@ -14,6 +16,7 @@ import {
   verifications,
   userSettings,
   interests,
+  specializations,
 } from '@astalakshimi/database';
 import { eq, asc, and, or } from 'drizzle-orm';
 import type { CompleteRegistrationPayload, FullProfileView } from '@astalakshimi/types';
@@ -24,7 +27,192 @@ export class ProfilesService {
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly blocksService: BlocksService,
     private readonly entitlementsService: EntitlementsService,
+    private readonly educationsService: EducationsService,
+    private readonly careersService: CareersService,
   ) {}
+
+  private async buildEducationUpdate(
+    payload: Partial<CompleteRegistrationPayload>,
+    existingEducationId?: number | null,
+  ) {
+    const update: {
+      educationId?: number | null;
+      specializationId?: number | null;
+      degree?: string | null;
+    } = {};
+
+    const nextEducationId =
+      payload.educationId !== undefined ? payload.educationId : existingEducationId ?? null;
+
+    if (payload.educationId !== undefined) {
+      if (payload.educationId === null) {
+        update.educationId = null;
+        update.specializationId = null;
+        update.degree = null;
+        return update;
+      }
+
+      const levelName = await this.educationsService.getLevelName(payload.educationId);
+      if (!levelName) {
+        throw new BadRequestException('Invalid education level');
+      }
+
+      update.educationId = payload.educationId;
+      update.degree = levelName;
+      if (payload.specializationId === undefined) {
+        update.specializationId = null;
+      }
+    }
+
+    if (payload.specializationId !== undefined) {
+      if (payload.specializationId === null) {
+        update.specializationId = null;
+        return update;
+      }
+
+      const [spec] = await this.db
+        .select({
+          id: specializations.id,
+          educationId: specializations.educationId,
+        })
+        .from(specializations)
+        .where(eq(specializations.id, payload.specializationId))
+        .limit(1);
+
+      if (!spec) {
+        throw new BadRequestException('Invalid specialization');
+      }
+      if (nextEducationId && spec.educationId !== nextEducationId) {
+        throw new BadRequestException('Specialization does not match selected education');
+      }
+
+      update.specializationId = payload.specializationId;
+    }
+
+    return update;
+  }
+
+  private async enrichProfileEducation<T extends { educationId?: number | null; specializationId?: number | null; degree?: string | null }>(
+    profile: T,
+  ) {
+    const degree =
+      profile.degree ??
+      (profile.educationId ? await this.educationsService.getLevelName(profile.educationId) : null);
+
+    const specializationName = profile.specializationId
+      ? await this.educationsService.getSpecializationName(profile.specializationId)
+      : null;
+
+    return {
+      ...profile,
+      degree: degree ?? profile.degree,
+      specializationName,
+    };
+  }
+
+  private mapCompanySector(sector?: string | null) {
+    if (!sector) return undefined;
+    const value = sector.toLowerCase();
+    if (value.includes('government') || value.includes('defense')) return 'Govt';
+    if (value.includes('startup')) return 'Startup';
+    if (value === 'business') return 'Business';
+    return 'Private';
+  }
+
+  private async buildCareerUpdate(payload: Partial<CompleteRegistrationPayload>) {
+    const update: {
+      occupationId?: number | null;
+      profession?: string | null;
+      companyId?: number | null;
+      companyName?: string | null;
+      companySector?: 'Private' | 'Govt' | 'MNC' | 'Startup' | 'Business';
+    } = {};
+
+    if (payload.occupationId !== undefined) {
+      if (payload.occupationId === null) {
+        update.occupationId = null;
+        update.profession = null;
+      } else {
+        const occupationName = await this.careersService.getOccupationName(payload.occupationId);
+        if (!occupationName) {
+          throw new BadRequestException('Invalid occupation');
+        }
+        update.occupationId = payload.occupationId;
+        update.profession = occupationName;
+      }
+    } else if (payload.profession) {
+      const resolved = await this.careersService.resolveOccupation(payload.profession);
+      if (resolved) {
+        update.occupationId = resolved.id;
+        update.profession = resolved.name;
+      }
+    }
+
+    if (payload.companyId !== undefined) {
+      if (payload.companyId === null) {
+        update.companyId = null;
+      } else {
+        const companyName = await this.careersService.getCompanyName(payload.companyId);
+        if (!companyName) {
+          throw new BadRequestException('Invalid company');
+        }
+        const resolved = await this.careersService.resolveCompany(companyName);
+        update.companyId = payload.companyId;
+        update.companyName = companyName;
+        const sector = this.mapCompanySector(resolved?.sector);
+        if (sector) update.companySector = sector;
+      }
+    } else if (payload.companyName !== undefined) {
+      const trimmed = payload.companyName.trim();
+      if (!trimmed) {
+        update.companyId = null;
+        update.companyName = null;
+      } else {
+        const resolved = await this.careersService.resolveCompany(trimmed);
+        if (resolved) {
+          update.companyId = resolved.id;
+          update.companyName = resolved.name;
+          const sector = this.mapCompanySector(resolved.sector);
+          if (sector) update.companySector = sector;
+        } else {
+          update.companyId = null;
+          update.companyName = trimmed;
+        }
+      }
+    }
+
+    if (payload.profession !== undefined && update.profession === undefined && !payload.occupationId) {
+      update.profession = payload.profession;
+    }
+
+    return update;
+  }
+
+  private async enrichProfileCareer<T extends {
+    occupationId?: number | null;
+    profession?: string | null;
+    companyId?: number | null;
+    companyName?: string | null;
+  }>(profile: T) {
+    const profession =
+      profile.profession ??
+      (profile.occupationId ? await this.careersService.getOccupationName(profile.occupationId) : null);
+
+    const companyName =
+      profile.companyName ??
+      (profile.companyId ? await this.careersService.getCompanyName(profile.companyId) : null);
+
+    return {
+      ...profile,
+      profession: profession ?? profile.profession,
+      companyName: companyName ?? profile.companyName,
+    };
+  }
+
+  private async enrichProfileDetails<T extends Record<string, unknown>>(profile: T) {
+    const withEducation = await this.enrichProfileEducation(profile as any);
+    return this.enrichProfileCareer(withEducation);
+  }
 
   private async getMutualConnectState(
     viewerUserId: string | undefined,
@@ -79,6 +267,9 @@ export class ProfilesService {
   }
 
   async completeRegistration(userId: string, payload: CompleteRegistrationPayload) {
+    const educationFields = await this.buildEducationUpdate(payload);
+    const careerFields = await this.buildCareerUpdate(payload);
+
     return this.db.transaction(async (tx) => {
       // 1. Format DOB as YYYY-MM-DD
       const month = payload.dobMonth.padStart(2, '0');
@@ -117,13 +308,17 @@ export class ProfilesService {
             subcaste: payload.subcaste ?? null,
             gotra: payload.gotra ?? null,
             motherTongue: payload.motherTongue,
+            educationId: educationFields.educationId ?? payload.educationId ?? null,
+            specializationId: educationFields.specializationId ?? payload.specializationId ?? null,
             educationLevel: payload.educationLevel,
-            degree: payload.degree,
+            degree: educationFields.degree ?? payload.degree ?? null,
             collegeName: payload.collegeName ?? null,
             employmentStatus: payload.employmentStatus,
-            profession: payload.profession,
-            companyName: payload.companyName ?? null,
-            companySector: payload.companySector ?? null,
+            occupationId: careerFields.occupationId ?? payload.occupationId ?? null,
+            profession: careerFields.profession ?? payload.profession,
+            companyId: careerFields.companyId ?? payload.companyId ?? null,
+            companyName: careerFields.companyName ?? payload.companyName ?? null,
+            companySector: careerFields.companySector ?? payload.companySector ?? null,
             annualIncome: payload.annualIncome,
             photoPrivacy: payload.photoPrivacy || 'blurred',
             updatedAt: new Date(),
@@ -152,13 +347,17 @@ export class ProfilesService {
             subcaste: payload.subcaste ?? null,
             gotra: payload.gotra ?? null,
             motherTongue: payload.motherTongue,
+            educationId: educationFields.educationId ?? payload.educationId ?? null,
+            specializationId: educationFields.specializationId ?? payload.specializationId ?? null,
             educationLevel: payload.educationLevel,
-            degree: payload.degree,
+            degree: educationFields.degree ?? payload.degree ?? null,
             collegeName: payload.collegeName ?? null,
             employmentStatus: payload.employmentStatus,
-            profession: payload.profession,
-            companyName: payload.companyName ?? null,
-            companySector: payload.companySector ?? null,
+            occupationId: careerFields.occupationId ?? payload.occupationId ?? null,
+            profession: careerFields.profession ?? payload.profession,
+            companyId: careerFields.companyId ?? payload.companyId ?? null,
+            companyName: careerFields.companyName ?? payload.companyName ?? null,
+            companySector: careerFields.companySector ?? payload.companySector ?? null,
             annualIncome: payload.annualIncome,
             photoPrivacy: payload.photoPrivacy || 'blurred',
           })
@@ -328,9 +527,20 @@ export class ProfilesService {
   }
 
   async updateMyProfile(userId: string, payload: Partial<CompleteRegistrationPayload>) {
-    const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    const [profile] = await this.db
+      .select({
+        id: profiles.id,
+        educationId: profiles.educationId,
+        occupationId: profiles.occupationId,
+        companyId: profiles.companyId,
+      })
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
     const profileId = profile.id;
+    const educationFields = await this.buildEducationUpdate(payload, profile.educationId);
+    const careerFields = await this.buildCareerUpdate(payload);
 
     return this.db.transaction(async (tx) => {
       // Check if any fields belong to profiles
@@ -352,13 +562,15 @@ export class ProfilesService {
       if (payload.subcaste !== undefined) profilesUpdate.subcaste = payload.subcaste;
       if (payload.gotra !== undefined) profilesUpdate.gotra = payload.gotra;
       if (payload.motherTongue !== undefined) profilesUpdate.motherTongue = payload.motherTongue;
+      Object.assign(profilesUpdate, educationFields);
+      Object.assign(profilesUpdate, careerFields);
       if (payload.educationLevel !== undefined) profilesUpdate.educationLevel = payload.educationLevel;
-      if (payload.degree !== undefined) profilesUpdate.degree = payload.degree;
+      if (payload.degree !== undefined && educationFields.degree === undefined) profilesUpdate.degree = payload.degree;
       if (payload.collegeName !== undefined) profilesUpdate.collegeName = payload.collegeName;
       if (payload.employmentStatus !== undefined) profilesUpdate.employmentStatus = payload.employmentStatus;
-      if (payload.profession !== undefined) profilesUpdate.profession = payload.profession;
-      if (payload.companyName !== undefined) profilesUpdate.companyName = payload.companyName;
-      if (payload.companySector !== undefined) profilesUpdate.companySector = payload.companySector;
+      if (payload.profession !== undefined && careerFields.profession === undefined) profilesUpdate.profession = payload.profession;
+      if (payload.companyName !== undefined && careerFields.companyName === undefined) profilesUpdate.companyName = payload.companyName;
+      if (payload.companySector !== undefined && careerFields.companySector === undefined) profilesUpdate.companySector = payload.companySector;
       if (payload.annualIncome !== undefined) profilesUpdate.annualIncome = payload.annualIncome;
       if (payload.photoPrivacy !== undefined) profilesUpdate.photoPrivacy = payload.photoPrivacy;
       // Special handling for DOB
@@ -549,7 +761,7 @@ export class ProfilesService {
       .orderBy(asc(profilePhotos.displayOrder));
 
     return {
-      profile: profile as any,
+      profile: await this.enrichProfileDetails(profile as any),
       family: (family as any) || null,
       lifestyle: (lifestyle as any) || null,
       horoscope: (horoscope as any) || null,
@@ -706,7 +918,7 @@ export class ProfilesService {
     }
 
     return {
-      profile: profile as any,
+      profile: await this.enrichProfileDetails(profile as any),
       family: (family as any) || null,
       lifestyle: (lifestyle as any) || null,
       horoscope: horoscopePayload,

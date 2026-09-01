@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { formatHeightFromCm } from "@/lib/input-units"
 import { apiClient } from "@/lib/api-client"
 import {
   Briefcase,
@@ -107,7 +108,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
     hasHoroscope: !!data.hasHoroscope || !!data.horoscope?.horoscopeS3Key,
     blurPhoto: data.blurPhoto,
     matchPercent: 90,
-    height: `${data.profile.heightCm} cm`,
+    height: formatHeightFromCm(data.profile.heightCm),
     education: data.profile.educationLevel,
     occupation: data.profile.profession,
     community: data.profile.caste,

@@ -6,3 +6,7 @@ export * from './interests';
 export * from './shortlists';
 export * from './chat';
 export * from './admin';
+export * from './locations';
+export * from './communities';
+export * from './educations';
+export * from './careers';

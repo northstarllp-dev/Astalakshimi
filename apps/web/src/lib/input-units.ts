@@ -69,3 +69,58 @@ export function maskWeightInput(raw: string): string {
   if (rest.length === 0) return whole.slice(0, 3)
   return `${whole.slice(0, 3)}.${rest.join("").slice(0, 1)}`
 }
+
+export const DEFAULT_HEIGHT_CM = 165
+
+/** Format stored cm as feet and inches, e.g. 180 → 5'11" */
+export function formatHeightFromCm(cm: number): string {
+  const totalInches = Math.round(cm / 2.54)
+  const feet = Math.floor(totalInches / 12)
+  const inches = totalInches % 12
+  return `${feet}'${inches}"`
+}
+
+/** Accept feet/inches (5'11") or legacy cm strings (165). */
+export function displayHeight(raw: string | undefined | null): string {
+  const text = String(raw ?? "").trim()
+  if (!text) return ""
+  if (/^\d{2,3}$/.test(text)) return formatHeightFromCm(parseInt(text, 10))
+  return text
+}
+
+export function heightToCm(raw: string): number {
+  const text = raw.trim()
+  if (!text) return DEFAULT_HEIGHT_CM
+
+  if (/^\d{2,3}$/.test(text)) return parseInt(text, 10)
+
+  const match = text.match(/^(\d{1,2})[''′]?\s*(\d{1,2})"?\s*$/)
+  if (match) {
+    const feet = parseInt(match[1], 10)
+    const inches = parseInt(match[2], 10)
+    if (Number.isFinite(feet) && Number.isFinite(inches)) {
+      return Math.round(feet * 30.48 + inches * 2.54)
+    }
+  }
+
+  const digits = text.replace(/\D/g, "").slice(0, 3)
+  if (digits.length >= 2) {
+    const feet = parseInt(digits[0], 10)
+    const inches = Math.min(11, parseInt(digits.slice(1), 10) || 0)
+    return Math.round(feet * 30.48 + inches * 2.54)
+  }
+
+  return DEFAULT_HEIGHT_CM
+}
+
+/** Mask typed digits into feet'inches" as the user types (e.g. 511 → 5'11"). */
+export function maskHeightInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 3)
+  if (!digits) return ""
+
+  const feet = digits[0]
+  if (digits.length === 1) return feet
+
+  const inches = String(Math.min(11, parseInt(digits.slice(1), 10) || 0))
+  return `${feet}'${inches}"`
+}

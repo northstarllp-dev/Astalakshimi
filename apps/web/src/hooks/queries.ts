@@ -2,6 +2,7 @@ type UserSettings = any;
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { loadProfile, saveProfile, emptySignupData, DEMO_REJECTION_REASON, type SignupData } from "@/lib/profile-store"
 import { apiClient } from "@/lib/api-client"
+import { formatHeightFromCm, heightToCm } from "@/lib/input-units"
 export const queryKeys = {
   profile: ["profile"] as const,
   matches: ["matches"] as const,
@@ -38,6 +39,46 @@ export function useProfileQuery() {
           
           if (authMe.hasProfile) {
             const fullProfile = await apiClient.profiles.getMyProfile();
+            let educationId = fullProfile.profile.educationId ?? null;
+            let education = fullProfile.profile.degree || "";
+            let educationStream = fullProfile.profile.specializationName ?? "";
+            let otherEducation = "";
+
+            if (education.includes(" · ") && !fullProfile.profile.specializationName) {
+              const [level, ...streamParts] = education.split(" · ");
+              education = level;
+              educationStream = streamParts.join(" · ");
+            }
+
+            if (!educationId && education) {
+              const resolved = await apiClient.educations.resolve(education).catch(() => null);
+              if (resolved) {
+                educationId = resolved.id;
+                education = resolved.name;
+              } else {
+                otherEducation = education;
+              }
+            }
+            let occupationId = fullProfile.profile.occupationId ?? null;
+            let occupation = fullProfile.profile.profession || "";
+            if (!occupationId && occupation) {
+              const resolvedOccupation = await apiClient.careers.resolveOccupation(occupation).catch(() => null);
+              if (resolvedOccupation) {
+                occupationId = resolvedOccupation.id;
+                occupation = resolvedOccupation.name;
+              }
+            }
+
+            let companyId = fullProfile.profile.companyId ?? null;
+            let companyName = fullProfile.profile.companyName ?? "";
+            if (!companyId && companyName) {
+              const resolvedCompany = await apiClient.careers.resolveCompany(companyName).catch(() => null);
+              if (resolvedCompany) {
+                companyId = resolvedCompany.id;
+                companyName = resolvedCompany.name;
+              }
+            }
+
             const mapped = {
               profileFor: fullProfile.profile.profileFor,
               fullName: fullProfile.profile.fullName,
@@ -45,7 +86,7 @@ export function useProfileQuery() {
               dobYear: fullProfile.profile.dob.split('-')[0],
               dobMonth: fullProfile.profile.dob.split('-')[1],
               dobDay: fullProfile.profile.dob.split('-')[2],
-              height: String(fullProfile.profile.heightCm),
+              height: formatHeightFromCm(fullProfile.profile.heightCm),
               maritalStatus: fullProfile.profile.maritalStatus,
               hasChildren: fullProfile.profile.hasChildren ?? false,
               childrenCount: fullProfile.profile.childrenCount ?? 0,
@@ -55,14 +96,20 @@ export function useProfileQuery() {
               subcaste: fullProfile.profile.subcaste ?? '',
               gotra: fullProfile.profile.gotra ?? '',
               motherTongue: fullProfile.profile.motherTongue,
+              educationId,
+              specializationId: fullProfile.profile.specializationId ?? null,
               educationLevel: fullProfile.profile.educationLevel ?? '',
-              education: fullProfile.profile.degree || "",
-              degree: fullProfile.profile.degree ?? '',
+              education,
+              degree: fullProfile.profile.degree ?? education,
+              educationStream,
+              otherEducation,
               collegeName: fullProfile.profile.collegeName ?? '',
               employmentStatus: fullProfile.profile.employmentStatus ?? '',
-              occupation: fullProfile.profile.profession || "",
-              profession: fullProfile.profile.profession ?? '',
-              companyName: fullProfile.profile.companyName ?? '',
+              occupationId,
+              occupation,
+              profession: occupation,
+              companyId,
+              companyName,
               companySector: fullProfile.profile.companySector ?? '',
               annualIncome: fullProfile.profile.annualIncome ?? '',
               photoPrivacy: fullProfile.profile.photoPrivacy,
@@ -124,7 +171,7 @@ export function useSaveProfileMutation() {
         hasChildren: data.hasChildren,
         childrenCount: data.childrenCount,
         childrenLivingWithMe: data.childrenLivingWithMe,
-        heightCm: parseInt(data.height || '165', 10),
+        heightCm: heightToCm(data.height || "5'5\""),
         aboutMe: data.aboutMe,
         city: data.city || 'Chennai',
         state: data.state || 'Tamil Nadu',
@@ -135,10 +182,14 @@ export function useSaveProfileMutation() {
         gotra: data.gotra,
         motherTongue: data.motherTongue || 'Tamil',
         educationLevel: (data.educationLevel as any) || 'Bachelors',
-        degree: data.degree || data.education || 'B.Tech',
+        educationId: data.educationId ?? undefined,
+        specializationId: data.specializationId ?? undefined,
+        degree: data.degree || data.education || undefined,
         collegeName: data.collegeName,
         employmentStatus: (data.employmentStatus as any) || 'Employed',
-        profession: data.profession || data.occupation || 'Software Engineer',
+        occupationId: data.occupationId ?? undefined,
+        profession: data.profession || data.occupation || undefined,
+        companyId: data.companyId ?? undefined,
         companyName: data.companyName,
         companySector: (data.companySector as any) || 'Private',
         annualIncome: data.annualIncome || '₹10 – 15 Lakh',
@@ -221,8 +272,11 @@ function buildProfileUpdatePayload(data: Partial<SignupData>) {
     "height",
     "education",
     "otherEducation",
+    "degree",
+    "educationStream",
     "occupation",
     "otherOccupation",
+    "companyName",
     "prefReligion",
     "manglik",
   ])
@@ -231,18 +285,28 @@ function buildProfileUpdatePayload(data: Partial<SignupData>) {
     if (!skip.has(key)) payload[key] = value
   }
 
-  if (data.height) payload.heightCm = parseInt(data.height, 10)
+  if (data.height) payload.heightCm = heightToCm(data.height)
   if (data.star !== undefined) payload.nakshatra = data.star
   if (data.horoscopeName !== undefined) payload.horoscopeFileName = data.horoscopeName
   if (data.horoscopeSize !== undefined) payload.horoscopeFileSizeBytes = data.horoscopeSize
   if (data.horoscopeS3Key !== undefined) payload.horoscopeS3Key = data.horoscopeS3Key
   if (data.manglik !== undefined) payload.manglik = normalizeManglik(data.manglik)
-  if (data.education !== undefined || data.otherEducation !== undefined || data.degree !== undefined) {
+  if (data.educationId !== undefined) payload.educationId = data.educationId
+  if (data.specializationId !== undefined) payload.specializationId = data.specializationId
+  if (!data.educationId && (data.education !== undefined || data.otherEducation !== undefined || data.degree !== undefined)) {
     payload.degree = data.otherEducation || data.education || data.degree
   }
-  if (data.occupation !== undefined || data.otherOccupation !== undefined || data.profession !== undefined) {
+  if (data.educationId && !data.specializationId && data.educationStream?.trim()) {
+    payload.degree = data.education
+      ? `${data.education} · ${data.educationStream.trim()}`
+      : data.educationStream.trim()
+  }
+  if (data.occupationId !== undefined) payload.occupationId = data.occupationId
+  if (data.companyId !== undefined) payload.companyId = data.companyId
+  if (!data.occupationId && (data.occupation !== undefined || data.otherOccupation !== undefined || data.profession !== undefined)) {
     payload.profession = data.otherOccupation || data.occupation || data.profession
   }
+  if (!data.companyId && data.companyName !== undefined) payload.companyName = data.companyName
   if (data.prefReligion !== undefined) payload.prefReligions = data.prefReligion
 
   return payload
@@ -260,7 +324,7 @@ function mapFullProfileToSignupData(
     dobYear: fullProfile.profile.dob.split("-")[0],
     dobMonth: fullProfile.profile.dob.split("-")[1],
     dobDay: fullProfile.profile.dob.split("-")[2],
-    height: String(fullProfile.profile.heightCm),
+    height: formatHeightFromCm(fullProfile.profile.heightCm),
     maritalStatus: fullProfile.profile.maritalStatus,
     hasChildren: fullProfile.profile.hasChildren ?? false,
     childrenCount: fullProfile.profile.childrenCount ?? 0,
@@ -270,13 +334,25 @@ function mapFullProfileToSignupData(
     subcaste: fullProfile.profile.subcaste ?? "",
     gotra: fullProfile.profile.gotra ?? "",
     motherTongue: fullProfile.profile.motherTongue,
+    educationId: fullProfile.profile.educationId ?? null,
+    specializationId: fullProfile.profile.specializationId ?? null,
     educationLevel: fullProfile.profile.educationLevel ?? "",
-    education: fullProfile.profile.degree || "",
+    education: fullProfile.profile.degree?.split(" · ")[0] || fullProfile.profile.degree || "",
     degree: fullProfile.profile.degree ?? "",
+    educationStream:
+      fullProfile.profile.specializationName ??
+      (fullProfile.profile.degree?.includes(" · ")
+        ? fullProfile.profile.degree.split(" · ").slice(1).join(" · ")
+        : ""),
+    otherEducation: fullProfile.profile.educationId
+      ? ""
+      : fullProfile.profile.degree || "",
     collegeName: fullProfile.profile.collegeName ?? "",
     employmentStatus: fullProfile.profile.employmentStatus ?? "",
+    occupationId: fullProfile.profile.occupationId ?? null,
     occupation: fullProfile.profile.profession || "",
     profession: fullProfile.profile.profession ?? "",
+    companyId: fullProfile.profile.companyId ?? null,
     companyName: fullProfile.profile.companyName ?? "",
     companySector: fullProfile.profile.companySector ?? "Private",
     annualIncome: fullProfile.profile.annualIncome ?? "",
@@ -314,9 +390,11 @@ export function useUpdateProfileMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: Partial<SignupData>) => {
-      if (!apiClient.getToken()) throw new Error("Not authenticated")
-
       const payload = buildProfileUpdatePayload(data)
+      if (Object.keys(payload).length === 0) {
+        throw new Error("No changes to save.")
+      }
+
       const fullProfile = await apiClient.profiles.updateMyProfile(payload as any)
 
       const base = loadProfile() || emptySignupData()

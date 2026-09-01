@@ -9,7 +9,7 @@ import { emptySignupData, type SignupData } from "@/lib/profile-store"
  *   Optional details (employer, specialization, family, horoscope PDF, …) do not block Discover.
  * - Frontend never talks to Postgres; this is computed from SignupData (session cache / API profile).
  *
- * Defaults from `emptySignupData()` (height 165, diet Vegetarian, etc.) do not count
+ * Defaults from `emptySignupData()` (height 5'5", diet Vegetarian, etc.) do not count
  * until the member actually sets them, except signup fields after submit.
  */
 
@@ -150,7 +150,7 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     group: "career",
     signup: false,
     required: true,
-    filled: (d) => filledTyped(d.education) || filledTyped(d.degree) || filledTyped(d.otherEducation),
+    filled: (d) => Boolean(d.educationId) || filledTyped(d.education) || filledTyped(d.degree) || filledTyped(d.otherEducation),
   },
   { id: "collegeName", label: "College", group: "career", signup: false, filled: (d) => filledTyped(d.collegeName) },
   {
@@ -159,9 +159,9 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     group: "career",
     signup: false,
     required: true,
-    filled: (d) => filledTyped(d.occupation) || filledTyped(d.profession) || filledTyped(d.otherOccupation),
+    filled: (d) => Boolean(d.occupationId) || filledTyped(d.occupation) || filledTyped(d.profession) || filledTyped(d.otherOccupation),
   },
-  { id: "companyName", label: "Company", group: "career", signup: false, filled: (d) => filledTyped(d.companyName) },
+  { id: "companyName", label: "Company", group: "career", signup: false, filled: (d) => Boolean(d.companyId) || filledTyped(d.companyName) },
   {
     id: "annualIncome",
     label: "Annual income",

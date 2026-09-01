@@ -1,22 +1,35 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
-
-const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+import { getApiBaseUrl } from '@/lib/api-config';
 
 async function handleProxy(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const resolvedParams = await params;
   const path = resolvedParams.path.join('/');
   const searchParams = request.nextUrl.searchParams.toString();
   const queryString = searchParams ? `?${searchParams}` : '';
-  const url = `${NEXT_PUBLIC_API_URL}/${path}${queryString}`;
+  const url = `${getApiBaseUrl()}/${path}${queryString}`;
 
   const cookieStore = await cookies();
   const token = cookieStore.get('astalakshimi.auth_token')?.value;
 
   const headers = new Headers(request.headers);
-  headers.delete('host');
-  headers.delete('cookie');
+  for (const name of [
+    'host',
+    'cookie',
+    'connection',
+    'keep-alive',
+    'transfer-encoding',
+    'te',
+    'trailer',
+    'upgrade',
+    'expect',
+    'proxy-connection',
+    'proxy-authenticate',
+    'proxy-authorization',
+  ]) {
+    headers.delete(name);
+  }
   
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
@@ -47,7 +60,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       const refreshToken = cookieStore.get('astalakshimi.refresh_token')?.value;
       
       if (refreshToken) {
-        const refreshRes = await fetch(`${NEXT_PUBLIC_API_URL}/auth/refresh`, {
+        const refreshRes = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),
@@ -118,8 +131,24 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       headers: responseHeaders,
     });
   } catch (error: any) {
+    const causeCode = error?.cause?.code || error?.code;
+    const apiUnavailable =
+      causeCode === 'ECONNREFUSED' ||
+      causeCode === 'ECONNRESET' ||
+      error?.message?.includes('fetch failed');
+
     console.error('Proxy error fetching', url, ':', error);
-    return NextResponse.json({ message: 'Proxy error', error: error.message, cause: error.cause }, { status: 502 });
+
+    return NextResponse.json(
+      {
+        message: apiUnavailable
+          ? 'API server is not running. Start it with `pnpm dev` and wait for "Nest application successfully started".'
+          : 'Proxy error',
+        error: error.message,
+        cause: error.cause,
+      },
+      { status: 502 },
+    );
   }
 }
 
