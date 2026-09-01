@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
+import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -37,6 +37,53 @@ function useDebouncedValue<T>(value: T, delay = 250): T {
   }, [value, delay])
 
   return debounced
+}
+
+async function searchNominatimDirect(query: string): Promise<CityAutocompleteResult[]> {
+  try {
+    const params = new URLSearchParams({
+      q: query.trim(),
+      format: "json",
+      addressdetails: "1",
+      limit: "10",
+      countrycodes: "in",
+    })
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+      headers: {
+        Accept: "application/json",
+      },
+    })
+    if (!res.ok) return []
+    const list = await res.json()
+    const seen = new Set<string>()
+    const results: CityAutocompleteResult[] = []
+    for (const row of list) {
+      const addr = row.address || {}
+      const name =
+        addr.city ||
+        addr.town ||
+        addr.village ||
+        addr.suburb ||
+        addr.county ||
+        row.display_name?.split(",")[0]?.trim()
+      const state = addr.state || addr.state_district || ""
+      const country = addr.country || "India"
+      if (!name) continue
+      const key = `${name.toLowerCase()}|${state.toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      results.push({
+        id: row.place_id,
+        name,
+        state,
+        country,
+        label: state ? `${name}, ${state}` : name,
+      })
+    }
+    return results
+  } catch {
+    return []
+  }
 }
 
 export function CityAutocomplete({
@@ -76,16 +123,27 @@ export function CityAutocomplete({
 
     apiClient.locations
       .autocomplete(trimmed, stateFilter)
-      .then((rows) => {
+      .then(async (rows) => {
         if (!cancelled) {
-          setResults(rows)
-          setError(null)
+          if (rows && rows.length > 0) {
+            setResults(rows)
+            setError(null)
+          } else {
+            const direct = await searchNominatimDirect(trimmed)
+            if (!cancelled) {
+              setResults(direct)
+              setError(null)
+            }
+          }
         }
       })
-      .catch((err: unknown) => {
+      .catch(async () => {
         if (!cancelled) {
-          setResults([])
-          setError(err instanceof Error ? err.message : "City search failed.")
+          const direct = await searchNominatimDirect(trimmed)
+          if (!cancelled) {
+            setResults(direct)
+            setError(null)
+          }
         }
       })
       .finally(() => {
@@ -98,6 +156,7 @@ export function CityAutocomplete({
   }, [debouncedQuery, open, stateFilter])
 
   const displayValue = city ? (state ? `${city}, ${state}` : city) : ""
+  const trimmed = debouncedQuery.trim()
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -129,15 +188,50 @@ export function CityAutocomplete({
           />
           <CommandList>
             <CommandEmpty>
-              {debouncedQuery.trim().length < 2
-                ? "Type at least 2 characters."
-                : loading
-                  ? "Searching…"
-                  : error
-                    ? error
-                    : emptyText}
+              <div className="py-2 text-center">
+                <p className="text-xs text-muted-foreground">
+                  {trimmed.length < 2
+                    ? "Type at least 2 characters."
+                    : loading
+                      ? "Searching…"
+                      : error
+                        ? error
+                        : emptyText}
+                </p>
+                {trimmed.length >= 2 && !loading && (
+                  <Button
+                    type="button"
+                    variant="soft"
+                    size="sm"
+                    className="mt-3 text-xs"
+                    onClick={() => {
+                      onCityChange({ city: trimmed, state: stateFilter || "" })
+                      setQuery(trimmed)
+                      setOpen(false)
+                    }}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Use &ldquo;{trimmed}&rdquo;
+                  </Button>
+                )}
+              </div>
             </CommandEmpty>
             <CommandGroup>
+              {trimmed.length >= 2 &&
+                !results.some((r) => r.name.toLowerCase() === trimmed.toLowerCase()) && (
+                  <CommandItem
+                    value={`__custom__:${trimmed}`}
+                    onSelect={() => {
+                      onCityChange({ city: trimmed, state: stateFilter || "" })
+                      setQuery(trimmed)
+                      setOpen(false)
+                    }}
+                    className="font-medium text-primary cursor-pointer"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Use &ldquo;{trimmed}&rdquo; {stateFilter ? `(${stateFilter})` : ""}
+                  </CommandItem>
+                )}
               {results.map((item) => (
                 <CommandItem
                   key={`${item.id}-${item.label}`}

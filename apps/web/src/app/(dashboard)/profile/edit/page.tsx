@@ -32,6 +32,11 @@ import { SearchableSelect } from "@/components/profile/searchable-select"
 import { CityAutocomplete } from "@/components/profile/city-autocomplete"
 import { CommunityFields } from "@/components/profile/community-fields"
 import {
+  getCommunitiesForReligion,
+  getSubcastesForCommunity,
+  getGotrasForReligion,
+} from "@/lib/community-data"
+import {
   emptySignupData,
   type SignupData,
   COMPLEXIONS,
@@ -81,16 +86,18 @@ function Field({
   required,
   missing,
   error,
+  className,
   children,
 }: {
   label: string
   required?: boolean
   missing?: boolean
   error?: string
+  className?: string
   children: React.ReactNode
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className={cn("space-y-1.5", className)}>
       <Label
         className={cn(
           "text-xs font-semibold tracking-wide uppercase",
@@ -429,35 +436,78 @@ export default function ProfileEditPage() {
           <Field label="Religion" required missing={isMissing("religion")} error={fieldError(errors, "religion")}>
             <SearchableSelect
               value={data.religion || undefined}
-              onValueChange={(v) => update({ religion: v })}
+              onValueChange={(v) =>
+                update({
+                  religion: v,
+                  caste: "",
+                  subcaste: "",
+                  gotra: "",
+                })
+              }
               options={RELIGIONS}
               placeholder="Select religion"
               searchPlaceholder="Search religion…"
               className={cn(isMissing("religion") && invalidCls)}
             />
           </Field>
-          <Field label="Caste / community" required missing={isMissing("caste")} error={fieldError(errors, "caste")}>
-            <CommunityFields
-              religion={data.religion}
-              caste={data.caste}
-              subcaste={data.subcaste}
-              gotra={data.gotra}
-              onChange={(value) => update(value)}
-              casteMissing={isMissing("caste")}
-              casteClassName={cn(isMissing("caste") && invalidCls)}
+
+          <Field label="Mother tongue" required missing={isMissing("motherTongue")} error={fieldError(errors, "motherTongue")}>
+            <SearchableSelect
+              value={data.motherTongue || undefined}
+              onValueChange={(v) => update({ motherTongue: v })}
+              options={MOTHER_TONGUES}
+              placeholder="Select language"
+              searchPlaceholder="Search language…"
+              className={cn(isMissing("motherTongue") && invalidCls)}
             />
           </Field>
+
+          <Field label="Caste / community" required missing={isMissing("caste")} error={fieldError(errors, "caste")}>
+            <SearchableSelect
+              value={data.caste || undefined}
+              onValueChange={(next) =>
+                update({
+                  caste: next,
+                  subcaste: next === data.caste ? data.subcaste : "",
+                })
+              }
+              options={getCommunitiesForReligion(data.religion)}
+              placeholder={data.religion ? "Select caste / community…" : "Select religion first"}
+              searchPlaceholder="Search or type caste…"
+              emptyText="No matching community found."
+              disabled={!data.religion}
+              className={cn(isMissing("caste") && invalidCls)}
+              allowCustom={true}
+            />
+          </Field>
+
+          <Field label="Subcaste (optional)">
+            <SearchableSelect
+              value={data.subcaste || undefined}
+              onValueChange={(next) => update({ subcaste: next })}
+              options={getSubcastesForCommunity(data.caste, data.religion)}
+              placeholder={data.caste ? "Select subcaste (optional)…" : "Select caste first"}
+              searchPlaceholder="Search or type subcaste…"
+              emptyText="No matching subcaste found."
+              disabled={!data.caste}
+              allowCustom={true}
+            />
+          </Field>
+
+          {(data.religion === "Hindu" || data.religion === "Jain") && (
+            <Field label="Gotra (optional)" className="sm:col-span-2">
+              <SearchableSelect
+                value={data.gotra || undefined}
+                onValueChange={(next) => update({ gotra: next })}
+                options={getGotrasForReligion(data.religion)}
+                placeholder="Select gotra (optional)…"
+                searchPlaceholder="Search or type gotra…"
+                emptyText="No matching gotra found."
+                allowCustom={true}
+              />
+            </Field>
+          )}
         </div>
-        <Field label="Mother tongue" required missing={isMissing("motherTongue")} error={fieldError(errors, "motherTongue")}>
-          <SearchableSelect
-            value={data.motherTongue || undefined}
-            onValueChange={(v) => update({ motherTongue: v })}
-            options={MOTHER_TONGUES}
-            placeholder="Select language"
-            searchPlaceholder="Search language…"
-            className={cn(isMissing("motherTongue") && invalidCls)}
-          />
-        </Field>
       </EditSection>
 
       <EditSection id="career" title="Education & career">
