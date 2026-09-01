@@ -64,7 +64,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="hidden items-center gap-0.5 md:flex">
-            {navItems.map((item) => {
+            {navItems.filter(item => session?.role !== "staff" || item.href === "/admin/profiles").map((item) => {
               const active = item.match(pathname)
               return (
                 <Link
@@ -108,8 +108,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[#fffbf4]/95 backdrop-blur-md md:hidden safe-bottom"
         aria-label="Admin sections"
       >
-        <div className="mx-auto grid max-w-lg grid-cols-4 px-1 pt-1">
-          {navItems.map((item) => {
+        <div className={cn(
+          "mx-auto grid max-w-lg px-1 pt-1",
+          session?.role === "staff" ? "grid-cols-1" : "grid-cols-4"
+        )}>
+          {navItems.filter(item => session?.role !== "staff" || item.href === "/admin/profiles").map((item) => {
             const active = item.match(pathname)
             const Icon = item.icon
             return (

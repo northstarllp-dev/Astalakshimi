@@ -29,6 +29,7 @@
     "crypto": "^1.0.1",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.4",
+    "firebase-admin": "^14.3.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "razorpay": "^2.9.8",

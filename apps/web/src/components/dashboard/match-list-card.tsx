@@ -6,7 +6,7 @@ import Link from "next/link"
 import { cn, getMediaUrl } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { BadgeCheck, ChevronLeft, ChevronRight, MapPin, Sparkles, Star } from "lucide-react"
+import { BadgeCheck, ChevronLeft, ChevronRight, MapPin, Sparkles, Star, Bookmark } from "lucide-react"
 import { ConnectButton } from "@/components/profile/connect-button"
 import { useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
 
@@ -106,7 +106,6 @@ export function MatchListCard({
               )}
             </div>
 
-            {/* Shortlist Star toggle button on photo */}
             <button
               type="button"
               onClick={handleToggleShortlist}
@@ -114,7 +113,7 @@ export function MatchListCard({
               aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
               className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition hover:bg-black/75 hover:scale-105 active:scale-95"
             >
-              <Star
+              <Bookmark
                 className={cn(
                   "h-4 w-4 transition-colors",
                   isShortlisted ? "fill-amber-400 text-amber-400" : "text-white"

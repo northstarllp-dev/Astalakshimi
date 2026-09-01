@@ -226,6 +226,9 @@ export default function AdminProfilesPageInner() {
                   <th className="px-3 py-2.5 font-medium">City</th>
                   <th className="px-3 py-2.5 font-medium">Status</th>
                   <th className="px-3 py-2.5 font-medium">%</th>
+                  <th className="px-3 py-2.5 font-medium">Plan</th>
+                  <th className="px-3 py-2.5 font-medium">Plan Expiry</th>
+                  <th className="px-3 py-2.5 font-medium">Payment By</th>
                   <th className="px-3 py-2.5 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -260,6 +263,10 @@ function ProfileCard({ profile: p, onDelete }: { profile: AdminProfile; onDelete
           <p className="truncate text-sm font-semibold">{p.fullName}</p>
           <p className="text-xs text-muted-foreground">
             {p.city} · {p.completeness}%
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {p.plan || "Free"} · Pay: <span className="capitalize">{p.paymentMethod || "-"}</span>
+            {p.planExpiry && ` · Exp: ${new Date(p.planExpiry).toLocaleDateString("en-IN")}`}
           </p>
         </div>
         <StatusBadge status={p.verificationStatus} />
@@ -299,6 +306,11 @@ function ProfileRow({ profile: p, onDelete }: { profile: AdminProfile; onDelete:
         <StatusBadge status={p.verificationStatus} />
       </td>
       <td className="px-3 py-2.5 tabular-nums">{p.completeness}%</td>
+      <td className="px-3 py-2.5">{p.plan || "-"}</td>
+      <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
+        {p.planExpiry ? new Date(p.planExpiry).toLocaleDateString("en-IN") : "-"}
+      </td>
+      <td className="px-3 py-2.5 capitalize">{p.paymentMethod || "-"}</td>
       <td className="px-3 py-2.5">
         <div className="flex gap-1">
           <Link href={`/admin/profiles/${p.id}`}>

@@ -22,7 +22,7 @@ export const notifications = pgTable('notifications', {
   isRead: boolean('is_read').default(false).notNull(),
   paidOnly: boolean('paid_only').default(false).notNull(),
   actorProfileId: uuid('actor_profile_id')
-    .references(() => profiles.id, { onDelete: 'set null' }),
+    .references(() => profiles.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

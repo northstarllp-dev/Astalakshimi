@@ -256,6 +256,7 @@ export const adminCreateProfileSchema = z
     motherTongue: z.string().min(1, "Select mother tongue."),
     brothersCount: z.number().int().min(0).max(5),
     sistersCount: z.number().int().min(0).max(5),
+    planId: z.string().optional(),
   })
   .superRefine((value, ctx) => {
     const age = dobAge(value.dobDay, value.dobMonth, value.dobYear, value.gender)

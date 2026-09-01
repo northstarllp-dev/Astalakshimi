@@ -14,6 +14,8 @@ import {
   verifications,
   userSettings,
   interests,
+  plans,
+  subscriptions,
 } from '@astalakshimi/database';
 import { eq, asc, and, or } from 'drizzle-orm';
 import type { CompleteRegistrationPayload, FullProfileView } from '@astalakshimi/types';
@@ -318,6 +320,34 @@ export class ProfilesService {
             updatedAt: new Date(),
           },
         });
+
+      // Launch offer: Give Silver plan if they don't have an active subscription
+      const [activeSub] = await tx
+        .select({ id: subscriptions.id })
+        .from(subscriptions)
+        .where(and(eq(subscriptions.userId, userId), eq(subscriptions.status, 'active')))
+        .limit(1);
+
+      if (!activeSub) {
+        const [silverPlan] = await tx
+          .select()
+          .from(plans)
+          .where(eq(plans.slug, 'silver'))
+          .limit(1);
+        
+        const launchOfferEnd = new Date('2026-12-17T23:59:59.999Z');
+        const now = new Date();
+        
+        if (silverPlan && now < launchOfferEnd) {
+          await tx.insert(subscriptions).values({
+            userId,
+            planId: silverPlan.id,
+            status: 'active',
+            startsAt: now,
+            expiresAt: launchOfferEnd,
+          });
+        }
+      }
 
       return {
         success: true,

@@ -8,8 +8,10 @@ export const ADMIN_AUDIT_KEY = "astalakshimi.admin.audit"
 
 export const DEMO_ADMIN_EMAIL = "admin@astalakshimi.in"
 export const DEMO_ADMIN_PASSWORD = "AstaAdmin@2026"
+export const DEMO_STAFF_EMAIL = "staff@astalakshimi.in"
+export const DEMO_STAFF_PASSWORD = "Staff@2026"
 
-export type AdminRole = "admin" | "moderator"
+export type AdminRole = "admin" | "moderator" | "staff"
 export type AccountStatus = "active" | "suspended"
 export type AdminVerificationStatus = "idle" | "pending" | "verified" | "rejected"
 export type PhotoReviewStatus = "pending" | "approved" | "rejected"
@@ -71,6 +73,9 @@ export type AdminProfile = {
   reviewedAt?: string
   reviewedBy?: string
   activeSubscription: boolean
+  plan?: string
+  planExpiry?: string
+  paymentMethod?: "admin" | "self"
 }
 
 export type AdminStats = {
@@ -129,6 +134,7 @@ export type AuditEntry = {
 const STAFF = [
   { id: "staff-1", email: DEMO_ADMIN_EMAIL, password: DEMO_ADMIN_PASSWORD, name: "Priya Admin", role: "admin" as const },
   { id: "staff-2", email: "moderator@astalakshimi.in", password: "Mod@2026", name: "Ravi Moderator", role: "moderator" as const },
+  { id: "staff-3", email: DEMO_STAFF_EMAIL, password: DEMO_STAFF_PASSWORD, name: "Suresh Staff", role: "staff" as const },
 ]
 
 function hoursAgo(h: number) {
@@ -194,7 +200,10 @@ function seedProfiles(): AdminProfile[] {
       createdBy: "self",
       accountStatus: "active",
       submittedAt: hoursAgo(4),
-      activeSubscription: false,
+      activeSubscription: true,
+      plan: "Silver",
+      planExpiry: daysAgo(-90), // Expiry 90 days from now (assuming it was created recently)
+      paymentMethod: "admin",
       ...overrides,
       photos,
     }

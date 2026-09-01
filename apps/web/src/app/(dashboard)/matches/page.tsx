@@ -6,7 +6,8 @@ import Link from "next/link"
 import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useInterestsQuery, useUnlockedContactsQuery } from "@/hooks/queries"
+import { useInterestsQuery, useUnlockedContactsQuery, useContactUsageQuery } from "@/hooks/queries"
+import { ProfileContactUnlockDialog } from "@/components/profile/profile-contact-unlock-dialog"
 import { cn, getMediaUrl } from "@/lib/utils"
 import {
   HeartHandshake,
@@ -152,10 +153,15 @@ function ConfettiBurst({ active }: { active: boolean }) {
 // ──────────────────────────────────────────────
 function MutualTab({
   items,
+  onGoToUnlocked,
 }: {
   items: InterestItem[]
+  onGoToUnlocked: () => void
 }) {
   const [celebrated, setCelebrated] = React.useState(false)
+  const [unlockTarget, setUnlockTarget] = React.useState<string | null>(null)
+  const { data: usage } = useContactUsageQuery()
+  const { data: unlockedData = [] } = useUnlockedContactsQuery()
 
   React.useEffect(() => {
     if (items.length > 0) {
@@ -192,7 +198,9 @@ function MutualTab({
       </div>
 
       <div className="space-y-3">
-        {items.map((item) => (
+        {items.map((item) => {
+          const isUnlocked = unlockedData.some((u: any) => u.profileId === item.profileId)
+          return (
           <article
             key={item.id}
             className="relative overflow-hidden rounded-2xl border-2 border-emerald-200 bg-card p-3.5 sm:p-4 shadow-sm"
@@ -236,26 +244,57 @@ function MutualTab({
                       View profile
                     </Button>
                   </Link>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="h-8 gap-1.5 px-3 text-xs bg-primary/10 text-primary hover:bg-primary/20 font-semibold"
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        window.dispatchEvent(
-                          new CustomEvent("TRIGGER_CONTACT_PAYWALL", { detail: { targetProfileId: item.profileId } })
-                        )
-                      }
-                    }}
-                  >
-                    <Lock className="h-3.5 w-3.5" /> Unlock Contact
-                  </Button>
+                  {isUnlocked ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-8 gap-1.5 px-3 text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-medium"
+                      onClick={onGoToUnlocked}
+                    >
+                      <LockKeyholeOpen className="h-3.5 w-3.5" /> Unlocked
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-8 gap-1.5 px-3 text-xs bg-primary/10 text-primary hover:bg-primary/20 font-semibold"
+                      onClick={() => setUnlockTarget(item.profileId)}
+                    >
+                      <Lock className="h-3.5 w-3.5" /> Unlock Contact
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
           </article>
-        ))}
+        )})}
       </div>
+
+      {unlockTarget && (
+        <ProfileContactUnlockDialog
+          open={!!unlockTarget}
+          onOpenChange={(open) => {
+            if (!open) setUnlockTarget(null)
+          }}
+          profileId={unlockTarget}
+          access={
+            usage
+              ? {
+                  canView: false,
+                  isUnlocked: false,
+                  isMutualBenefit: true,
+                  limit: usage.limit,
+                  usedThisMonth: usage.usedThisMonth,
+                  remaining: usage.remaining,
+                  canUnlockWithQuota: usage.limit === null || (usage.remaining !== null && usage.remaining > 0),
+                  canPayExtra: usage.canPayExtra,
+                  extraContactFeePaise: usage.extraContactFeePaise,
+                  planSlug: usage.planSlug,
+                }
+              : null
+          }
+        />
+      )}
     </div>
   )
 }
@@ -410,6 +449,7 @@ function MatchesPageInner() {
           {activeTab === "mutual" && (
             <MutualTab
               items={mutual}
+              onGoToUnlocked={() => setActiveTab("unlocked")}
             />
           )}
           {activeTab === "unlocked" && (

@@ -17,9 +17,12 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
       router.replace("/admin/login")
     }
     if (session && isLogin) {
-      router.replace("/admin")
+      router.replace(session.role === "staff" ? "/admin/profiles" : "/admin")
     }
-  }, [session, isLoading, isLogin, router])
+    if (session?.role === "staff" && pathname !== "/admin/profiles" && !pathname.startsWith("/admin/profiles/")) {
+      router.replace("/admin/profiles")
+    }
+  }, [session, isLoading, isLogin, pathname, router])
 
   // Staff login must render even while the mock session query is pending.
   if (isLogin) {

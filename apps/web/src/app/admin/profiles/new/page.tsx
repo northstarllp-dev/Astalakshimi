@@ -54,6 +54,7 @@ export default function AdminCreateProfilePage() {
       motherTongue: "Tamil",
       brothersCount: 0,
       sistersCount: 0,
+      planId: "free",
     },
   })
 
@@ -124,6 +125,7 @@ export default function AdminCreateProfilePage() {
           motherTongue: values.motherTongue,
           brothersCount: values.brothersCount,
           sistersCount: values.sistersCount,
+          planId: values.planId,
         },
         photos,
       })
@@ -243,6 +245,18 @@ export default function AdminCreateProfilePage() {
                 {SIBLING_COUNTS.map((v) => (
                   <SelectItem key={v} value={String(v)}>{v}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Plan">
+            <Select value={form.watch("planId") || "free"} onValueChange={(v) => form.setValue("planId", v)}>
+              <SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="silver">Silver</SelectItem>
+                <SelectItem value="gold">Gold</SelectItem>
+                <SelectItem value="platinum">Platinum</SelectItem>
+                <SelectItem value="diamond">Diamond</SelectItem>
               </SelectContent>
             </Select>
           </Field>

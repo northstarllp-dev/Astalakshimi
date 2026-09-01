@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ADD COLUMN "created_by" varchar(20) DEFAULT 'self' NOT NULL;

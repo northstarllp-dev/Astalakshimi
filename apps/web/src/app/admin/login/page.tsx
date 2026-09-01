@@ -27,8 +27,8 @@ export default function AdminLoginPage() {
   const onSubmit = async (values: AdminLoginValues) => {
     setError("")
     try {
-      await login.mutateAsync(values)
-      router.replace("/admin")
+      const session = await login.mutateAsync(values)
+      router.replace(session.role === "staff" ? "/admin/profiles" : "/admin")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.")
     }
@@ -103,16 +103,18 @@ export default function AdminLoginPage() {
 
         <details className="mt-8 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           <summary className="cursor-pointer font-medium text-foreground">Demo accounts</summary>
-          <p className="mt-2 break-all">
-            {DEMO_ADMIN_EMAIL}
-            <br />
-            {DEMO_ADMIN_PASSWORD}
-          </p>
-          <p className="mt-2 break-all">
-            moderator@astalakshimi.in
-            <br />
-            Mod@2026
-          </p>
+          <div className="mt-2 space-y-2">
+            <div>
+              <p className="font-semibold text-foreground">Admin (All Access)</p>
+              <p className="break-all">{DEMO_ADMIN_EMAIL}</p>
+              <p className="break-all">{DEMO_ADMIN_PASSWORD}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Staff (Profiles Only)</p>
+              <p className="break-all">staff@astalakshimi.in</p>
+              <p className="break-all">Staff@2026</p>
+            </div>
+          </div>
         </details>
 
         <div className="mt-6 md:hidden">

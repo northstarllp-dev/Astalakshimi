@@ -6,7 +6,7 @@ import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { Button } from "@/components/ui/button"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
 import { useSendInterestMutation, useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
-import { Star, Loader2, Compass } from "lucide-react"
+import { Bookmark, Loader2, Compass } from "lucide-react"
 
 export default function ShortlistPage() {
   return (
@@ -47,7 +47,7 @@ function ShortlistPageInner() {
         <div>
           <div className="flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
-              <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+              <Bookmark className="h-4 w-4 fill-amber-500 text-amber-500" />
             </span>
             <p className="text-xs font-semibold tracking-wider text-amber-600 uppercase">Private Watchlist</p>
           </div>
@@ -72,11 +72,11 @@ function ShortlistPageInner() {
       ) : matches.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
           <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-500">
-            <Star className="h-6 w-6" />
+            <Bookmark className="h-6 w-6" />
           </div>
           <p className="mt-4 font-serif text-xl font-bold">No shortlisted profiles yet</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            Click the Star or Bookmark icon on any profile card in Discover or Search to save them here for easy review.
+            Click the Bookmark icon on any profile card in Discover or Search to save them here for easy review.
           </p>
           <Link href="/dashboard" className="mt-6 inline-block">
             <Button className="shadow-sm">

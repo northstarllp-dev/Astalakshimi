@@ -176,6 +176,9 @@ export default function AdminProfileReviewPage() {
           <Detail label="Completeness" value={`${profile.completeness}%`} />
           <Detail label="Created by" value={profile.createdBy === "staff" ? profile.createdByStaff ?? "Staff" : "Self signup"} />
           <Detail label="Account" value={profile.accountStatus} />
+          <Detail label="Plan" value={profile.plan || "Free"} />
+          <Detail label="Plan Expiry" value={profile.planExpiry ? new Date(profile.planExpiry).toLocaleDateString("en-GB") : "-"} />
+          <Detail label="Payment Method" value={profile.paymentMethod ? (profile.paymentMethod === "online" ? "Online" : "Offline") : "-"} />
         </dl>
         {profile.rejectionReason && (
           <p className="mt-4 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -184,7 +187,7 @@ export default function AdminProfileReviewPage() {
         )}
       </section>
 
-      {["pending", "idle"].includes(profile.verificationStatus) && (
+      {profile.verificationStatus === "pending" && (
         <footer className="sticky bottom-4 rounded-2xl border border-secondary/30 bg-[#fffbf4]/95 p-4 shadow-lg backdrop-blur">
           {!showReject ? (
             <div className="flex flex-wrap gap-2">

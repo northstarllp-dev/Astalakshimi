@@ -21,9 +21,15 @@
     "db:seed": "pnpm --filter @astalakshimi/database db:seed"
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "typescript": "^5.8.3"
   },
   "dependencies": {
     "next-auth": "5.0.0-beta.32"
+  },
+  "pnpm": {
+    "overrides": {
+      "drizzle-orm": "^0.38.4"
+    }
   }
 }

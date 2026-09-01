@@ -24,6 +24,7 @@ export const adminCreateProfileSchema = z.object({
   brothersCount: z.number().int().min(0).max(5),
   sistersCount: z.number().int().min(0).max(5),
   aboutMe: z.string().max(1000).optional(),
+  planId: z.string().optional(),
 });
 
 export const adminAttachPhotosSchema = z.object({

@@ -13,6 +13,7 @@ export const profiles = pgTable('profiles', {
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull().unique(),
 
   // Profile Ownership & Basic Identity
+  createdBy: varchar('created_by', { length: 20 }).default('self').notNull(), // 'self' or 'staff'
   profileFor: varchar('profile_for', { length: 20 }).notNull(), // Myself, Son, Daughter, Brother, Sister, Relative, Friend
   fullName: varchar('full_name', { length: 100 }).notNull(),
   gender: genderEnum('gender').notNull(),

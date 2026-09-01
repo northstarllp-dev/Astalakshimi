@@ -16,6 +16,7 @@ import { apiClient } from "@/lib/api-client"
 import { cn, getMediaUrl } from "@/lib/utils"
 import {
   Ban,
+  Bookmark,
   BookmarkMinus,
   Check,
   EyeOff,
@@ -44,7 +45,7 @@ import {
 // ──────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────
-type Tab = "received" | "sent" | "mutual" | "shortlisted" | "blocked"
+type Tab = "received" | "sent" | "mutual" | "shortlisted"
 
 interface ProfileSummary {
   id: string
@@ -74,8 +75,7 @@ type PrivateNotes = Record<string, string>
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "received", label: "Received", icon: Inbox },
   { id: "sent", label: "Sent", icon: Send },
-  { id: "shortlisted", label: "Shortlisted", icon: Star },
-  { id: "blocked", label: "Blocked", icon: Ban },
+  { id: "shortlisted", label: "Shortlisted", icon: Bookmark },
 ]
 
 const CONFETTI_COLORS = ["#b8901f", "#e8c84a", "#7c1535", "#0d4f42", "#d4a843", "#067647", "#fff"]
@@ -291,14 +291,22 @@ function EmptyState({
 // ──────────────────────────────────────────────
 function ReceivedTab({
   items,
+  blockedIds,
+  shortlistedIds,
   onAccept,
   onDecline,
   onBlock,
+  onUnblock,
+  onToggleShortlist,
 }: {
   items: InterestItem[]
+  blockedIds: Set<string>
+  shortlistedIds: Set<string>
   onAccept: (profileId: string) => void
   onDecline: (profileId: string) => void
   onBlock: (profileId: string) => void
+  onUnblock: (profileId: string) => void
+  onToggleShortlist: (profileId: string) => void
 }) {
   const pending = items.filter((i) => i.status === "pending")
   const actioned = items.filter((i) => i.status !== "pending")
@@ -324,9 +332,13 @@ function ReceivedTab({
               <ReceivedCard
                 key={item.id}
                 item={item}
+                isBlocked={blockedIds.has(item.profileId)}
+                isShortlisted={shortlistedIds.has(item.profileId)}
                 onAccept={onAccept}
                 onDecline={onDecline}
                 onBlock={onBlock}
+                onUnblock={onUnblock}
+                onToggleShortlist={onToggleShortlist}
               />
             ))}
           </div>
@@ -340,9 +352,13 @@ function ReceivedTab({
               <ReceivedCard
                 key={item.id}
                 item={item}
+                isBlocked={blockedIds.has(item.profileId)}
+                isShortlisted={shortlistedIds.has(item.profileId)}
                 onAccept={onAccept}
                 onDecline={onDecline}
                 onBlock={onBlock}
+                onUnblock={onUnblock}
+                onToggleShortlist={onToggleShortlist}
               />
             ))}
           </div>
@@ -354,17 +370,55 @@ function ReceivedTab({
 
 function ReceivedCard({
   item,
+  isBlocked,
+  isShortlisted,
   onAccept,
   onDecline,
   onBlock,
+  onUnblock,
+  onToggleShortlist,
 }: {
   item: InterestItem
+  isBlocked: boolean
+  isShortlisted: boolean
   onAccept: (id: string) => void
   onDecline: (id: string) => void
   onBlock: (id: string) => void
+  onUnblock: (id: string) => void
+  onToggleShortlist: (id: string) => void
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const isPending = item.status === "pending"
+
+  if (isBlocked) {
+    return (
+      <article className="relative overflow-hidden rounded-2xl border border-destructive/20 bg-destructive/5 p-3.5 sm:p-4 grayscale-[50%] transition-all hover:grayscale-0">
+        <div className="flex gap-3">
+          <div className="relative shrink-0">
+            <ProfileAvatar profile={item.profile} size={56} />
+            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive ring-2 ring-background">
+              <Ban className="h-3 w-3 text-white" />
+            </span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between">
+              <p className="truncate font-serif text-base font-bold text-foreground">
+                {item.profile?.fullName || `Blocked Profile (${item.profileId.slice(0, 8)})`}
+              </p>
+              <Badge variant="destructive" className="text-[10px] uppercase tracking-wide">Blocked</Badge>
+            </div>
+            <button
+              type="button"
+              onClick={() => onUnblock(item.profileId)}
+              className="mt-3 flex items-center gap-1.5 rounded-md bg-background px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm border border-border hover:bg-muted"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Unblock Profile
+            </button>
+          </div>
+        </div>
+      </article>
+    )
+  }
 
   return (
     <article className="royal-card relative overflow-hidden p-3.5 sm:p-4">
@@ -378,6 +432,14 @@ function ReceivedCard({
             <div className="flex shrink-0 items-center gap-1.5">
               <StatusBadge status={item.status} />
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
+              <button
+                type="button"
+                onClick={() => onToggleShortlist(item.profileId)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full hover:bg-muted ml-1 transition-colors"
+                aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+              >
+                <Bookmark className={cn("h-4 w-4", isShortlisted ? "fill-amber-500 text-amber-500" : "text-muted-foreground hover:text-foreground")} />
+              </button>
             </div>
           </div>
 
@@ -443,12 +505,20 @@ function ReceivedCard({
 // ──────────────────────────────────────────────
 function SentTab({
   items,
+  blockedIds,
+  shortlistedIds,
   onWithdraw,
   onBlock,
+  onUnblock,
+  onToggleShortlist,
 }: {
   items: InterestItem[]
+  blockedIds: Set<string>
+  shortlistedIds: Set<string>
   onWithdraw: (profileId: string) => void
   onBlock: (profileId: string) => void
+  onUnblock: (profileId: string) => void
+  onToggleShortlist: (profileId: string) => void
 }) {
   if (items.length === 0) {
     return (
@@ -463,63 +533,108 @@ function SentTab({
 
   return (
     <div className="space-y-3">
-      {items.map((item) => (
-        <article key={item.id} className="royal-card relative p-3.5 sm:p-4">
-          <div className="flex gap-3">
-            <Link href={`/profiles/${item.profileId}`} className="shrink-0">
-              <ProfileAvatar profile={item.profile} size={56} />
-            </Link>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <ProfileMeta profile={item.profile} />
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <StatusBadge status={item.status} />
-                  <span className="text-[10px] text-muted-foreground">{item.time}</span>
+      {items.map((item) => {
+        const isBlocked = blockedIds.has(item.profileId)
+        const isShortlisted = shortlistedIds.has(item.profileId)
+
+        if (isBlocked) {
+          return (
+            <article key={item.id} className="relative overflow-hidden rounded-2xl border border-destructive/20 bg-destructive/5 p-3.5 sm:p-4 grayscale-[50%] transition-all hover:grayscale-0">
+              <div className="flex gap-3">
+                <div className="relative shrink-0">
+                  <ProfileAvatar profile={item.profile} size={56} />
+                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive ring-2 ring-background">
+                    <Ban className="h-3 w-3 text-white" />
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between">
+                    <p className="truncate font-serif text-base font-bold text-foreground">
+                      {item.profile?.fullName || `Blocked Profile (${item.profileId.slice(0, 8)})`}
+                    </p>
+                    <Badge variant="destructive" className="text-[10px] uppercase tracking-wide">Blocked</Badge>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onUnblock(item.profileId)}
+                    className="mt-3 flex items-center gap-1.5 rounded-md bg-background px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm border border-border hover:bg-muted"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Unblock Profile
+                  </button>
                 </div>
               </div>
+            </article>
+          )
+        }
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {item.status === "pending" && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 gap-1 border border-border px-3 text-xs text-muted-foreground hover:text-destructive"
-                    onClick={() => onWithdraw(item.profileId)}
-                  >
-                    <Undo2 className="h-3.5 w-3.5" /> Withdraw
-                  </Button>
-                )}
-                {item.status === "accepted" && (
-                  <Link href="/inbox">
-                    <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 px-3 text-xs hover:bg-emerald-700 text-white">
-                      <MessageSquarePlus className="h-3.5 w-3.5" /> Go to chat
+        return (
+          <article key={item.id} className="royal-card relative p-3.5 sm:p-4">
+            <div className="flex gap-3">
+              <Link href={`/profiles/${item.profileId}`} className="shrink-0">
+                <ProfileAvatar profile={item.profile} size={56} />
+              </Link>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <ProfileMeta profile={item.profile} />
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <StatusBadge status={item.status} />
+                      <button
+                        type="button"
+                        onClick={() => onToggleShortlist(item.profileId)}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full hover:bg-muted ml-1 transition-colors"
+                        aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+                      >
+                        <Bookmark className={cn("h-4 w-4", isShortlisted ? "fill-amber-500 text-amber-500" : "text-muted-foreground hover:text-foreground")} />
+                      </button>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">{item.time}</span>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {item.status === "pending" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1 border border-border px-3 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => onWithdraw(item.profileId)}
+                    >
+                      <Undo2 className="h-3.5 w-3.5" /> Withdraw
+                    </Button>
+                  )}
+                  {item.status === "accepted" && (
+                    <Link href="/inbox">
+                      <Button size="sm" className="h-8 gap-1.5 bg-emerald-600 px-3 text-xs hover:bg-emerald-700 text-white">
+                        <MessageSquarePlus className="h-3.5 w-3.5" /> Go to chat
+                      </Button>
+                    </Link>
+                  )}
+                  <Link href={`/profiles/${item.profileId}`}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1 border border-border px-3 text-xs text-muted-foreground hover:bg-muted"
+                    >
+                      <UserRound className="h-3.5 w-3.5" /> View
                     </Button>
                   </Link>
-                )}
-                <Link href={`/profiles/${item.profileId}`}>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 gap-1 border border-border px-3 text-xs text-muted-foreground hover:bg-muted"
-                  >
-                    <UserRound className="h-3.5 w-3.5" /> View
-                  </Button>
-                </Link>
-                {item.status === "accepted" && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 gap-1 border border-border px-3 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => onBlock(item.profileId)}
-                  >
-                    <Ban className="h-3.5 w-3.5" /> Block
-                  </Button>
-                )}
+                  {item.status === "accepted" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1 border border-border px-3 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => onBlock(item.profileId)}
+                    >
+                      <Ban className="h-3.5 w-3.5" /> Block
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </article>
-      ))}
+          </article>
+        )
+      })}
     </div>
   )
 }
@@ -636,64 +751,6 @@ function ShortlistedTab({
 
 
 // ──────────────────────────────────────────────
-// Blocked Tab
-// ──────────────────────────────────────────────
-function BlockedTab({
-  items,
-  onUnblock,
-}: {
-  items: any[]
-  onUnblock: (id: string) => void
-}) {
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        icon={ShieldOff}
-        title="No blocked profiles"
-        body="Profiles you block will appear here. Blocked members cannot see your profile."
-      />
-    )
-  }
-
-  return (
-    <div>
-      <p className="mb-3 rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-        Blocked members cannot see your profile, send interests, or message you.
-      </p>
-      <div className="space-y-3">
-        {items.map((item) => (
-          <article key={item.blockedId} className="relative overflow-hidden rounded-2xl border border-destructive/20 bg-destructive/5 p-3.5 sm:p-4 grayscale-[50%] transition-all hover:grayscale-0">
-            <div className="flex gap-3">
-              <div className="relative shrink-0">
-                <ProfileAvatar profile={item as any} size={56} />
-                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive ring-2 ring-background">
-                  <Ban className="h-3 w-3 text-white" />
-                </span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between">
-                  <p className="truncate font-serif text-base font-bold text-foreground">
-                    {item.fullName || `Blocked Profile (${item.profileId.slice(0, 8)})`}
-                  </p>
-                  <Badge variant="destructive" className="text-[10px] uppercase tracking-wide">Blocked</Badge>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onUnblock(item.profileId)}
-                  className="mt-3 flex items-center gap-1.5 rounded-md bg-background px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm border border-border hover:bg-muted"
-                >
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Unblock Profile
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ──────────────────────────────────────────────
 // Main Page Export
 // ──────────────────────────────────────────────
 export default function InterestsPage() {
@@ -714,6 +771,9 @@ function InterestsPageInner() {
   const received = (data?.received ?? []) as InterestItem[]
   const sent = (data?.sent ?? []) as InterestItem[]
   const blocked = (data?.blocked ?? []) as any[]
+  const blockedIds = React.useMemo(() => new Set<string>(blocked.map((b) => b.profileId)), [blocked])
+  const shortlistedIds = React.useMemo(() => new Set<string>(shortlist.map((s: any) => s.id || s.profileId || s.targetProfileId)), [shortlist])
+
   const [notes, setNotes] = React.useState<PrivateNotes>({})
   const [noteTarget, setNoteTarget] = React.useState<string | null>(null)
 
@@ -840,16 +900,24 @@ function InterestsPageInner() {
           {activeTab === "received" && (
             <ReceivedTab
               items={received}
+              blockedIds={blockedIds}
+              shortlistedIds={shortlistedIds}
               onAccept={handleAccept}
               onDecline={handleDecline}
               onBlock={handleBlock}
+              onUnblock={handleUnblock}
+              onToggleShortlist={handleRemoveShortlist}
             />
           )}
           {activeTab === "sent" && (
             <SentTab
               items={sent}
+              blockedIds={blockedIds}
+              shortlistedIds={shortlistedIds}
               onWithdraw={handleWithdraw}
               onBlock={handleBlock}
+              onUnblock={handleUnblock}
+              onToggleShortlist={handleRemoveShortlist}
             />
           )}
           {activeTab === "shortlisted" && (
@@ -858,12 +926,6 @@ function InterestsPageInner() {
               notes={notes}
               onRemove={handleRemoveShortlist}
               onNoteOpen={setNoteTarget}
-            />
-          )}
-          {activeTab === "blocked" && (
-            <BlockedTab
-              items={blocked}
-              onUnblock={handleUnblock}
             />
           )}
         </div>

@@ -53,6 +53,9 @@ export function ProfileContactUnlockDialog({
   const fee = (access?.extraContactFeePaise ?? EXTRA_CONTACT_FEE * 100) / 100
   const busy = unlock.isPending || payExtra.isPending
 
+  const usedThisMonth = access?.usedThisMonth ?? 0
+  const currentCredit = usedThisMonth + 1
+
   const handleQuotaUnlock = async () => {
     setError("")
     try {
@@ -104,7 +107,7 @@ export function ProfileContactUnlockDialog({
           {canQuota ? (
             <Button type="button" className="w-full" disabled={busy} onClick={() => void handleQuotaUnlock()}>
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Unlock contact
+              {unlimited ? "Unlock contact" : `Use ${currentCredit}/${limit} credit to unlock contact`}
             </Button>
           ) : canPay ? (
             <>

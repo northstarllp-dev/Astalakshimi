@@ -12,6 +12,8 @@ import {
   horoscopes,
   partnerPreferences,
   userSettings,
+  plans,
+  notifications,
 } from '@astalakshimi/database';
 import { eq, inArray, and, sql } from 'drizzle-orm';
 import type { AdminCreateProfileInput } from '@astalakshimi/validation';
@@ -68,20 +70,14 @@ export class AdminService {
   }
 
   async updateVerificationStatus(profileId: string, status: 'verified' | 'rejected', rejectionReason?: string) {
-    let [updated] = await this.db
+    const [updated] = await this.db
       .update(verifications)
       .set({ status, rejectionReason })
       .where(eq(verifications.profileId, profileId))
       .returning();
 
     if (!updated) {
-      const [inserted] = await this.db.insert(verifications).values({
-        profileId,
-        status,
-        rejectionReason,
-        method: 'govt_id',
-      }).returning();
-      updated = inserted;
+      throw new NotFoundException('Verification request not found for this profile');
     }
 
     const [profile] = await this.db.select({ userId: profiles.userId }).from(profiles).where(eq(profiles.id, profileId));
@@ -142,8 +138,14 @@ export class AdminService {
         .from(partnerPreferences)
         .where(inArray(partnerPreferences.profileId, profileIds)),
       this.db
-        .select({ userId: subscriptions.userId })
+        .select({ 
+          userId: subscriptions.userId,
+          planName: plans.name,
+          expiresAt: subscriptions.expiresAt,
+          paymentId: subscriptions.paymentId,
+        })
         .from(subscriptions)
+        .innerJoin(plans, eq(subscriptions.planId, plans.id))
         .where(eq(subscriptions.status, 'active')),
     ]);
 
@@ -158,7 +160,7 @@ export class AdminService {
     const familyByProfile = new Map(dbFamily.map((f) => [f.profileId, f]));
     const lifestyleByProfile = new Map(dbLifestyle.map((l) => [l.profileId, l]));
     const prefByProfile = new Map(dbPreferences.map((p) => [p.profileId, p]));
-    const activeUserIds = new Set(activeSubs.map((s) => s.userId));
+    const activeSubByUserId = new Map(activeSubs.map((s) => [s.userId, s]));
 
     return records.map((r) => {
       const p = r.profile;
@@ -176,9 +178,12 @@ export class AdminService {
         phone: r.phone,
         verificationStatus,
         accountStatus: r.accountStatus,
-        createdBy: 'self' as const,
+        createdBy: p.createdBy,
         submittedAt: r.submittedAt || p.createdAt,
-        activeSubscription: activeUserIds.has(p.userId),
+        activeSubscription: activeSubByUserId.has(p.userId),
+        plan: activeSubByUserId.get(p.userId)?.planName || 'Free',
+        planExpiry: activeSubByUserId.get(p.userId)?.expiresAt || undefined,
+        paymentMethod: activeSubByUserId.has(p.userId) ? (activeSubByUserId.get(p.userId)?.paymentId || p.createdBy === 'self' ? 'online' : 'offline') : undefined,
         completeness: calculateProfileCompleteness({
           profile: p,
           userPhone: r.phone,
@@ -218,8 +223,14 @@ export class AdminService {
       this.db.select().from(lifestyleInterests).where(eq(lifestyleInterests.profileId, profileId)),
       this.db.select().from(partnerPreferences).where(eq(partnerPreferences.profileId, profileId)),
       this.db
-        .select({ userId: subscriptions.userId })
+        .select({ 
+           userId: subscriptions.userId,
+           planName: plans.name,
+           expiresAt: subscriptions.expiresAt,
+           paymentId: subscriptions.paymentId,
+        })
         .from(subscriptions)
+        .innerJoin(plans, eq(subscriptions.planId, plans.id))
         .where(and(eq(subscriptions.userId, p.userId), eq(subscriptions.status, 'active')))
         .limit(1),
     ]);
@@ -271,11 +282,26 @@ export class AdminService {
         verificationStatus,
         submittedAt: v?.updatedAt || p.createdAt,
       }),
-      createdBy: 'self' as const,
+      createdBy: p.createdBy as 'self' | 'staff',
       accountStatus: u.status,
-      verificationStatus,
       submittedAt: v?.updatedAt || p.createdAt,
       activeSubscription: activeSub.length > 0,
+      plan: activeSub[0]?.planName || 'Free',
+      planExpiry: activeSub[0]?.expiresAt || undefined,
+      paymentMethod: activeSub.length > 0 ? (activeSub[0].paymentId || p.createdBy === 'self' ? 'online' : 'offline') : undefined,
+      verificationStatus: verificationStatus,
+      verificationMethod: v?.method,
+      selfieS3Key: v?.selfieS3Key,
+      govtIdS3Key: v?.govtIdS3Key,
+      govtIdType: v?.govtIdType,
+      rejectionReason: v?.rejectionReason,
+      horoscopeName: h?.horoscopeS3Key ? h.horoscopeFileName || 'Uploaded Horoscope' : null,
+      birthTime: h?.birthTime || null,
+      birthPlace: h?.birthPlace || null,
+      rashi: h?.rashi || null,
+      star: h?.nakshatra || null,
+      manglik: h?.manglik || null,
+      photos: mappedPhotos,
     };
   }
 
@@ -334,6 +360,7 @@ export class AdminService {
         .insert(profiles)
         .values({
           userId,
+          createdBy: 'staff',
           profileFor: input.profileFor,
           fullName: input.fullName.trim(),
           gender: input.gender,
@@ -398,6 +425,39 @@ export class AdminService {
         reviewedAt: now,
       });
 
+      let finalPlanId = input.planId || 'free';
+      const launchOfferEnd = new Date('2026-12-17T23:59:59.999Z');
+      const isWithinLaunchOffer = now < launchOfferEnd;
+
+      if (finalPlanId === 'free' && isWithinLaunchOffer) {
+        finalPlanId = 'silver';
+      }
+
+      if (finalPlanId !== 'free') {
+        const [plan] = await tx.select().from(plans).where(eq(plans.slug, finalPlanId)).limit(1);
+        
+        if (plan) {
+          let startsAt = now;
+          let expiresAt = new Date(now);
+
+          if (finalPlanId === 'silver' && isWithinLaunchOffer && (input.planId === 'free' || !input.planId)) {
+            // Default launch offer upgrade
+            expiresAt = launchOfferEnd;
+          } else {
+            // Standard paid plan (offline payment)
+            expiresAt.setDate(startsAt.getDate() + plan.durationDays);
+          }
+
+          await tx.insert(subscriptions).values({
+            userId,
+            planId: plan.id,
+            status: 'active',
+            startsAt,
+            expiresAt,
+          });
+        }
+      }
+
       return id;
     });
 
@@ -450,6 +510,10 @@ export class AdminService {
     
     const userId = profileRecords[0].userId;
     
+    // Explicitly delete notifications where this profile is the actor, 
+    // to ensure they are removed and not just set to null if there's any mismatch.
+    await this.db.delete(notifications).where(eq(notifications.actorProfileId, profileId));
+
     // Delete the user, which should cascade and delete the profile, photos, verifications, etc.
     await this.db.delete(users).where(eq(users.id, userId));
     return { success: true };

@@ -14,7 +14,7 @@ import {
 } from "@/hooks/queries"
 import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import { Star } from "lucide-react"
+import { Bookmark } from "lucide-react"
 
 export function ProfileActionBar({ profileId }: { profileId: string }) {
   const router = useRouter()
@@ -99,7 +99,7 @@ export function ProfileActionBar({ profileId }: { profileId: string }) {
           disabled={toggleMutation.isPending}
           onClick={() => toggleMutation.mutate(profileId)}
         >
-          <Star
+          <Bookmark
             className={cn(
               "mr-2 h-4 w-4 transition-colors",
               shortlisted ? "fill-amber-400 text-amber-400" : "text-muted-foreground"
