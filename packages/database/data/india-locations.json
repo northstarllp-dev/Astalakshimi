@@ -1,0 +1,232 @@
+{
+  "country": "India",
+  "states": [
+    {
+      "name": "Karnataka",
+      "cities": [
+        { "name": "Bengaluru", "aliases": ["Bangalore", "bangalore", "banglore", "bengaluru", "BLR"] },
+        { "name": "Mysuru", "aliases": ["Mysore", "mysore"] },
+        { "name": "Mangaluru", "aliases": ["Mangalore", "mangalore"] },
+        { "name": "Hubballi", "aliases": ["Hubli", "hubli"] },
+        { "name": "Belagavi", "aliases": ["Belgaum", "belgaum"] },
+        { "name": "Kalaburagi", "aliases": ["Gulbarga", "gulbarga"] },
+        { "name": "Davanagere", "aliases": ["Davangere"] },
+        { "name": "Ballari", "aliases": ["Bellary", "bellary"] },
+        { "name": "Shivamogga", "aliases": ["Shimoga", "shimoga"] },
+        { "name": "Tumakuru", "aliases": ["Tumkur", "tumkur"] }
+      ]
+    },
+    {
+      "name": "Tamil Nadu",
+      "cities": [
+        { "name": "Chennai", "aliases": ["Madras", "madras", "chenai"] },
+        { "name": "Coimbatore", "aliases": ["kovai", "Kovai"] },
+        { "name": "Madurai", "aliases": ["madurai"] },
+        { "name": "Salem", "aliases": ["salem"] },
+        { "name": "Tiruchirappalli", "aliases": ["Trichy", "trichy", "Tiruchy"] },
+        { "name": "Tirunelveli", "aliases": ["tirunelveli"] },
+        { "name": "Erode", "aliases": ["erode"] },
+        { "name": "Vellore", "aliases": ["vellore"] },
+        { "name": "Thoothukudi", "aliases": ["Tuticorin", "tuticorin"] },
+        { "name": "Thanjavur", "aliases": ["Tanjore", "tanjore"] }
+      ]
+    },
+    {
+      "name": "Maharashtra",
+      "cities": [
+        { "name": "Mumbai", "aliases": ["Bombay", "bombay"] },
+        { "name": "Pune", "aliases": ["Poona", "poona"] },
+        { "name": "Nagpur", "aliases": ["nagpur"] },
+        { "name": "Nashik", "aliases": ["Nasik", "nasik"] },
+        { "name": "Thane", "aliases": ["thane"] },
+        { "name": "Aurangabad", "aliases": ["aurangabad"] }
+      ]
+    },
+    {
+      "name": "Telangana",
+      "cities": [
+        { "name": "Hyderabad", "aliases": ["hyd", "Hyd", "secunderabad"] },
+        { "name": "Warangal", "aliases": ["warangal"] },
+        { "name": "Nizamabad", "aliases": ["nizamabad"] },
+        { "name": "Karimnagar", "aliases": ["karimnagar"] }
+      ]
+    },
+    {
+      "name": "Andhra Pradesh",
+      "cities": [
+        { "name": "Visakhapatnam", "aliases": ["Vizag", "vizag", "vishakapatnam"] },
+        { "name": "Vijayawada", "aliases": ["vijayawada"] },
+        { "name": "Guntur", "aliases": ["guntur"] },
+        { "name": "Nellore", "aliases": ["nellore"] },
+        { "name": "Tirupati", "aliases": ["tirupati"] }
+      ]
+    },
+    {
+      "name": "Kerala",
+      "cities": [
+        { "name": "Kochi", "aliases": ["Cochin", "cochin", "Ernakulam"] },
+        { "name": "Thiruvananthapuram", "aliases": ["Trivandrum", "trivandrum"] },
+        { "name": "Kozhikode", "aliases": ["Calicut", "calicut"] },
+        { "name": "Thrissur", "aliases": ["Trichur", "trichur"] },
+        { "name": "Kollam", "aliases": ["Quilon", "quilon"] }
+      ]
+    },
+    {
+      "name": "Delhi",
+      "cities": [
+        { "name": "New Delhi", "aliases": ["Delhi", "delhi", "NCR"] },
+        { "name": "Dwarka", "aliases": ["dwarka"] },
+        { "name": "Rohini", "aliases": ["rohini"] }
+      ]
+    },
+    {
+      "name": "Gujarat",
+      "cities": [
+        { "name": "Ahmedabad", "aliases": ["ahmedabad", "amdavad"] },
+        { "name": "Surat", "aliases": ["surat"] },
+        { "name": "Vadodara", "aliases": ["Baroda", "baroda"] },
+        { "name": "Rajkot", "aliases": ["rajkot"] },
+        { "name": "Gandhinagar", "aliases": ["gandhinagar"] }
+      ]
+    },
+    {
+      "name": "Rajasthan",
+      "cities": [
+        { "name": "Jaipur", "aliases": ["jaipur", "pink city"] },
+        { "name": "Jodhpur", "aliases": ["jodhpur"] },
+        { "name": "Udaipur", "aliases": ["udaipur"] },
+        { "name": "Kota", "aliases": ["kota"] },
+        { "name": "Ajmer", "aliases": ["ajmer"] }
+      ]
+    },
+    {
+      "name": "Uttar Pradesh",
+      "cities": [
+        { "name": "Lucknow", "aliases": ["lucknow"] },
+        { "name": "Kanpur", "aliases": ["kanpur", "cawnpore"] },
+        { "name": "Varanasi", "aliases": ["Banaras", "banaras", "Kashi", "kashi"] },
+        { "name": "Agra", "aliases": ["agra"] },
+        { "name": "Noida", "aliases": ["noida"] },
+        { "name": "Ghaziabad", "aliases": ["ghaziabad"] }
+      ]
+    },
+    {
+      "name": "West Bengal",
+      "cities": [
+        { "name": "Kolkata", "aliases": ["Calcutta", "calcutta"] },
+        { "name": "Siliguri", "aliases": ["siliguri"] },
+        { "name": "Durgapur", "aliases": ["durgapur"] },
+        { "name": "Howrah", "aliases": ["howrah"] }
+      ]
+    },
+    {
+      "name": "Punjab",
+      "cities": [
+        { "name": "Ludhiana", "aliases": ["ludhiana"] },
+        { "name": "Amritsar", "aliases": ["amritsar"] },
+        { "name": "Jalandhar", "aliases": ["jalandhar"] },
+        { "name": "Chandigarh", "aliases": ["chandigarh"] }
+      ]
+    },
+    {
+      "name": "Haryana",
+      "cities": [
+        { "name": "Gurugram", "aliases": ["Gurgaon", "gurgaon"] },
+        { "name": "Faridabad", "aliases": ["faridabad"] },
+        { "name": "Panipat", "aliases": ["panipat"] },
+        { "name": "Ambala", "aliases": ["ambala"] }
+      ]
+    },
+    {
+      "name": "Madhya Pradesh",
+      "cities": [
+        { "name": "Bhopal", "aliases": ["bhopal"] },
+        { "name": "Indore", "aliases": ["indore"] },
+        { "name": "Gwalior", "aliases": ["gwalior"] },
+        { "name": "Jabalpur", "aliases": ["jabalpur"] }
+      ]
+    },
+    {
+      "name": "Bihar",
+      "cities": [
+        { "name": "Patna", "aliases": ["patna"] },
+        { "name": "Gaya", "aliases": ["gaya"] },
+        { "name": "Muzaffarpur", "aliases": ["muzaffarpur"] }
+      ]
+    },
+    {
+      "name": "Odisha",
+      "cities": [
+        { "name": "Bhubaneswar", "aliases": ["bhubaneswar", "bhubaneshwar"] },
+        { "name": "Cuttack", "aliases": ["cuttack"] },
+        { "name": "Rourkela", "aliases": ["rourkela"] }
+      ]
+    },
+    {
+      "name": "Assam",
+      "cities": [
+        { "name": "Guwahati", "aliases": ["gauhati", "Gauhati"] },
+        { "name": "Silchar", "aliases": ["silchar"] },
+        { "name": "Dibrugarh", "aliases": ["dibrugarh"] }
+      ]
+    },
+    {
+      "name": "Jharkhand",
+      "cities": [
+        { "name": "Ranchi", "aliases": ["ranchi"] },
+        { "name": "Jamshedpur", "aliases": ["jamshedpur", "tatanagar"] },
+        { "name": "Dhanbad", "aliases": ["dhanbad"] }
+      ]
+    },
+    {
+      "name": "Chhattisgarh",
+      "cities": [
+        { "name": "Raipur", "aliases": ["raipur"] },
+        { "name": "Bhilai", "aliases": ["bhilai"] },
+        { "name": "Bilaspur", "aliases": ["bilaspur"] }
+      ]
+    },
+    {
+      "name": "Uttarakhand",
+      "cities": [
+        { "name": "Dehradun", "aliases": ["dehradun", "dehra dun"] },
+        { "name": "Haridwar", "aliases": ["haridwar"] },
+        { "name": "Rishikesh", "aliases": ["rishikesh"] }
+      ]
+    },
+    {
+      "name": "Himachal Pradesh",
+      "cities": [
+        { "name": "Shimla", "aliases": ["simla", "Simla"] },
+        { "name": "Dharamshala", "aliases": ["dharamsala", "Dharamsala"] },
+        { "name": "Manali", "aliases": ["manali"] }
+      ]
+    },
+    {
+      "name": "Goa",
+      "cities": [
+        { "name": "Panaji", "aliases": ["Panjim", "panjim"] },
+        { "name": "Margao", "aliases": ["margao"] },
+        { "name": "Vasco da Gama", "aliases": ["Vasco", "vasco"] }
+      ]
+    },
+    {
+      "name": "Jammu and Kashmir",
+      "cities": [
+        { "name": "Srinagar", "aliases": ["srinagar"] },
+        { "name": "Jammu", "aliases": ["jammu"] }
+      ]
+    },
+    {
+      "name": "Chandigarh",
+      "cities": [{ "name": "Chandigarh", "aliases": ["chandigarh"] }]
+    },
+    {
+      "name": "Puducherry",
+      "cities": [
+        { "name": "Puducherry", "aliases": ["Pondicherry", "pondicherry"] },
+        { "name": "Karaikal", "aliases": ["karaikal"] }
+      ]
+    }
+  ]
+}

@@ -24,9 +24,18 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { DateOfBirthPicker } from "@/components/profile/date-of-birth-picker"
-import { BirthTimeInput, InputWithUnit, WeightInput } from "@/components/profile/input-with-unit"
+import { BirthTimeInput, HeightInput, WeightInput } from "@/components/profile/input-with-unit"
+import { EducationFields } from "@/components/profile/education-fields"
+import { OccupationSelect } from "@/components/profile/occupation-select"
 import { MultiSelect } from "@/components/profile/multi-select"
 import { SearchableSelect } from "@/components/profile/searchable-select"
+import { CityAutocomplete } from "@/components/profile/city-autocomplete"
+import { CommunityFields } from "@/components/profile/community-fields"
+import {
+  getCommunitiesForReligion,
+  getSubcastesForCommunity,
+  getGotrasForReligion,
+} from "@/lib/community-data"
 import {
   emptySignupData,
   type SignupData,
@@ -77,16 +86,18 @@ function Field({
   required,
   missing,
   error,
+  className,
   children,
 }: {
   label: string
   required?: boolean
   missing?: boolean
   error?: string
+  className?: string
   children: React.ReactNode
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className={cn("space-y-1.5", className)}>
       <Label
         className={cn(
           "text-xs font-semibold tracking-wide uppercase",
@@ -115,6 +126,35 @@ function EditSection({ id, title, children }: { id: string; title: string; child
 function fieldError(errors: Record<string, unknown>, key: string): string | undefined {
   const err = errors[key] as { message?: string } | undefined
   return err?.message
+}
+
+function firstValidationError(errors: Record<string, unknown>): string | undefined {
+  for (const value of Object.values(errors)) {
+    if (!value || typeof value !== "object") continue
+    if ("message" in value && typeof (value as { message?: string }).message === "string") {
+      return (value as { message: string }).message
+    }
+    const nested = firstValidationError(value as Record<string, unknown>)
+    if (nested) return nested
+  }
+  return undefined
+}
+
+const SAVE_FIELD_SECTION: Record<string, string> = {
+  caste: "#community",
+  subcaste: "#community",
+  gotra: "#community",
+  religion: "#community",
+  motherTongue: "#community",
+  educationId: "#career",
+  occupationId: "#career",
+  annualIncome: "#career",
+  birthTime: "#horoscope",
+  birthPlace: "#horoscope",
+  star: "#horoscope",
+  rashi: "#horoscope",
+  manglik: "#horoscope",
+  prefReligion: "#preferences",
 }
 
 export default function ProfileEditPage() {
@@ -171,33 +211,52 @@ export default function ProfileEditPage() {
 
   const update = (fields: Partial<SignupData>) => {
     for (const [key, value] of Object.entries(fields)) {
-      form.setValue(key as keyof SignupData, value as never, { shouldDirty: true, shouldValidate: true })
+      form.setValue(key as keyof SignupData, value as never, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      })
     }
   }
 
-  const onSave = form.handleSubmit((values) => {
-    const delta: Record<string, unknown> = {}
-    const excludeKeys = new Set(["photos", "photoS3Keys", "photoObjects", "selfiePhoto", "govtIdPhoto"])
-    for (const key of Object.keys(values)) {
-      if (!excludeKeys.has(key)) {
-        delta[key] = (values as Record<string, unknown>)[key]
+  const onSave = form.handleSubmit(
+    (values) => {
+      const delta: Record<string, unknown> = {}
+      const excludeKeys = new Set(["photos", "photoS3Keys", "photoObjects", "selfiePhoto", "govtIdPhoto"])
+      for (const key of Object.keys(values)) {
+        if (!excludeKeys.has(key)) {
+          delta[key] = (values as Record<string, unknown>)[key]
+        }
       }
-    }
 
-    const nextProfile = { ...data, ...(values as SignupData) }
-    const unlockingDiscover =
-      !isProfileComplete(profileQuery.data ?? null) && isProfileComplete(nextProfile)
+      const nextProfile = { ...data, ...(values as SignupData) }
+      const unlockingDiscover =
+        !isProfileComplete(profileQuery.data ?? null) && isProfileComplete(nextProfile)
 
-    updateMutation.mutate(delta, {
-      onSuccess: () => {
-        setSaved(true)
-        window.setTimeout(() => router.push(unlockingDiscover ? "/dashboard" : "/profile"), 600)
-      },
-      onError: (err) => {
-        alert(err instanceof Error ? err.message : "Failed to save profile. Please try again.")
-      },
-    })
-  })
+      updateMutation.mutate(delta, {
+        onSuccess: (saved) => {
+          form.reset(saved)
+          setSaved(true)
+          window.setTimeout(() => router.push(unlockingDiscover ? "/dashboard" : "/profile"), 600)
+        },
+        onError: (err) => {
+          alert(err instanceof Error ? err.message : "Failed to save profile. Please try again.")
+        },
+      })
+    },
+    (invalidErrors) => {
+      const message =
+        firstValidationError(invalidErrors as Record<string, unknown>) ||
+        "Please fix the highlighted fields before saving."
+      alert(message)
+      const firstKey = Object.keys(invalidErrors)[0]
+      const hash = firstKey ? SAVE_FIELD_SECTION[firstKey] : undefined
+      if (hash) {
+        const el = document.querySelector(hash)
+        el?.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    },
+  )
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return
@@ -341,14 +400,7 @@ export default function ProfileEditPage() {
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Height">
-            <InputWithUnit
-              value={String(data.height ?? "").replace(/\D/g, "")}
-              onChange={(next) => update({ height: next.replace(/\D/g, "").slice(0, 3) })}
-              placeholder="170"
-              unit="cm"
-              inputMode="numeric"
-              aria-label="Height"
-            />
+            <HeightInput value={data.height} onChange={(height) => update({ height })} />
           </Field>
           <Field label="Weight">
             <WeightInput value={data.weight} onChange={(weight) => update({ weight })} />
@@ -384,75 +436,121 @@ export default function ProfileEditPage() {
           <Field label="Religion" required missing={isMissing("religion")} error={fieldError(errors, "religion")}>
             <SearchableSelect
               value={data.religion || undefined}
-              onValueChange={(v) => update({ religion: v })}
+              onValueChange={(v) =>
+                update({
+                  religion: v,
+                  caste: "",
+                  subcaste: "",
+                  gotra: "",
+                })
+              }
               options={RELIGIONS}
               placeholder="Select religion"
               searchPlaceholder="Search religion…"
               className={cn(isMissing("religion") && invalidCls)}
             />
           </Field>
-          <Field label="Caste / community" required missing={isMissing("caste")} error={fieldError(errors, "caste")}>
-            <Input
-              value={data.caste}
-              onChange={(e) => update({ caste: e.target.value })}
-              placeholder="e.g. Iyer"
-              className={cn(isMissing("caste") && invalidCls)}
+
+          <Field label="Mother tongue" required missing={isMissing("motherTongue")} error={fieldError(errors, "motherTongue")}>
+            <SearchableSelect
+              value={data.motherTongue || undefined}
+              onValueChange={(v) => update({ motherTongue: v })}
+              options={MOTHER_TONGUES}
+              placeholder="Select language"
+              searchPlaceholder="Search language…"
+              className={cn(isMissing("motherTongue") && invalidCls)}
             />
           </Field>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Subcaste">
-            <Input value={data.subcaste} onChange={(e) => update({ subcaste: e.target.value })} placeholder="e.g. Vadama" />
+
+          <Field label="Caste / community" required missing={isMissing("caste")} error={fieldError(errors, "caste")}>
+            <SearchableSelect
+              value={data.caste || undefined}
+              onValueChange={(next) =>
+                update({
+                  caste: next,
+                  subcaste: next === data.caste ? data.subcaste : "",
+                })
+              }
+              options={getCommunitiesForReligion(data.religion)}
+              placeholder={data.religion ? "Select caste / community…" : "Select religion first"}
+              searchPlaceholder="Search or type caste…"
+              emptyText="No matching community found."
+              disabled={!data.religion}
+              className={cn(isMissing("caste") && invalidCls)}
+              allowCustom={true}
+            />
           </Field>
-          <Field label="Gotra">
-            <Input value={data.gotra} onChange={(e) => update({ gotra: e.target.value })} placeholder="e.g. Bharadwaja" />
+
+          <Field label="Subcaste (optional)">
+            <SearchableSelect
+              value={data.subcaste || undefined}
+              onValueChange={(next) => update({ subcaste: next })}
+              options={getSubcastesForCommunity(data.caste, data.religion)}
+              placeholder={data.caste ? "Select subcaste (optional)…" : "Select caste first"}
+              searchPlaceholder="Search or type subcaste…"
+              emptyText="No matching subcaste found."
+              disabled={!data.caste}
+              allowCustom={true}
+            />
           </Field>
+
+          {(data.religion === "Hindu" || data.religion === "Jain") && (
+            <Field label="Gotra (optional)" className="sm:col-span-2">
+              <SearchableSelect
+                value={data.gotra || undefined}
+                onValueChange={(next) => update({ gotra: next })}
+                options={getGotrasForReligion(data.religion)}
+                placeholder="Select gotra (optional)…"
+                searchPlaceholder="Search or type gotra…"
+                emptyText="No matching gotra found."
+                allowCustom={true}
+              />
+            </Field>
+          )}
         </div>
-        <Field label="Mother tongue" required missing={isMissing("motherTongue")} error={fieldError(errors, "motherTongue")}>
-          <SearchableSelect
-            value={data.motherTongue || undefined}
-            onValueChange={(v) => update({ motherTongue: v })}
-            options={MOTHER_TONGUES}
-            placeholder="Select language"
-            searchPlaceholder="Search language…"
-            className={cn(isMissing("motherTongue") && invalidCls)}
-          />
-        </Field>
       </EditSection>
 
       <EditSection id="career" title="Education & career">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Highest education" required missing={isMissing("education")} error={fieldError(errors, "education")}>
-            <Input
-              value={data.otherEducation || data.education || data.degree || ""}
-              onChange={(e) =>
-                update({ education: e.target.value, otherEducation: "", degree: e.target.value })
-              }
-              placeholder="e.g. B.Tech"
-              className={cn(isMissing("education") && invalidCls)}
-            />
-          </Field>
-          <Field label="Specialization (optional)">
-            <Input
-              value={data.educationStream || ""}
-              onChange={(e) => update({ educationStream: e.target.value })}
-              placeholder="e.g. Computer Science"
-            />
-          </Field>
-        </div>
-        <Field label="Occupation" required missing={isMissing("occupation")} error={fieldError(errors, "occupation")}>
-          <Input
-            value={data.otherOccupation || data.occupation || data.profession || ""}
-            onChange={(e) =>
-              update({ occupation: e.target.value, otherOccupation: "", profession: e.target.value })
-            }
-            placeholder="e.g. Software Engineer"
+        <EducationFields
+          educationId={data.educationId}
+          specializationId={data.specializationId}
+          otherEducation={data.otherEducation || (!data.educationId ? data.education || data.degree || "" : "")}
+          educationStream={data.educationStream}
+          educationMissing={isMissing("education")}
+          educationError={fieldError(errors, "educationId") || fieldError(errors, "education")}
+          educationClassName={cn(isMissing("education") && invalidCls)}
+          onEducationChange={(value) =>
+            update({
+              educationId: value.educationId,
+              education: value.otherEducation || value.education,
+              degree: value.otherEducation || value.education,
+              specializationId: value.specializationId,
+              educationStream: value.educationStream,
+              otherEducation: value.otherEducation,
+            })
+          }
+        />
+        <Field label="Occupation" required missing={isMissing("occupation")} error={fieldError(errors, "occupationId") || fieldError(errors, "occupation")}>
+          <OccupationSelect
+            occupationId={data.occupationId}
             className={cn(isMissing("occupation") && invalidCls)}
+            onOccupationChange={(value) =>
+              update({
+                occupationId: value.occupationId,
+                occupation: value.occupation,
+                profession: value.profession,
+                otherOccupation: "",
+              })
+            }
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Employer name (optional)">
-            <Input value={data.companyName} onChange={(e) => update({ companyName: e.target.value })} placeholder="e.g. Infosys" />
+            <Input
+              value={data.companyName}
+              onChange={(e) => update({ companyName: e.target.value, companyId: null })}
+              placeholder="e.g. Deloitte, Infosys, Self-employed"
+            />
           </Field>
           <Field label="Annual income" required missing={isMissing("annualIncome")} error={fieldError(errors, "annualIncome")}>
             <SearchableSelect
@@ -502,15 +600,16 @@ export default function ProfileEditPage() {
       <EditSection id="location" title="Location">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Current city" required missing={isMissing("city")} error={fieldError(errors, "city")}>
-            <Input
-              value={data.city}
-              onChange={(e) => update({ city: e.target.value })}
-              placeholder="e.g. Chennai"
+            <CityAutocomplete
+              city={data.city}
+              state={data.state}
+              onCityChange={({ city, state }) => update({ city, state })}
+              placeholder="Search city…"
               className={cn(isMissing("city") && invalidCls)}
             />
           </Field>
           <Field label="State">
-            <Input value={data.state} onChange={(e) => update({ state: e.target.value })} placeholder="e.g. Tamil Nadu" />
+            <Input value={data.state} readOnly placeholder="Auto-filled from city" />
           </Field>
         </div>
         <Field label="Willing to relocate">

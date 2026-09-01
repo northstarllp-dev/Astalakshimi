@@ -33,16 +33,20 @@ export type SignupData = {
   rashi: string
   manglik: string
   motherTongue: string
+  educationId?: number | null
+  specializationId?: number | null
   education: string
   educationLevel?: string
   educationStream: string
   otherEducation: string
   degree?: string
   collegeName?: string
+  occupationId?: number | null
   occupation: string
   employmentStatus?: string
   profession?: string
   otherOccupation: string
+  companyId?: number | null
   companyName: string
   companySector?: string
   annualIncome: string
@@ -101,7 +105,7 @@ export const emptySignupData = (): SignupData => ({
   dobDay: "",
   dobMonth: "",
   dobYear: "",
-  height: "165",
+  height: "5'5\"",
   weight: "",
   complexion: "",
   diet: "Vegetarian",
@@ -118,16 +122,20 @@ export const emptySignupData = (): SignupData => ({
   rashi: "",
   manglik: "",
   motherTongue: "",
+  educationId: null,
+  specializationId: null,
   education: "",
   educationLevel: "",
   educationStream: "",
   otherEducation: "",
   degree: "",
   collegeName: "",
+  occupationId: null,
   occupation: "",
   employmentStatus: "",
   profession: "",
   otherOccupation: "",
+  companyId: null,
   companyName: "",
   companySector: "",
   annualIncome: "",
@@ -245,15 +253,24 @@ export const VERIFICATION_SLA_HOURS = 12
 export const SIBLING_COUNTS = [0, 1, 2, 3, 4, 5] as const
 
 export const COMPLEXIONS = ["Very fair", "Fair", "Wheatish", "Wheatish brown", "Dark"]
-export const DIETS = ["Vegetarian", "Non-vegetarian", "Eggetarian", "Vegan", "Jain"]
+export const DIETS = ["Vegetarian", "Non-vegetarian", "Occasional Non-vegetarian", "Eggetarian", "Vegan", "Jain"]
 export const MARITAL_STATUSES = ["Never Married", "Divorced", "Widowed", "Awaiting Divorce"]
-export const RELIGIONS = ["Hindu", "Muslim", "Christian", "Sikh", "Jain", "Buddhist", "Other"]
+export const RELIGIONS = [
+  "Hindu", "Muslim", "Christian", "Sikh", "Jain", "Buddhist",
+  "Parsi", "Jewish", "Spiritual", "No Religion", "Inter-Religion", "Other",
+]
 export const MOTHER_TONGUES = [
   "Tamil", "Telugu", "Hindi", "Malayalam", "Kannada",
-  "Marathi", "Bengali", "Gujarati", "Punjabi", "Other",
+  "Marathi", "Bengali", "Gujarati", "Punjabi", "Urdu",
+  "Odia", "Assamese", "Konkani", "Sindhi", "Tulu",
+  "Bhojpuri", "Marwari", "Rajasthani", "Haryanvi", "Maithili",
+  "Dogri", "Kashmiri", "Nepali", "Sourashtra", "Chhattisgarhi",
+  "Garhwali", "Kumaoni", "Magahi", "Manipuri", "Mizo",
+  "Khasi", "Santhali", "Kodava", "Kutchi", "Himachali",
+  "English", "Other",
 ]
 export const FAMILY_TYPES = ["Nuclear", "Joint"]
-export const FAMILY_STATUS = ["Middle class", "Upper middle class", "Affluent", "Rich"]
+export const FAMILY_STATUS = ["Lower middle class", "Middle class", "Upper middle class", "Affluent", "Wealthy", "Rich"]
 export const RELOCATE_OPTIONS = ["Yes", "No", "Open to discussion"]
 export const MANGLIK_OPTIONS = ["Yes", "No", "Don't know"]
 export const PHOTO_PRIVACY = [

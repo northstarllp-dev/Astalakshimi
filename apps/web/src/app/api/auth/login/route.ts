@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+import { getApiBaseUrl } from '@/lib/api-config';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
     // Call NestJS verify-otp
-    const res = await fetch(`${NEXT_PUBLIC_API_URL}/auth/verify-otp`, {
+    const res = await fetch(`${getApiBaseUrl()}/auth/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

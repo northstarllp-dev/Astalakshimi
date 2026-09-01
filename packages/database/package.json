@@ -20,7 +20,12 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:import-cities": "node scripts/import-cities.mjs",
+    "db:import-educations": "node scripts/import-educations.mjs",
+    "db:import-careers": "node scripts/import-careers.mjs",
+    "db:import-communities": "node scripts/import-communities.mjs",
+    "db:apply-migration": "node scripts/apply-migration.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

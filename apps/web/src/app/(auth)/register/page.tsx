@@ -30,6 +30,8 @@ import {
   type SignupData,
 } from "@/lib/profile-store"
 import { StepHeading, StepProgress, TapCard } from "@/components/signup/shared"
+import { CityAutocomplete } from "@/components/profile/city-autocomplete"
+import { CommunityFields } from "@/components/profile/community-fields"
 import { Step4Verify, VerificationSubmitted } from "@/components/signup/step-verify"
 import { useSaveProfileMutation } from "@/hooks/queries"
 import {
@@ -58,6 +60,12 @@ function SignupPageInner() {
       sessionStorage.setItem(REFERRED_BY_KEY, ref)
     }
   }, [searchParams])
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" })
+    }
+  }, [step, submitted])
 
   const updateData = (fields: Partial<SignupData>) => {
     setData((prev) => ({ ...prev, ...fields }))
@@ -512,11 +520,11 @@ function Step2Identity({
         {/* Location */}
         <div className="space-y-2">
           <Label htmlFor="city">{p}Current city</Label>
-          <Input
-            id="city"
-            placeholder="e.g. Chennai, Bangalore"
-            value={data.city}
-            onChange={(e) => updateData({ city: e.target.value })}
+          <CityAutocomplete
+            city={data.city}
+            state={data.state}
+            onCityChange={({ city, state }) => updateData({ city, state })}
+            placeholder="Search city…"
           />
           {errors.city && <p className="text-xs text-destructive">{errors.city.message}</p>}
         </div>
@@ -589,12 +597,13 @@ function Step3Community({
           {errors.religion && <p className="text-xs text-destructive">{errors.religion.message}</p>}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="caste">{p}Caste / community</Label>
-          <Input
-            id="caste"
-            placeholder="Type caste or community…"
-            value={data.caste}
-            onChange={(e) => updateData({ caste: e.target.value })}
+          <Label>{p}Caste / community</Label>
+          <CommunityFields
+            religion={data.religion}
+            caste={data.caste}
+            subcaste={data.subcaste}
+            gotra={data.gotra}
+            onChange={(value) => updateData(value)}
           />
           {errors.caste && <p className="text-xs text-destructive">{errors.caste.message}</p>}
         </div>

@@ -1,5 +1,7 @@
 import { pgTable, uuid, varchar, text, integer, boolean, date, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
+import { educationLevels, specializations } from './educations';
+import { occupations, companies } from './careers';
 
 export const genderEnum = pgEnum('gender', ['Male', 'Female', 'Other']);
 export const maritalStatusEnum = pgEnum('marital_status', ['Never Married', 'Divorced', 'Widowed', 'Awaiting Divorce']);
@@ -42,11 +44,15 @@ export const profiles = pgTable('profiles', {
   motherTongue: varchar('mother_tongue', { length: 50 }).notNull(),
 
   // Education & Career Details
+  educationId: integer('education_id').references(() => educationLevels.id),
+  specializationId: integer('specialization_id').references(() => specializations.id),
   educationLevel: educationLevelEnum('education_level'),
   degree: varchar('degree', { length: 150 }),
   collegeName: varchar('college_name', { length: 200 }),
   employmentStatus: employmentStatusEnum('employment_status'),
+  occupationId: integer('occupation_id').references(() => occupations.id),
   profession: varchar('profession', { length: 150 }),
+  companyId: integer('company_id').references(() => companies.id),
   companyName: varchar('company_name', { length: 150 }),
   companySector: companySectorEnum('company_sector'),
   annualIncome: varchar('annual_income', { length: 50 }),

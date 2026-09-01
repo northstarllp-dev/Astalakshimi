@@ -43,7 +43,7 @@ import {
 } from "lucide-react"
 
 const HEIGHT_BANDS = ["Up to 5'4\"", "5'5\" – 5'8\"", "5'9\" & above"]
-const EDUCATION_GROUPS = ["B.Tech", "B.E", "MBA", "M.Sc", "Ph.D", "M.Phil", "Post Doctorate"]
+const EDUCATION_GROUPS = ["B.Tech", "B.E", "MBA", "M.Sc", "Ph.D", "M.Phil", "Post Doctorate", "Others"]
 
 function FilterSection({
   title,

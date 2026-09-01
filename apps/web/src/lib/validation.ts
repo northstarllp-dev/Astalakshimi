@@ -113,64 +113,6 @@ export const profileEditSchema = z
     if (!age.ok) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: age.message, path: ["dobYear"] })
     }
-    const hasText = (v: unknown) => typeof v === "string" && v.trim().length > 0
-    if (!hasText(value.education) && !hasText(value.otherEducation) && !hasText(value.degree)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Highest education is required.",
-        path: ["education"],
-      })
-    }
-    if (!hasText(value.occupation) && !hasText(value.otherOccupation) && !hasText(value.profession)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Occupation is required.",
-        path: ["occupation"],
-      })
-    }
-    if (!hasText(value.annualIncome)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Annual income is required.",
-        path: ["annualIncome"],
-      })
-    }
-    const horoscope = value as Record<string, unknown>
-    if (!hasText(horoscope.birthTime)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Birth time is required.",
-        path: ["birthTime"],
-      })
-    }
-    if (!hasText(horoscope.birthPlace)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Birth place is required.",
-        path: ["birthPlace"],
-      })
-    }
-    if (!hasText(horoscope.star)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Star / nakshatra is required.",
-        path: ["star"],
-      })
-    }
-    if (!hasText(horoscope.rashi)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Rashi is required.",
-        path: ["rashi"],
-      })
-    }
-    if (!hasText(horoscope.manglik)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Manglik status is required.",
-        path: ["manglik"],
-      })
-    }
   })
 
 export const searchFiltersSchema = z

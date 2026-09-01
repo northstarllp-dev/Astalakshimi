@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "aws": {
+      "command": "node",
+      "args": ["scripts/mcp/run-aws.mjs"],
+      "cwd": ".",
+      "timeout": 60000,
+      "trust": true
+    },
+    "postgres-rds": {
+      "command": "node",
+      "args": ["scripts/mcp/run-postgres.mjs"],
+      "cwd": ".",
+      "timeout": 60000,
+      "trust": true
+    }
+  }
+}
