@@ -192,7 +192,7 @@ export function CityAutocomplete({
             value={query}
             onValueChange={setQuery}
           />
-          <CommandList>
+          <CommandList className="max-h-60 sm:max-h-72 overflow-y-auto">
             <CommandEmpty>
               <div className="py-2 text-center">
                 <p className="text-xs text-muted-foreground">

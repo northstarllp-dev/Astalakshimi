@@ -104,11 +104,11 @@ export function ReferAndEarnCard({ className }: { className?: string }) {
       </div>
 
       {/* Action Buttons */}
-      <div className="mt-4 flex flex-wrap items-center gap-2.5">
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2.5">
         <Button
           type="button"
           onClick={() => void shareReferral()}
-          className="rounded-full bg-[#7c1535] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#63102a] active:scale-95 transition"
+          className="w-full sm:w-auto justify-center rounded-full bg-[#7c1535] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#63102a] active:scale-95 transition"
         >
           <Share2 className="mr-2 h-4 w-4" />
           Share link
@@ -117,7 +117,7 @@ export function ReferAndEarnCard({ className }: { className?: string }) {
           type="button"
           variant="outline"
           onClick={() => void copyReferral()}
-          className="rounded-full border-border/80 bg-card px-5 py-2 text-sm font-semibold text-foreground hover:bg-muted/60 active:scale-95 transition"
+          className="w-full sm:w-auto justify-center rounded-full border-border/80 bg-card px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-muted/60 active:scale-95 transition"
         >
           {copied ? (
             <>
@@ -134,9 +134,9 @@ export function ReferAndEarnCard({ className }: { className?: string }) {
       </div>
 
       {/* Perks summary */}
-      <div className="mt-4 pt-3.5 border-t border-secondary/15 flex items-center justify-between text-xs text-muted-foreground">
+      <div className="mt-4 pt-3.5 border-t border-secondary/15 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <Sparkles className="h-3.5 w-3.5 text-secondary" />
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-secondary" />
           Both you and your friend receive benefits
         </span>
         <span className="font-medium text-foreground">Unlimited invites</span>

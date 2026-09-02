@@ -94,7 +94,7 @@ export function SearchableSelect({
             value={search}
             onValueChange={setSearch}
           />
-          <CommandList>
+          <CommandList className="max-h-60 sm:max-h-72 overflow-y-auto">
             <CommandEmpty>
               <div className="py-2 text-center">
                 <p className="text-xs text-muted-foreground">{emptyText}</p>

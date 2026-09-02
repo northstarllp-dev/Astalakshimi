@@ -36,7 +36,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div
       className={cn(
         "flex min-h-dvh flex-col bg-background",
-        isany ? "h-dvh overflow-hidden" : "pb-24 md:pb-12"
+        isany ? "pb-24" : "pb-24 md:pb-12"
       )}
     >
       <header className="sticky top-0 z-50 border-b border-secondary/30 bg-[#fffbf4]/92 backdrop-blur-xl safe-top">
@@ -105,7 +105,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className={cn("flex-1", isany && "min-h-0 overflow-hidden")}>{children}</div>
+      <div className="flex-1">{children}</div>
       {isany ? null : <MobileBottomNav />}
       <ContactUnlockModal />
     </div>

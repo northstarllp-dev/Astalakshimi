@@ -132,6 +132,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
       mother: data.family?.motherOccupation || "Homemaker",
       siblings: `${(data.family?.brothersCount || 0) + (data.family?.sistersCount || 0)}`,
     },
+    planSlug: data.planSlug || data.profile?.planSlug || data.subscription?.planSlug || null,
     preferences: {
       ageRange: "25 - 32 yrs",
       heightRange: "160 - 180 cm",
@@ -144,11 +145,11 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        {/* LEFT: portrait photo, no scroll */}
-        <aside className="relative flex shrink-0 flex-col overflow-hidden px-4 pt-3 lg:w-[40%] lg:max-w-[480px] lg:px-5 lg:pt-5">
-          <div className="relative mx-auto aspect-[3/4] w-full max-h-[min(72dvh,640px)] overflow-hidden rounded-2xl shadow-md">
+    <div className="relative mx-auto max-w-6xl px-3 py-4 sm:px-4 md:py-6 pb-28 sm:pb-32">
+      <div className="grid gap-5 lg:grid-cols-[400px_minmax(0,1fr)] lg:items-start xl:grid-cols-[440px_minmax(0,1fr)]">
+        {/* LEFT: portrait photo card (natural scroll on mobile, sticky on desktop) */}
+        <div className="lg:sticky lg:top-20">
+          <div className="relative mx-auto aspect-[3/4] w-full max-w-[440px] overflow-hidden rounded-2xl sm:rounded-3xl shadow-md border border-border/70">
             <ProfileGallery
               name={profile.fullName}
               age={profile.age}
@@ -160,98 +161,94 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
               verified={profile.verified}
               hasHoroscope={profile.hasHoroscope}
               blurPhoto={profile.blurPhoto}
+              plan={profile.planSlug}
             />
 
-            <span className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-1 text-[11px] font-bold text-white shadow backdrop-blur">
-              <Star className="h-3 w-3 fill-current" /> {profile.matchPercent}% match
+            <span className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-full bg-emerald-500/95 px-2.5 py-1 text-xs font-bold text-white shadow backdrop-blur-xs">
+              <Star className="h-3.5 w-3.5 fill-current" /> {profile.matchPercent}% match
             </span>
           </div>
-        </aside>
-
-        {/* RIGHT: details column */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto hide-scrollbar">
-            <div className="space-y-4 p-4 pb-[6.5rem] sm:p-6 sm:pb-[6.5rem]">
-
-            {/* Quick pills */}
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex flex-wrap gap-2 text-sm">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 font-medium">
-                  <Ruler className="h-3.5 w-3.5 text-primary" /> {profile.height}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 font-medium">
-                  <GraduationCap className="h-3.5 w-3.5 text-primary" /> {profile.education.split(" ")[0].trim()}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 font-medium">
-                  <Briefcase className="h-3.5 w-3.5 text-primary" /> {profile.occupation}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 font-medium">
-                  <Users className="h-3.5 w-3.5 text-primary" /> {profile.community}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 font-medium">
-                  <MapPin className="h-3.5 w-3.5 text-primary" /> {profile.city}
-                </span>
-              </div>
-              <p className="mt-4 text-sm leading-relaxed text-foreground/85">{profile.about}</p>
-            </section>
-
-            <ProfileAboutSection
-              profileId={profile.id}
-              gender={profile.gender}
-              maritalStatus={profile.maritalStatus}
-              religion={profile.religion}
-              community={profile.community}
-              motherTongue={profile.motherTongue}
-              city={profile.city}
-              state={profile.state}
-              hasHoroscope={profile.hasHoroscope}
-              horoscopeFileName={data.horoscope?.horoscopeFileName}
-              horoscopeS3Key={data.horoscope?.horoscopeS3Key}
-              contactPhone={data.contactPhone}
-              initialMutualConnect={Boolean(data.isMutualConnect)}
-              contactAccess={data.contactAccess}
-            />
-
-            <Section title="Education & career" icon={<Briefcase className="h-4 w-4" />}>
-              <dl>
-                <DetailRow label="Education" value={profile.education} />
-                <DetailRow label="College" value={profile.college} />
-                <DetailRow label="Occupation" value={profile.occupation} />
-                <DetailRow label="Company" value={profile.company} />
-                <DetailRow label="Annual income" value={profile.income} />
-              </dl>
-            </Section>
-
-            <Section title="Lifestyle" icon={<Heart className="h-4 w-4" />}>
-              <dl>
-                <DetailRow label="Diet" value={profile.lifestyle.diet} />
-                <DetailRow label="Smoking" value={profile.lifestyle.smoking} />
-                <DetailRow label="Drinking" value={profile.lifestyle.drinking} />
-              </dl>
-            </Section>
-
-            <Section title="Family" icon={<Users className="h-4 w-4" />}>
-              <dl>
-                <DetailRow label="Family type" value={profile.family.type} />
-                <DetailRow label="Family values" value={profile.family.values} />
-                <DetailRow label="Father" value={profile.family.father} />
-                <DetailRow label="Mother" value={profile.family.mother} />
-                <DetailRow label="Siblings" value={profile.family.siblings} />
-              </dl>
-            </Section>
-
-            <Section title="Partner preferences" icon={<CheckCircle2 className="h-4 w-4" />}>
-              <dl>
-                <DetailRow label="Age" value={profile.preferences.ageRange} />
-                <DetailRow label="Height" value={profile.preferences.heightRange} />
-                <DetailRow label="Education" value={profile.preferences.education} />
-                <DetailRow label="Location" value={profile.preferences.location} />
-                <DetailRow label="Community" value={profile.preferences.community} />
-              </dl>
-            </Section>
-
-          </div>
         </div>
+
+        {/* RIGHT: details column (continuous natural scroll) */}
+        <div className="min-w-0 space-y-4 sm:space-y-5">
+          {/* Quick pills */}
+          <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
+            <div className="flex flex-wrap gap-2 text-sm">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
+                <Ruler className="h-3.5 w-3.5 text-primary" /> {profile.height}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
+                <GraduationCap className="h-3.5 w-3.5 text-primary" /> {profile.education.split(" ")[0].trim()}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
+                <Briefcase className="h-3.5 w-3.5 text-primary" /> {profile.occupation}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
+                <Users className="h-3.5 w-3.5 text-primary" /> {profile.community}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
+                <MapPin className="h-3.5 w-3.5 text-primary" /> {profile.city}
+              </span>
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-foreground/85">{profile.about}</p>
+          </section>
+
+          <ProfileAboutSection
+            profileId={profile.id}
+            gender={profile.gender}
+            maritalStatus={profile.maritalStatus}
+            religion={profile.religion}
+            community={profile.community}
+            motherTongue={profile.motherTongue}
+            city={profile.city}
+            state={profile.state}
+            hasHoroscope={profile.hasHoroscope}
+            horoscopeFileName={data.horoscope?.horoscopeFileName}
+            horoscopeS3Key={data.horoscope?.horoscopeS3Key}
+            contactPhone={data.contactPhone}
+            initialMutualConnect={Boolean(data.isMutualConnect)}
+            contactAccess={data.contactAccess}
+          />
+
+          <Section title="Education & career" icon={<Briefcase className="h-4 w-4" />}>
+            <dl>
+              <DetailRow label="Education" value={profile.education} />
+              <DetailRow label="College" value={profile.college} />
+              <DetailRow label="Occupation" value={profile.occupation} />
+              <DetailRow label="Company" value={profile.company} />
+              <DetailRow label="Annual income" value={profile.income} />
+            </dl>
+          </Section>
+
+          <Section title="Lifestyle" icon={<Heart className="h-4 w-4" />}>
+            <dl>
+              <DetailRow label="Diet" value={profile.lifestyle.diet} />
+              <DetailRow label="Smoking" value={profile.lifestyle.smoking} />
+              <DetailRow label="Drinking" value={profile.lifestyle.drinking} />
+            </dl>
+          </Section>
+
+          <Section title="Family" icon={<Users className="h-4 w-4" />}>
+            <dl>
+              <DetailRow label="Family type" value={profile.family.type} />
+              <DetailRow label="Family values" value={profile.family.values} />
+              <DetailRow label="Father" value={profile.family.father} />
+              <DetailRow label="Mother" value={profile.family.mother} />
+              <DetailRow label="Siblings" value={profile.family.siblings} />
+            </dl>
+          </Section>
+
+          <Section title="Partner preferences" icon={<CheckCircle2 className="h-4 w-4" />}>
+            <dl>
+              <DetailRow label="Age" value={profile.preferences.ageRange} />
+              <DetailRow label="Height" value={profile.preferences.heightRange} />
+              <DetailRow label="Education" value={profile.preferences.education} />
+              <DetailRow label="Location" value={profile.preferences.location} />
+              <DetailRow label="Community" value={profile.preferences.community} />
+            </dl>
+          </Section>
+
         </div>
       </div>
 

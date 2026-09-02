@@ -121,11 +121,30 @@ function DiscoverPage() {
   const [query, setQuery] = React.useState<DiscoverQuery>(DEFAULT_DISCOVER)
   const [page, setPage] = React.useState(1)
   const [moreOpen, setMoreOpen] = React.useState(false)
+  const [filterOpen, setFilterOpen] = React.useState(false)
   const [saveOpen, setSaveOpen] = React.useState(false)
   const [saveLabel, setSaveLabel] = React.useState("")
   const [paywall, setPaywall] = React.useState<string | null>(null)
   const interestCount = interests?.pendingCount ?? 0
   const shortlistCount = shortlist.length
+
+  const activeFilterCount = React.useMemo(() => {
+    let count = 0
+    if (query.city) count++
+    if (query.community) count++
+    if (query.ageMin !== 21 || query.ageMax !== 40) count++
+    if (query.advanced.heights.length > 0) count++
+    if (query.advanced.educations.length > 0) count++
+    if (query.advanced.occupations.length > 0) count++
+    if (query.advanced.incomes.length > 0) count++
+    if (query.advanced.diets.length > 0) count++
+    if (query.advanced.smoking.length > 0) count++
+    if (query.advanced.drinking.length > 0) count++
+    if (query.advanced.manglik.length > 0) count++
+    if (query.advanced.stars.length > 0) count++
+    if (query.advanced.relocate) count++
+    return count
+  }, [query])
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
   const pending = profile?.verificationStatus === "pending"
@@ -193,7 +212,7 @@ function DiscoverPage() {
             Namaste, {firstName}. Apply a filter and results update instantly  no search button.
           </p>
         </div>
-        <div className="hidden gap-2 sm:flex">
+        <div className="grid grid-cols-3 gap-2 sm:flex">
           {[
             { label: "Interests", value: String(interestCount), href: "/interests" },
             { label: "Shortlisted", value: String(shortlistCount), href: "/interests?tab=shortlisted" },
@@ -202,14 +221,14 @@ function DiscoverPage() {
             <Link
               key={stat.label}
               href={stat.href}
-              className="min-w-[64px] rounded-xl border border-border bg-card px-3 py-2 text-center hover:border-primary/30"
+              className="flex-1 rounded-xl border border-border bg-card px-2 py-1.5 text-center transition hover:border-primary/30 sm:min-w-[68px] sm:px-3 sm:py-2"
             >
-              <p className="font-serif text-lg font-bold leading-none text-primary">{stat.value}</p>
+              <p className="font-serif text-base font-bold leading-none text-primary sm:text-lg">{stat.value}</p>
               <p className="mt-1 text-[10px] font-medium text-muted-foreground">{stat.label}</p>
             </Link>
           ))}
         </div>
-        </div>
+      </div>
 
         {pending && (
         <div className="mb-5 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-[#fff8ef] shadow-sm">
@@ -227,156 +246,39 @@ function DiscoverPage() {
               </div>
       )}
 
-      {/* Quick search — 3 fields, live */}
-      <section className="mb-4 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-3">
-          {/* 1. Age Range */}
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Age range
-              </span>
-              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary tabular-nums">
-                {query.ageMin} – {query.ageMax} yrs
-              </span>
-            </div>
-            <div className="mt-2 flex h-12 items-center rounded-xl border border-input bg-card px-4 shadow-xs">
-              <div className="flex w-full items-center gap-3">
-                <span className="text-xs font-medium text-muted-foreground tabular-nums">18</span>
-                <input
-                  type="range"
-                  min={18}
-                  max={50}
-                  value={query.ageMin}
-                  onChange={(e) => {
-                    const ageMin = Math.min(Number(e.target.value), query.ageMax)
-                    setQuick({ ageMin })
-                  }}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-[#7c1535]"
-                  aria-label="Minimum age"
-                />
-                <input
-                  type="range"
-                  min={18}
-                  max={50}
-                  value={query.ageMax}
-                  onChange={(e) => {
-                    const ageMax = Math.max(Number(e.target.value), query.ageMin)
-                    setQuick({ ageMax })
-                  }}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-[#7c1535]"
-                  aria-label="Maximum age"
-                />
-                <span className="text-xs font-medium text-muted-foreground tabular-nums">50</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Location (CityAutocomplete like in Edit Profile) */}
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Location
-              </span>
-              {query.city ? (
-                <button
-                  type="button"
-                  onClick={() => setQuick({ city: "" })}
-                  className="text-xs font-semibold text-primary hover:underline"
-                >
-                  Clear
-                </button>
-              ) : null}
-            </div>
-            <div className="relative mt-2">
-              <CityAutocomplete
-                city={query.city}
-                onCityChange={({ city }) => setQuick({ city })}
-                placeholder="Any city"
-                searchPlaceholder="Search city (e.g. Chennai, Bengaluru)…"
-                className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm"
-              />
-              {query.city ? (
-                <button
-                  type="button"
-                  onClick={() => setQuick({ city: "" })}
-                  className="absolute right-9 top-1/2 -translate-y-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition"
-                  aria-label="Clear location"
-                  title="Clear location"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          {/* 3. Community (SearchableSelect like in Edit Profile) */}
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Community
-              </span>
-              {query.community ? (
-                <button
-                  type="button"
-                  onClick={() => setQuick({ community: "" })}
-                  className="text-xs font-semibold text-primary hover:underline"
-                >
-                  Clear
-                </button>
-              ) : null}
-            </div>
-            <div className="relative mt-2">
-              <SearchableSelect
-                value={query.community}
-                onValueChange={(community) => setQuick({ community })}
-                options={communityOptions}
-                placeholder="Any community"
-                searchPlaceholder="Search or type community…"
-                emptyText="No matching community found."
-                allowCustom={true}
-                className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm"
-              />
-              {query.community ? (
-                <button
-                  type="button"
-                  onClick={() => setQuick({ community: "" })}
-                  className="absolute right-9 top-1/2 -translate-y-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition"
-                  aria-label="Clear community"
-                  title="Clear community"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" variant="soft" size="sm" onClick={applyPreferences}>
-            <Heart className="mr-1.5 h-3.5 w-3.5" /> My preferences
-          </Button>
+      {/* Compact Filters Button Bar */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Small Filters Button */}
           <Button
             type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => requirePaid("Advanced filters", () => setMoreOpen(true))}
+            variant={activeFilterCount > 0 ? "default" : "outline"}
+            onClick={() => setFilterOpen(true)}
+            className="h-10 rounded-full px-4 text-sm font-semibold shadow-xs transition"
           >
-            {paid ? <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" /> : <Lock className="mr-1.5 h-3.5 w-3.5" />}
-            More filters
+            <SlidersHorizontal className="mr-2 h-4 w-4" />
+            <span>Filters</span>
+            {activeFilterCount > 0 ? (
+              <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-secondary-foreground">
+                {activeFilterCount}
+              </span>
+            ) : null}
           </Button>
+
+          {/* Quick preferences */}
           <Button
             type="button"
-            variant="outline"
+            variant="soft"
             size="sm"
-            onClick={() => requirePaid("Saved searches", () => setSaveOpen(true))}
+            onClick={applyPreferences}
+            className="h-10 rounded-full px-3.5 text-sm"
           >
-            {paid ? <Bookmark className="mr-1.5 h-3.5 w-3.5" /> : <Lock className="mr-1.5 h-3.5 w-3.5" />}
-            Save search
+            <Heart className="mr-1.5 h-4 w-4 text-primary" /> My preferences
           </Button>
+
           {saved.length > 0 && paid && (
             <select
-              className="h-9 rounded-full border border-border bg-background px-3 text-sm"
+              className="h-10 rounded-full border border-border bg-background px-3 text-xs sm:text-sm"
               defaultValue=""
               onChange={(e) => {
                 const item = saved.find((s: any) => s.id === e.target.value)
@@ -395,15 +297,73 @@ function DiscoverPage() {
               ))}
             </select>
           )}
+        </div>
+
+        {activeFilterCount > 0 ? (
           <button
             type="button"
-            className="ml-auto text-xs font-semibold text-primary hover:underline"
+            className="text-xs font-semibold text-primary hover:underline"
             onClick={() => setQuery(DEFAULT_DISCOVER)}
           >
-            Clear all
+            Clear all ({activeFilterCount})
           </button>
-          </div>
-        </section>
+        ) : null}
+      </div>
+
+      {/* Active filter chips row */}
+      {activeFilterCount > 0 ? (
+        <div className="-mx-3 mb-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-1 hide-scrollbar sm:mx-0 sm:px-0">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide shrink-0 mr-1">
+            Active:
+          </span>
+          {(query.ageMin !== 21 || query.ageMax !== 40) && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground">
+              {query.ageMin}–{query.ageMax} yrs
+              <button
+                type="button"
+                onClick={() => setQuick({ ageMin: 21, ageMax: 40 })}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Reset age"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+          {query.city && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground">
+              {query.city}
+              <button
+                type="button"
+                onClick={() => setQuick({ city: "" })}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Clear city"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+          {query.community && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground">
+              {query.community}
+              <button
+                type="button"
+                onClick={() => setQuick({ community: "" })}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Clear community"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setFilterOpen(true)}
+            className="shrink-0 text-xs font-semibold text-primary hover:underline ml-1"
+          >
+            Edit
+          </button>
+        </div>
+      ) : null}
 
       {paywall && (
         <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-secondary/40 bg-[#fff8ef] p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -420,7 +380,7 @@ function DiscoverPage() {
       )}
 
       {/* Browse tabs */}
-      <div className="mb-4 flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+      <div className="-mx-3 mb-4 flex gap-2 overflow-x-auto px-3 pb-1 hide-scrollbar sm:mx-0 sm:px-0">
         {BROWSE_TABS.map((tab) => {
           const locked = Boolean(tab.paid) && !paid
           const active = query.tab === tab.id
@@ -499,6 +459,225 @@ function DiscoverPage() {
           <Button variant="outline" disabled={page * 10 >= totalCount} onClick={() => setPage(p => p + 1)}>
             Next
           </Button>
+        </div>
+      )}
+
+      {/* Full Filters Popup Modal */}
+      {filterOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-xs"
+          onClick={() => setFilterOpen(false)}
+        >
+          <div
+            className="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[1.75rem] border border-secondary/30 bg-[#fffbf4] shadow-2xl sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border/80 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-5 w-5 text-primary" />
+                <div>
+                  <h2 className="font-serif text-lg font-bold text-foreground">Filters</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Filter profiles by age, location, and community
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {activeFilterCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery(DEFAULT_DISCOVER)}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    Reset all
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setFilterOpen(false)}
+                  aria-label="Close"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Scrollable */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+              {/* 1. Age Range */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Age range
+                  </span>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary tabular-nums">
+                    {query.ageMin} – {query.ageMax} yrs
+                  </span>
+                </div>
+                <div className="mt-2 flex h-12 items-center rounded-xl border border-input bg-card px-4 shadow-xs">
+                  <div className="flex w-full items-center gap-3">
+                    <span className="text-xs font-medium text-muted-foreground tabular-nums">18</span>
+                    <input
+                      type="range"
+                      min={18}
+                      max={50}
+                      value={query.ageMin}
+                      onChange={(e) => {
+                        const ageMin = Math.min(Number(e.target.value), query.ageMax)
+                        setQuick({ ageMin })
+                      }}
+                      className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-[#7c1535]"
+                      aria-label="Minimum age"
+                    />
+                    <input
+                      type="range"
+                      min={18}
+                      max={50}
+                      value={query.ageMax}
+                      onChange={(e) => {
+                        const ageMax = Math.max(Number(e.target.value), query.ageMin)
+                        setQuick({ ageMax })
+                      }}
+                      className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-[#7c1535]"
+                      aria-label="Maximum age"
+                    />
+                    <span className="text-xs font-medium text-muted-foreground tabular-nums">50</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Location */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Location
+                  </span>
+                  {query.city ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuick({ city: "" })}
+                      className="text-xs font-semibold text-primary hover:underline"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                <div className="relative mt-2">
+                  <CityAutocomplete
+                    city={query.city}
+                    onCityChange={({ city }) => setQuick({ city })}
+                    placeholder="Any city"
+                    searchPlaceholder="Search city (e.g. Chennai, Bengaluru)…"
+                    className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm"
+                  />
+                  {query.city ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuick({ city: "" })}
+                      className="absolute right-9 top-1/2 -translate-y-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition"
+                      aria-label="Clear location"
+                      title="Clear location"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* 3. Community */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Community
+                  </span>
+                  {query.community ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuick({ community: "" })}
+                      className="text-xs font-semibold text-primary hover:underline"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                <div className="relative mt-2">
+                  <SearchableSelect
+                    value={query.community}
+                    onValueChange={(community) => setQuick({ community })}
+                    options={communityOptions}
+                    placeholder="Any community"
+                    searchPlaceholder="Search or type community…"
+                    emptyText="No matching community found."
+                    allowCustom={true}
+                    className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm"
+                  />
+                  {query.community ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuick({ community: "" })}
+                      className="absolute right-9 top-1/2 -translate-y-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition"
+                      aria-label="Clear community"
+                      title="Clear community"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Advanced options */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/70">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full text-xs"
+                  onClick={() => requirePaid("Advanced filters", () => {
+                    setFilterOpen(false)
+                    setMoreOpen(true)
+                  })}
+                >
+                  {paid ? <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" /> : <Lock className="mr-1.5 h-3.5 w-3.5" />}
+                  Advanced filters (Height, Education, etc.)
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full text-xs"
+                  onClick={() => requirePaid("Saved searches", () => {
+                    setFilterOpen(false)
+                    setSaveOpen(true)
+                  })}
+                >
+                  {paid ? <Bookmark className="mr-1.5 h-3.5 w-3.5" /> : <Lock className="mr-1.5 h-3.5 w-3.5" />}
+                  Save search
+                </Button>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-border/80 bg-card p-4 flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setQuery(DEFAULT_DISCOVER)}
+                className="rounded-full"
+              >
+                Reset
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setFilterOpen(false)}
+                className="flex-1 rounded-full bg-primary text-primary-foreground font-semibold shadow-sm"
+              >
+                Show {totalCount} Profiles
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

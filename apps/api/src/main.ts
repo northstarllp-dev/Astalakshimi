@@ -6,6 +6,15 @@ import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filte
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  process.on('unhandledRejection', (reason) => {
+    logger.error('Unhandled Promise Rejection:', reason);
+  });
+
+  process.on('uncaughtException', (err) => {
+    logger.error('Uncaught Exception:', err);
+  });
+
   const app = await NestFactory.create(AppModule);
 
   const configService = app.get(ConfigService);

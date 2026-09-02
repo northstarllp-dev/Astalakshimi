@@ -1,8 +1,8 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { profiles, users, profilePhotos, userSettings, interests } from '@astalakshimi/database';
-import { eq, and, ne, inArray, gte, lte, or, desc, sql, isNotNull } from 'drizzle-orm';
+import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans } from '@astalakshimi/database';
+import { eq, and, ne, inArray, gte, lte, or, desc, sql, isNotNull, gt } from 'drizzle-orm';
 
 @Injectable()
 export class SearchService {
@@ -117,6 +117,7 @@ export class SearchService {
     let photos: any[] = [];
     let settings: any[] = [];
     let connections: any[] = [];
+    let activeSubs: any[] = [];
 
     if (profileIds.length > 0) {
       photos = await this.db
@@ -133,6 +134,27 @@ export class SearchService {
         .select()
         .from(userSettings)
         .where(inArray(userSettings.userId, userIds));
+
+      try {
+        activeSubs = await this.db
+          .select({
+            userId: subscriptions.userId,
+            planSlug: plans.slug,
+            planName: plans.name,
+          })
+          .from(subscriptions)
+          .innerJoin(plans, eq(subscriptions.planId, plans.id))
+          .where(
+            and(
+              inArray(subscriptions.userId, userIds),
+              eq(subscriptions.status, 'active'),
+              gt(subscriptions.expiresAt, new Date())
+            )
+          );
+      } catch (err) {
+        // Fallback if subscription join fails
+        activeSubs = [];
+      }
 
       if (currentUser) {
         connections = await this.db
@@ -151,6 +173,7 @@ export class SearchService {
     const mappedResult = result.map((profile) => {
       const primaryPhoto = photos.find((photo) => photo.profileId === profile.id);
       const setting = settings.find((s) => s.userId === profile.userId);
+      const userSub = activeSubs.find((s) => s.userId === profile.userId);
       const isAccepted = connections.some(
         (c) => c.senderProfileId === profile.id || c.receiverProfileId === profile.id
       );
@@ -169,6 +192,8 @@ export class SearchService {
         age: profile.dob ? new Date().getFullYear() - new Date(profile.dob).getFullYear() : 25,
         photos: primaryPhoto ? [primaryPhoto.s3Key] : [], 
         blurPhoto,
+        planSlug: userSub?.planSlug || 'free',
+        planName: userSub?.planName || 'Free',
         education: profile.educationLevel || 'Not specified',
         occupation: profile.profession || 'Not specified',
         company: profile.companyName || 'Not specified',

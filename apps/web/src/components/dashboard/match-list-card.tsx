@@ -9,12 +9,17 @@ import { Button } from "@/components/ui/button"
 import {
   BadgeCheck,
   Bookmark,
+  Briefcase,
+  Building2,
   Check,
   ChevronLeft,
   ChevronRight,
+  Coins,
   Crown,
   Eye,
+  GraduationCap,
   Image as ImageIcon,
+  Languages,
   Loader2,
   MapPin,
   MoreVertical,
@@ -25,6 +30,7 @@ import {
   X,
 } from "lucide-react"
 import { ConnectButton } from "@/components/profile/connect-button"
+import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
 import {
   useContactUsageQuery,
   useInterestsQuery,
@@ -209,12 +215,9 @@ export function MatchListCard({
             </span>
           </div>
 
-          {/* Top Right: VIP Crown + Photo Count + Three dots menu */}
+          {/* Top Right: Plan Crown Badge (Silver/Gold/Platinum/Diamond; hidden for free) + Photo Count + Three dots menu */}
           <div className="flex items-center gap-2">
-            {/* VIP Crown Red Circle */}
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#ff3b30] text-white shadow-md">
-              <Crown className="h-3.5 w-3.5 fill-current" />
-            </div>
+            <PlanCrownBadge plan={match.planSlug || match.plan || match.membership || (match.isVip ? "gold" : null)} />
 
             {/* Photo count pill */}
             <div className="flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-md border border-white/15 shadow-sm">
@@ -372,172 +375,244 @@ export function MatchListCard({
       </div>
 
       {/* ────────────────────────────────────────────────────────────────
-          DESKTOP VIEW: Two-column expansive layout
+          DESKTOP VIEW: High-end, spacious 2-column showcase layout
           ──────────────────────────────────────────────────────────────── */}
-      <div className="hidden md:grid md:grid-cols-[minmax(220px,260px)_1fr]">
-        {/* Photo column */}
-        <div className="relative">
-          <Link
-            href={`/profiles/${match.id}`}
-            className="relative block aspect-[4/5] overflow-hidden md:aspect-auto md:min-h-[300px]"
-          >
-            <Image
-              src={getMediaUrl(photos[activePhoto] ?? photos[0])}
-              alt={`${match.fullName}, ${match.age}`}
-              fill
-              priority={priority}
-              className={cn(
-                "object-cover object-[center_18%] transition-all duration-500",
-                match.blurPhoto ? "blur-xl scale-110" : ""
-              )}
-              sizes="260px"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-black/20" />
-
-            {/* Photo badges */}
-            <div className="absolute left-2.5 top-2.5 flex flex-col items-start gap-1.5">
-              <Badge className="border-transparent bg-emerald-500 text-[11px] font-bold text-white">
-                <Star className="fill-current" /> {match.matchPercent || 92}%
-              </Badge>
-              {match.photoVerified && (
-                <Badge
-                  variant="outline"
-                  className="border-transparent bg-black/50 text-[11px] font-semibold text-white backdrop-blur"
-                >
-                  <BadgeCheck className="text-secondary" /> Verified
-                </Badge>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={handleToggleShortlist}
-              disabled={toggleShortlistMutation.isPending}
-              aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
-              className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition hover:bg-black/75 hover:scale-105 active:scale-95"
-            >
-              <Bookmark
+      <div className="hidden md:flex md:flex-row items-stretch">
+        {/* Left: Photo Showcase Column */}
+        <div className="w-[280px] lg:w-[310px] xl:w-[325px] shrink-0 p-3.5 sm:p-4 flex flex-col justify-between border-r border-border/40 bg-secondary/[0.02]">
+          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-neutral-900 shadow-sm border border-border/50">
+            <Link href={`/profiles/${match.id}`} className="absolute inset-0 block">
+              <Image
+                src={getMediaUrl(photos[activePhoto] ?? photos[0])}
+                alt={`${match.fullName}, ${match.age}`}
+                fill
+                priority={priority}
                 className={cn(
-                  "h-4 w-4 transition-colors",
-                  isShortlisted ? "fill-amber-400 text-amber-400" : "text-white"
+                  "object-cover object-[center_18%] transition-all duration-500",
+                  match.blurPhoto ? "blur-xl scale-110" : "hover:scale-105"
                 )}
+                sizes="(max-width: 1200px) 300px, 330px"
               />
-            </button>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
+            </Link>
 
-            {/* Name overlay */}
-            <div className="absolute inset-x-0 bottom-0 p-3.5 pb-8 text-white">
-              <h2 className="font-serif text-[1.35rem] font-bold leading-tight flex items-center gap-1.5">
-                <span>{match.fullName}, {match.age}</span>
-                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1d9bf0] text-white shadow-sm ring-1 ring-white/30">
-                  <Check className="h-2.5 w-2.5 stroke-[3]" />
+            {/* Top Photo Badges */}
+            <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-2.5">
+              <div className="flex flex-col items-start gap-1">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/95 px-2.5 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-xs">
+                  <Star className="h-3 w-3 fill-current" /> {match.matchPercent || 92}% match
                 </span>
-              </h2>
-              <p className="mt-1 flex items-center gap-1 text-xs text-white/90">
-                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">
-                  {[match.city, formattedCommunity, formattedHeight].filter(Boolean).join(" · ")}
-                </span>
-              </p>
-              <p className="mt-0.5 truncate text-[11px] text-white/75">
-                {[education, formattedProfession].filter(Boolean).join(" · ")}
-              </p>
-            </div>
-          </Link>
+                {match.photoVerified && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-xs border border-white/10">
+                    <BadgeCheck className="h-3 w-3 text-secondary" /> Verified
+                  </span>
+                )}
+              </div>
 
-          {/* Dots */}
-          {photos.length > 1 && (
-            <div className="absolute bottom-3.5 left-3.5 z-10 flex gap-1">
-              {photos.map((_: any, i: number) => (
+              <div className="flex items-center gap-1.5">
+                <PlanCrownBadge plan={match.planSlug || match.plan || match.membership || (match.isVip ? "gold" : null)} />
                 <button
-                  key={i}
                   type="button"
-                  onClick={() => setActivePhoto(i)}
-                  aria-label={`Photo ${i + 1}`}
-                  className={cn(
-                    "h-1.5 rounded-full transition-all",
-                    activePhoto === i ? "w-5 bg-white" : "w-1.5 bg-white/45"
-                  )}
-                />
-              ))}
+                  onClick={handleToggleShortlist}
+                  disabled={toggleShortlistMutation.isPending}
+                  aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition hover:bg-black/75 hover:scale-105 active:scale-95 border border-white/20"
+                >
+                  <Bookmark
+                    className={cn(
+                      "h-3.5 w-3.5 transition-colors",
+                      isShortlisted ? "fill-amber-400 text-amber-400" : "text-white"
+                    )}
+                  />
+                </button>
+              </div>
             </div>
-          )}
 
-          {/* Arrows */}
-          {photos.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={prevPhoto}
-                aria-label="Previous photo"
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur transition hover:bg-black/70"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={nextPhoto}
-                aria-label="Next photo"
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur transition hover:bg-black/70"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </>
-          )}
-        </div>
+            {/* Bottom photo controls (prev/next + photo count) */}
+            <div className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-between p-2.5">
+              {photos.length > 1 ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={prevPhoto}
+                    aria-label="Previous photo"
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition hover:bg-black/75"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={nextPhoto}
+                    aria-label="Next photo"
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition hover:bg-black/75"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : <div />}
 
-        {/* Details column */}
-        <div className="flex flex-col justify-between gap-3 p-4">
-          <div className="flex flex-wrap gap-1.5">
-            {featured && (
-              <Badge variant="secondary" className="text-[11px] font-bold">
-                <Sparkles className="h-3 w-3" /> Top
-              </Badge>
-            )}
-            {match.joinedDaysAgo <= 7 && (
-              <Badge className="border-transparent bg-primary text-[11px] font-bold text-white">New</Badge>
-            )}
-            {match.premium && (
-              <Badge className="border-transparent bg-[#b8901f] text-[11px] font-bold text-white">
-                <Sparkles className="h-3 w-3" /> Premium
-              </Badge>
-            )}
-            {["Online now", "Today", "2 hours ago"].includes(match.lastActive) && (
-              <Badge
-                variant="outline"
-                className="border-emerald-200 bg-emerald-50 text-[11px] font-semibold text-emerald-800"
-              >
-                <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active today
-              </Badge>
-            )}
+              <div className="flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur border border-white/10">
+                <ImageIcon className="h-3 w-3" />
+                <span>{activePhoto + 1}/{photos.length || 1}</span>
+              </div>
+            </div>
           </div>
 
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-            <Detail label="Education" value={match.education} />
-            <Detail label="Profession" value={match.occupation} />
-            <Detail label="Company" value={match.company} />
-            <Detail label="Income" value={match.income} />
-            <Detail label="Mother tongue" value={match.motherTongue} />
-            <Detail label="Last active" value={match.lastActive} />
-          </dl>
+          <div className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-[11px] font-medium text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+            <span>ID: {match.id?.slice(0, 8).toUpperCase()}</span>
+          </div>
+        </div>
 
-          <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">{match.about}</p>
+        {/* Right: Details and Action Column */}
+        <div className="flex-1 min-w-0 p-5 lg:p-6 flex flex-col justify-between gap-4">
+          {/* Header Row */}
+          <div>
+            <div className="flex flex-wrap items-start justify-between gap-2.5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/profiles/${match.id}`}
+                    className="font-serif text-2xl lg:text-[1.65rem] font-bold text-foreground hover:text-primary transition-colors flex items-center gap-2"
+                  >
+                    <span>{match.fullName}, {match.age}</span>
+                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1d9bf0] text-white shadow-xs ring-1 ring-white/30" title="Verified Profile">
+                      <Check className="h-2.5 w-2.5 stroke-[3]" />
+                    </span>
+                  </Link>
+                </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-10 border border-border"
-              onClick={() => onSkip(match.id)}
-            >
-              Skip
-            </Button>
-            <Link href={`/profiles/${match.id}`} className="min-w-0">
-              <Button variant="outline" size="sm" className="h-10 w-full">
-                View
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs sm:text-sm font-medium text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 text-foreground/90 font-semibold">
+                    <MapPin className="h-3.5 w-3.5 text-primary" /> {match.city || "City not specified"}
+                  </span>
+                  {formattedCommunity && (
+                    <>
+                      <span>•</span>
+                      <span>{formattedCommunity}</span>
+                    </>
+                  )}
+                  {formattedHeight && (
+                    <>
+                      <span>•</span>
+                      <span>{formattedHeight}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Badges on the right */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {featured && (
+                  <Badge variant="secondary" className="text-xs font-bold bg-amber-50 text-amber-900 border-amber-200">
+                    <Sparkles className="mr-1 h-3 w-3 text-amber-600" /> Top
+                  </Badge>
+                )}
+                {["Online now", "Today", "2 hours ago"].includes(match.lastActive) && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active today
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Bento Attribute Tiles */}
+            <div className="mt-4 grid grid-cols-2 lg:grid-cols-3 gap-2.5">
+              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
+                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <GraduationCap className="h-3.5 w-3.5 text-primary" /> Education
+                </dt>
+                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground" title={match.education}>
+                  {match.education || "Not specified"}
+                </dd>
+              </div>
+
+              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
+                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <Briefcase className="h-3.5 w-3.5 text-primary" /> Profession
+                </dt>
+                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground" title={match.occupation}>
+                  {match.occupation || "Not specified"}
+                </dd>
+              </div>
+
+              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
+                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <Building2 className="h-3.5 w-3.5 text-primary" /> Company
+                </dt>
+                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground" title={match.company}>
+                  {match.company || "Not specified"}
+                </dd>
+              </div>
+
+              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
+                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <Coins className="h-3.5 w-3.5 text-primary" /> Annual Income
+                </dt>
+                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground">
+                  {match.income || "Not specified"}
+                </dd>
+              </div>
+
+              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
+                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <Languages className="h-3.5 w-3.5 text-primary" /> Mother Tongue
+                </dt>
+                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground">
+                  {match.motherTongue || "Tamil"}
+                </dd>
+              </div>
+
+              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
+                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <Users className="h-3.5 w-3.5 text-primary" /> Profile For
+                </dt>
+                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground">
+                  {match.profileFor ? `For ${match.profileFor}` : "Self / Family"}
+                </dd>
+              </div>
+            </div>
+
+            {/* About / Personal Note */}
+            <div className="mt-3 rounded-xl border border-border/60 bg-muted/30 p-3 text-xs leading-relaxed text-foreground/85">
+              <p className="line-clamp-2">
+                {match.about || "Profile created by staff on behalf of the family. Looking for an understanding partner from a good family background."}
+              </p>
+            </div>
+          </div>
+
+          {/* Footer Action Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/60">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+              <span>Last active: {match.lastActive || "Online now"}</span>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 rounded-xl px-4 text-xs font-semibold hover:bg-muted text-muted-foreground hover:text-foreground"
+                onClick={() => onSkip(match.id)}
+              >
+                Skip
               </Button>
-            </Link>
-            <ConnectButton profileId={match.id} size="sm" className="h-10 w-full" />
+              <Link href={`/profiles/${match.id}`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 rounded-xl border-secondary/40 px-4 text-xs font-semibold hover:bg-secondary/10 text-primary"
+                >
+                  View Profile
+                </Button>
+              </Link>
+              <ConnectButton
+                profileId={match.id}
+                size="sm"
+                className="h-10 rounded-xl px-5 text-xs font-semibold shadow-xs"
+              />
+            </div>
           </div>
         </div>
       </div>

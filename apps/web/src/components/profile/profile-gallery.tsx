@@ -4,6 +4,7 @@ import * as React from "react"
 import Image from "next/image"
 import { BadgeCheck, ChevronLeft, ChevronRight, FileText, MapPin, ShieldCheck, X } from "lucide-react"
 import { cn, getMediaUrl } from "@/lib/utils"
+import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
 
 type ProfileGalleryProps = {
   name: string
@@ -16,6 +17,7 @@ type ProfileGalleryProps = {
   verified?: boolean
   hasHoroscope?: boolean
   blurPhoto?: boolean
+  plan?: string | null
 }
 
 type BadgeKey = "photo" | "screened" | "horoscope"
@@ -46,6 +48,7 @@ export function ProfileGallery({
   verified,
   hasHoroscope,
   blurPhoto,
+  plan,
 }: ProfileGalleryProps) {
   const [activeIndex, setActiveIndex] = React.useState(0)
   const [lightboxOpen, setLightboxOpen] = React.useState(false)
@@ -137,7 +140,8 @@ export function ProfileGallery({
             </>
           )}
 
-          <div className="absolute left-2.5 right-2.5 top-2.5 z-20 flex flex-wrap gap-1.5">
+          <div className="absolute left-2.5 right-2.5 top-2.5 z-20 flex flex-wrap items-center gap-1.5">
+            <PlanCrownBadge plan={plan} />
             {photoVerified && (
               <button
                 type="button"
