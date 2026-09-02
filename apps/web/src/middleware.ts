@@ -1,13 +1,20 @@
 import NextAuth from "next-auth"
 import { authConfig } from "./auth.config"
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
 
 const { auth } = NextAuth(authConfig)
 
-export default auth((req) => {
-  const token = req.cookies.get("astalakshimi.auth_token")?.value
-  const isLoggedIn = !!req.auth || !!token
+export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
+  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
+  
+  if (isAdminRoute) {
+    // Let NextAuth handle admin routes
+    return (auth as any)(req)
+  }
+
+  const token = req.cookies.get("astalakshimi.auth_token")?.value
+  const isLoggedIn = !!token
 
   // List of public routes that don't require authentication
   const publicRoutes = ["/login", "/register", "/"]
@@ -16,10 +23,7 @@ export default auth((req) => {
   // API auth routes must always be accessible
   const isApiAuthRoute = pathname.startsWith("/api/auth")
 
-  // Staff console has its own session (not member NextAuth)
-  const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
-
-  if (isApiAuthRoute || isAdminRoute) {
+  if (isApiAuthRoute) {
     return NextResponse.next()
   }
 
@@ -44,7 +48,7 @@ export default auth((req) => {
   }
 
   return NextResponse.next()
-})
+}
 
 // Skip auth for Next internals, API, and static public assets (images, icons, manifest)
 export const config = {
