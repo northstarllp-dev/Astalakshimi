@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
         value: data.accessToken,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         path: '/',
         maxAge: 30 * 24 * 60 * 60, // 30 days
       });
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
           value: data.refreshToken,
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: 'lax',
           path: '/',
           maxAge: 7 * 24 * 60 * 60, // 7 days
         });
