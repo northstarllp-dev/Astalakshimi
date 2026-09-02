@@ -178,9 +178,11 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
                 <Ruler className="h-3.5 w-3.5 text-primary" /> {profile.height}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
-                <GraduationCap className="h-3.5 w-3.5 text-primary" /> {profile.education.split(" ")[0].trim()}
-              </span>
+              {profile.education && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
+                  <GraduationCap className="h-3.5 w-3.5 text-primary" /> {profile.education.split(" ")[0].trim()}
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
                 <Briefcase className="h-3.5 w-3.5 text-primary" /> {profile.occupation}
               </span>
