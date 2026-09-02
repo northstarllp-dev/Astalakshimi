@@ -159,7 +159,13 @@ export function CityAutocomplete({
   const trimmed = debouncedQuery.trim()
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) setQuery(city)
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"

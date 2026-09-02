@@ -41,6 +41,9 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react"
+import { CityAutocomplete } from "@/components/profile/city-autocomplete"
+import { SearchableSelect } from "@/components/profile/searchable-select"
+import { COMMUNITY_MASTER_DATA } from "@/lib/community-data"
 
 const HEIGHT_BANDS = ["Up to 5'4\"", "5'5\" – 5'8\"", "5'9\" & above"]
 const EDUCATION_GROUPS = ["B.Tech", "B.E", "MBA", "M.Sc", "Ph.D", "M.Phil", "Post Doctorate", "Others"]
@@ -166,8 +169,15 @@ function DiscoverPage() {
     setPage(1)
   }
 
-  const cities = ["Chennai", "Coimbatore", "Madurai", "Trichy", "Salem", "Tirunelveli", "Bengaluru", "Hyderabad", "Mumbai", "Delhi"]
-  const communities = ["Brahmin - Iyer", "Brahmin - Iyengar", "Chettiar", "Gounder", "Vanniyar", "Thevar", "Nadar", "Mudaliar", "Pillai", "Naidu", "Yadav", "Other"]
+  const communityOptions = React.useMemo(() => {
+    const list = Array.from(
+      new Set(COMMUNITY_MASTER_DATA.communities.map((c) => c.name))
+    ).sort((a, b) => a.localeCompare(b))
+    return [
+      { value: "", label: "Any community" },
+      ...list.map((c) => ({ value: c, label: c })),
+    ]
+  }, [])
   const occupations = ["Software Engineer", "Doctor", "Engineer - Non IT", "Teacher / Professor", "Business Owner", "Banker / Finance", "Government Service", "Defense", "Lawyer", "Other"]
   const incomes = INCOME_BANDS
   const diets = DIETS
@@ -217,72 +227,130 @@ function DiscoverPage() {
               </div>
       )}
 
-      {/* Quick search  3 fields, live */}
-      <section className="mb-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+      {/* Quick search — 3 fields, live */}
+      <section className="mb-4 rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Age range</span>
-            <div className="mt-2 flex items-center gap-3">
-              <input
-                type="range"
-                min={18}
-                max={50}
-                value={query.ageMin}
-                onChange={(e) => {
-                  const ageMin = Math.min(Number(e.target.value), query.ageMax)
-                  setQuick({ ageMin })
-                }}
-                className="w-full accent-primary"
-                aria-label="Minimum age"
-              />
-              <input
-                type="range"
-                min={18}
-                max={50}
-                value={query.ageMax}
-                onChange={(e) => {
-                  const ageMax = Math.max(Number(e.target.value), query.ageMin)
-                  setQuick({ ageMax })
-                }}
-                className="w-full accent-primary"
-                aria-label="Maximum age"
-              />
+          {/* 1. Age Range */}
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Age range
+              </span>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary tabular-nums">
+                {query.ageMin} – {query.ageMax} yrs
+              </span>
             </div>
-            <p className="mt-1 text-sm font-semibold text-primary">
-              {query.ageMin} – {query.ageMax} yrs
-            </p>
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</span>
-            <select
-              value={query.city}
-              onChange={(e) => setQuick({ city: e.target.value })}
-              className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Any city</option>
-              {cities.map((city: any) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Community</span>
-            <select
-              value={query.community}
-              onChange={(e) => setQuick({ community: e.target.value })}
-              className="mt-2 h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Any community</option>
-              {communities.map((c: any) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="mt-2 flex h-12 items-center rounded-xl border border-input bg-card px-4 shadow-xs">
+              <div className="flex w-full items-center gap-3">
+                <span className="text-xs font-medium text-muted-foreground tabular-nums">18</span>
+                <input
+                  type="range"
+                  min={18}
+                  max={50}
+                  value={query.ageMin}
+                  onChange={(e) => {
+                    const ageMin = Math.min(Number(e.target.value), query.ageMax)
+                    setQuick({ ageMin })
+                  }}
+                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-[#7c1535]"
+                  aria-label="Minimum age"
+                />
+                <input
+                  type="range"
+                  min={18}
+                  max={50}
+                  value={query.ageMax}
+                  onChange={(e) => {
+                    const ageMax = Math.max(Number(e.target.value), query.ageMin)
+                    setQuick({ ageMax })
+                  }}
+                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-[#7c1535]"
+                  aria-label="Maximum age"
+                />
+                <span className="text-xs font-medium text-muted-foreground tabular-nums">50</span>
+              </div>
+            </div>
           </div>
+
+          {/* 2. Location (CityAutocomplete like in Edit Profile) */}
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Location
+              </span>
+              {query.city ? (
+                <button
+                  type="button"
+                  onClick={() => setQuick({ city: "" })}
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+            <div className="relative mt-2">
+              <CityAutocomplete
+                city={query.city}
+                onCityChange={({ city }) => setQuick({ city })}
+                placeholder="Any city"
+                searchPlaceholder="Search city (e.g. Chennai, Bengaluru)…"
+                className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm"
+              />
+              {query.city ? (
+                <button
+                  type="button"
+                  onClick={() => setQuick({ city: "" })}
+                  className="absolute right-9 top-1/2 -translate-y-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition"
+                  aria-label="Clear location"
+                  title="Clear location"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* 3. Community (SearchableSelect like in Edit Profile) */}
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Community
+              </span>
+              {query.community ? (
+                <button
+                  type="button"
+                  onClick={() => setQuick({ community: "" })}
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+            <div className="relative mt-2">
+              <SearchableSelect
+                value={query.community}
+                onValueChange={(community) => setQuick({ community })}
+                options={communityOptions}
+                placeholder="Any community"
+                searchPlaceholder="Search or type community…"
+                emptyText="No matching community found."
+                allowCustom={true}
+                className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm"
+              />
+              {query.community ? (
+                <button
+                  type="button"
+                  onClick={() => setQuick({ community: "" })}
+                  className="absolute right-9 top-1/2 -translate-y-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition"
+                  aria-label="Clear community"
+                  title="Clear community"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" variant="soft" size="sm" onClick={applyPreferences}>

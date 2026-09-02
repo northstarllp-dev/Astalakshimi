@@ -21,6 +21,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react"
+import { ReferAndEarnCard } from "@/components/dashboard/refer-and-earn-card"
 
 const TIER_ORDER: PlanId[] = ["free", "silver", "gold", "platinum", "diamond"]
 const RENEWAL_WINDOW_DAYS = 7
@@ -45,23 +46,11 @@ const formatQuotaUsage = (used: number, limit: number | null | undefined) => {
   return `${used} / ${limit}`
 }
 
-const getOrCreateReferralCode = (name?: string) => {
-  const clean = (name || "member").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase()
-  return `ASTA-${clean || "MEMBER"}-2026`
-}
-
-const getReferralLink = (code: any) => {
-  if (typeof window === "undefined") return `https://astalakshimi.com/register?ref=${code}`
-  return `${window.location.origin}/register?ref=${code}`
-}
-
 const shouldShowRenewal = (date: any) => {
   if (!date) return false
   const days = daysRemaining(date)
   return days > 0 && days <= RENEWAL_WINDOW_DAYS
 }
-
-
 
 const getNextBetterPlan = (planId: PlanId): PlanId => {
   const idx = TIER_ORDER.indexOf(planId)
@@ -76,9 +65,6 @@ export default function PlansPage() {
   const { data: invoices = [] } = useInvoicesQuery()
   const { data: contactUsage } = useContactUsageQuery()
   const { data: interestUsage } = useInterestUsageQuery()
-  const [referralCode, setReferralCode] = React.useState("")
-  const [referralLink, setReferralLink] = React.useState("")
-  const [copied, setCopied] = React.useState(false)
 
   const currentPlanId: PlanId = React.useMemo(() => {
     if (!sub) return "free"
@@ -87,12 +73,6 @@ export default function PlansPage() {
   }, [sub])
 
   const [selectedCompare, setSelectedCompare] = React.useState<PlanId>("silver")
-
-  React.useEffect(() => {
-    const code = getOrCreateReferralCode(profile?.fullName || profile?.phone || "member")
-    setReferralCode(code)
-    setReferralLink(getReferralLink(code))
-  }, [profile])
 
   React.useEffect(() => {
     const nextBetter = getNextBetterPlan(currentPlanId)
@@ -116,32 +96,6 @@ export default function PlansPage() {
     const parsed = planSelectSchema.safeParse({ planId })
     if (!parsed.success) return
     router.push(`/checkout?plan=${parsed.data.planId}`)
-  }
-
-  const copyReferral = async () => {
-    try {
-      await navigator.clipboard.writeText(referralLink)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1800)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  const shareReferral = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Astalakshimi Matrimony",
-          text: "Join Astalakshimi  use my link and we both benefit. You get started free; I get 1 month Silver.",
-          url: referralLink,
-        })
-        return
-      } catch {
-        /* fall through to copy */
-      }
-    }
-    await copyReferral()
   }
 
   return (
@@ -348,29 +302,7 @@ export default function PlansPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-3xl border border-secondary/30 bg-[#fff9f2] p-5 md:p-6">
-          <div className="flex items-center gap-2 text-primary">
-            <Gift className="h-5 w-5" />
-            <p className="royal-label">Refer and earn</p>
-          </div>
-          <h2 className="mt-2 font-serif text-2xl font-bold">Refer a friend → get 1 month Silver free</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Share your unique link. When they complete signup with your code, you earn 1 month of Silver.
-          </p>
-          <div className="mt-4 rounded-2xl border border-border bg-card p-3">
-            <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Your referral code</p>
-            <p className="mt-1 font-mono text-lg font-bold text-primary">{referralCode || "…"}</p>
-            <p className="mt-2 break-all text-xs text-muted-foreground">{referralLink || "Generating link…"}</p>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => void shareReferral()}>
-              <Share2 className="mr-2 h-4 w-4" /> Share link
-            </Button>
-            <Button variant="outline" onClick={() => void copyReferral()}>
-              <Copy className="mr-2 h-4 w-4" /> {copied ? "Copied" : "Copy link"}
-            </Button>
-          </div>
-        </div>
+        <ReferAndEarnCard />
 
         <div className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
           <div className="flex items-center gap-2">

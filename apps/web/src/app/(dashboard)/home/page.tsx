@@ -21,7 +21,18 @@ import {
   useTopMatchesQuery,
 } from "@/hooks/queries"
 import { cn, getMediaUrl } from "@/lib/utils"
-import { AlertCircle, ChevronRight, Clock3, Lock, ShieldCheck } from "lucide-react"
+import {
+  AlertCircle,
+  ChevronRight,
+  Clock3,
+  Compass,
+  Crown,
+  Lock,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react"
+import { ReferAndEarnCard } from "@/components/dashboard/refer-and-earn-card"
 
 function InboxTile({
   label,
@@ -253,6 +264,62 @@ export default function HomePage() {
                 </>
               )}
             </section>
+
+            {/* Refer and Earn Card (Matching screenshot) */}
+            <ReferAndEarnCard />
+
+            {/* Matrimony Essentials & Shortcuts */}
+            <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div>
+                  <h2 className="font-serif text-lg font-bold text-foreground">Essentials & Shortcuts</h2>
+                  <p className="text-xs text-muted-foreground">Quick access to essential tools for your match search</p>
+                </div>
+                <span className="hidden sm:inline-block rounded-full bg-secondary/15 px-2.5 py-0.5 text-xs font-semibold text-secondary">
+                  Recommended
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <Link
+                  href="/dashboard"
+                  className="group rounded-xl border border-border/80 bg-muted/20 p-3.5 hover:border-primary/40 hover:bg-muted/50 transition"
+                >
+                  <div className="flex items-center gap-2 font-semibold text-sm text-primary">
+                    <Compass className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+                    <span>Discover Matches</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    Filter by age, community, city, education, and lifestyle preferences.
+                  </p>
+                </Link>
+
+                <Link
+                  href="/profile/edit#horoscope"
+                  className="group rounded-xl border border-border/80 bg-muted/20 p-3.5 hover:border-primary/40 hover:bg-muted/50 transition"
+                >
+                  <div className="flex items-center gap-2 font-semibold text-sm text-primary">
+                    <Sparkles className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+                    <span>Horoscope & Star</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    Verify Raasi, Nakshatram, and Porutham compatibility with matches.
+                  </p>
+                </Link>
+
+                <Link
+                  href="/settings"
+                  className="group rounded-xl border border-border/80 bg-muted/20 p-3.5 hover:border-primary/40 hover:bg-muted/50 transition"
+                >
+                  <div className="flex items-center gap-2 font-semibold text-sm text-primary">
+                    <Shield className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+                    <span>Privacy Controls</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    Hide from specific cities or members and manage phone visibility.
+                  </p>
+                </Link>
+              </div>
+            </section>
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-20">
@@ -315,6 +382,33 @@ export default function HomePage() {
                   </Button>
                 </Link>
               </div>
+            </section>
+
+            {/* Assisted Matchmaking Service */}
+            <section className="rounded-xl border border-secondary/25 bg-[#fffbf4] p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-primary">
+                <Crown className="h-4 w-4 text-[#b8901f]" />
+                <h3 className="font-serif text-sm font-bold text-foreground">Assisted Matchmaking</h3>
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                Prefer a dedicated relationship manager? Get curated introductions and until-marriage support.
+              </p>
+              <Link href="/plans" className="mt-3 block">
+                <Button variant="soft" size="sm" className="w-full text-xs h-8">
+                  View Assisted Plans
+                </Button>
+              </Link>
+            </section>
+
+            {/* Trust & Safety Guarantee */}
+            <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-primary">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                <h3 className="font-serif text-sm font-bold text-foreground">100% Verified Community</h3>
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                Manual identity screening & photo verification protect your privacy. Genuine profiles only.
+              </p>
             </section>
           </aside>
         </div>

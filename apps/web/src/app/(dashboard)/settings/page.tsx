@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { usePaidQuery, useProfileQuery, useSaveSettingsMutation, useSettingsQuery } from "@/hooks/queries"
+import { CityAutocomplete } from "@/components/profile/city-autocomplete"
 import { ArrowLeft, Lock, LogOut, MapPin, UserX, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -27,7 +28,6 @@ export default function SettingsPage() {
   const saveMutation = useSaveSettingsMutation()
   const phone = profile?.phone || ""
   const [hideUserInput, setHideUserInput] = React.useState("")
-  const [hideCityInput, setHideCityInput] = React.useState("")
 
   const update = (partial: Partial<UserSettings>) => {
     if (!settings) return
@@ -175,27 +175,16 @@ export default function SettingsPage() {
         )}
         {paid ? (
           <div className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                value={hideCityInput}
-                onChange={(e) => setHideCityInput(e.target.value)}
-                placeholder="e.g. Bengaluru"
-                className="flex-1"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!hideCityInput.trim()}
-                onClick={() => {
-                  if (!hideCityInput.trim() || settings.hideFromCities.includes(hideCityInput.trim())) return
-                  update({ hideFromCities: [...settings.hideFromCities, hideCityInput.trim()] })
-                  setHideCityInput("")
-                }}
-              >
-                Add
-              </Button>
-            </div>
+            <CityAutocomplete
+              city=""
+              placeholder="Search city to hide from…"
+              searchPlaceholder="Type city name (e.g. Bengaluru)…"
+              onCityChange={({ city }) => {
+                const trimmed = city?.trim()
+                if (!trimmed || settings.hideFromCities.includes(trimmed)) return
+                update({ hideFromCities: [...settings.hideFromCities, trimmed] })
+              }}
+            />
             {settings.hideFromCities.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {settings.hideFromCities.map((city: any) => (
