@@ -27,7 +27,14 @@ describe('Feature 4: Payments & Subscriptions - PaymentsService (Unit Tests)', (
       get: jest.fn((key: string) => {
         if (key === 'RAZORPAY_KEY_ID') return 'rzp_test_key123';
         if (key === 'RAZORPAY_KEY_SECRET') return mockSecret;
+        if (key === 'payments.razorpayKeyId') return 'rzp_test_key123';
+        if (key === 'payments.razorpayKeySecret') return mockSecret;
         return null;
+      }),
+      getOrThrow: jest.fn((key: string) => {
+        if (key === 'payments.razorpayKeyId') return 'rzp_test_key123';
+        if (key === 'payments.razorpayKeySecret') return mockSecret;
+        return 'test';
       }),
     };
 

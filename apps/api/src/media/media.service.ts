@@ -4,6 +4,7 @@ import type { Database } from '@astalakshimi/database';
 import { profiles, profilePhotos, verifications, horoscopes } from '@astalakshimi/database';
 import { eq, and } from 'drizzle-orm';
 import { S3Provider } from './providers/s3.provider';
+import { isOwnedPhotoKey } from '../common/photo-access';
 import type {
   PresignedUploadInput,
   ConfirmPhotoInput,
@@ -49,14 +50,6 @@ export class MediaService {
     };
   }
 
-  async getSignedMediaUrl(s3Key: string): Promise<string> {
-    return this.s3Provider.getSignedMediaUrl(s3Key);
-  }
-
-  getDemoMedia(s3Key: string) {
-    return this.s3Provider.getDemoObject(s3Key);
-  }
-
   async confirmPhoto(userId: string, input: ConfirmPhotoInput) {
     const [profile] = await this.db
       .select({ id: profiles.id })
@@ -66,6 +59,12 @@ export class MediaService {
 
     if (!profile) {
       throw new NotFoundException('Profile not found. Please create your profile first.');
+    }
+
+    // Reject keys that were not minted for this user — otherwise anyone can
+    // attach another user's (publicly readable) object as their own photo.
+    if (!isOwnedPhotoKey(input.s3Key, userId, 'profile_photo')) {
+      throw new BadRequestException('s3Key must be a profile photo uploaded through your own presigned URL');
     }
 
     if (input.isPrimary) {
@@ -102,6 +101,14 @@ export class MediaService {
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
+    }
+
+    if (input.selfieS3Key && !isOwnedPhotoKey(input.selfieS3Key, userId, 'selfie')) {
+      throw new BadRequestException('selfieS3Key must be a selfie uploaded through your own presigned URL');
+    }
+
+    if (input.govtIdS3Key && !isOwnedPhotoKey(input.govtIdS3Key, userId, 'govt_id')) {
+      throw new BadRequestException('govtIdS3Key must be an ID uploaded through your own presigned URL');
     }
 
     const [verification] = await this.db
@@ -144,6 +151,10 @@ export class MediaService {
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
+    }
+
+    if (!isOwnedPhotoKey(input.horoscopeS3Key, userId, 'horoscope')) {
+      throw new BadRequestException('horoscopeS3Key must be a horoscope uploaded through your own presigned URL');
     }
 
     const [horoscope] = await this.db

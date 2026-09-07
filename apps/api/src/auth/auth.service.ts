@@ -1,13 +1,23 @@
 import * as crypto from 'crypto';
-import { Injectable, BadRequestException, UnauthorizedException, Inject, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+  Inject,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { users, profiles, otpAttempts } from '@astalakshimi/database';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, gte, sql } from 'drizzle-orm';
 import type { SendOtpInput, VerifyOtpInput } from '@astalakshimi/validation';
 import type { AuthResponse, User } from '@astalakshimi/types';
+import { SmsService } from './sms.service';
+
+const sha256 = (value: string) => crypto.createHash('sha256').update(value).digest('hex');
 
 @Injectable()
 export class AuthService {
@@ -17,6 +27,7 @@ export class AuthService {
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly smsService: SmsService,
   ) {}
 
   async sendOtp(input: SendOtpInput): Promise<{ message: string; mockOtp?: string }> {
@@ -32,27 +43,52 @@ export class AuthService {
     }
     
     const mockEnabled = this.configService.get<boolean>('auth.mockOtpEnabled');
-    const defaultMockOtp = this.configService.get<string>('auth.defaultMockOtp') || '123456';
     const ttlSeconds = this.configService.get<number>('auth.otpTtlSeconds') || 300;
 
-    // Generate 6 digit OTP (mock or random)
-    const otp = mockEnabled ? defaultMockOtp : Math.floor(100000 + Math.random() * 900000).toString();
+    // Per-phone send cap (SMS-pumping protection) independent of per-IP throttling
+    const windowSeconds = this.configService.get<number>('auth.otpSendWindowSeconds') || 600;
+    const maxPerWindow = this.configService.get<number>('auth.otpMaxPerPhonePerWindow') || 3;
+    const [recent] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(otpAttempts)
+      .where(
+        and(eq(otpAttempts.phone, formattedPhone), gte(otpAttempts.createdAt, new Date(Date.now() - windowSeconds * 1000))),
+      );
+    if (recent && recent.count >= maxPerWindow) {
+      throw new BadRequestException('Too many OTP requests. Please try again in a few minutes.');
+    }
+
+    const otp = mockEnabled
+      ? this.configService.get<string>('auth.defaultMockOtp') || '123456'
+      : crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+    const hashedOtp = sha256(otp);
 
     await this.db.insert(otpAttempts).values({
       phone: formattedPhone,
-      otpHash: hashedOtp, 
+      otpHash: hashedOtp,
       expiresAt,
       consentAccepted: input.consentAccepted ?? false,
       referredBy: input.referredBy,
     });
 
-    this.logger.log(`[OTP] Generated OTP for ${formattedPhone}: ${mockEnabled ? otp : '******'} (expires in ${ttlSeconds}s)`);
+    if (mockEnabled) {
+      this.logger.log(`[OTP] Mock OTP generated for ${formattedPhone} (expires in ${ttlSeconds}s)`);
+      return {
+        message: `OTP sent successfully to ${formattedPhone}`,
+        mockOtp: otp,
+      };
+    }
+
+    try {
+      await this.smsService.sendOtp(formattedPhone, otp);
+    } catch (e) {
+      this.logger.error(`[OTP] SMS delivery failed for ${formattedPhone}: ${e instanceof Error ? e.message : e}`);
+      throw new InternalServerErrorException('Failed to send OTP. Please try again shortly.');
+    }
 
     return {
       message: `OTP sent successfully to ${formattedPhone}`,
-      ...(mockEnabled && { mockOtp: otp }),
     };
   }
 
@@ -73,84 +109,39 @@ export class AuthService {
       throw new BadRequestException('OTP has expired or already used. Please request a new OTP.');
     }
 
-    if (pending.attempts >= 5) {
+    if (pending.attempts >= pending.maxAttempts) {
       throw new BadRequestException('Maximum attempts reached. Please request a new OTP.');
     }
 
-    const hashedInput = crypto.createHash('sha256').update(input.otp).digest('hex');
+    const hashedInput = sha256(input.otp);
 
     if (pending.otpHash !== hashedInput) {
-      // Increment attempts
-      await this.db.update(otpAttempts)
-        .set({ attempts: pending.attempts + 1 })
-        .where(eq(otpAttempts.id, pending.id));
-        
+      // Atomic increment so parallel guesses cannot exceed the attempt cap
+      const [updated] = await this.db
+        .update(otpAttempts)
+        .set({ attempts: sql`${otpAttempts.attempts} + 1` })
+        .where(eq(otpAttempts.id, pending.id))
+        .returning({ attempts: otpAttempts.attempts });
+
+      if (updated && updated.attempts >= pending.maxAttempts) {
+        throw new BadRequestException('Maximum attempts reached. Please request a new OTP.');
+      }
       throw new BadRequestException('Invalid OTP. Please check and try again.');
     }
 
     // OTP is valid - mark as verified
-    await this.db.update(otpAttempts)
-      .set({ verified: true })
-      .where(eq(otpAttempts.id, pending.id));
+    await this.db.update(otpAttempts).set({ verified: true }).where(eq(otpAttempts.id, pending.id));
 
-    // Look up or create user
-    const [existingUser] = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.phone, formattedPhone))
-      .limit(1);
+    const { user, isNewUser } = await this.findOrCreateUser(formattedPhone, pending.consentAccepted, pending.referredBy ?? undefined);
+    const hasProfile = await this.userHasProfile(user.id);
 
-    let user: User;
-    let isNewUser = false;
+    const { accessToken, refreshToken } = this.issueTokens(user);
 
-    if (!existingUser) {
-      isNewUser = true;
-      const [newUser] = await this.db
-        .insert(users)
-        .values({
-          phone: formattedPhone,
-          isPhoneVerified: true,
-          consentAccepted: pending.consentAccepted,
-          consentTimestamp: new Date(),
-          referredBy: pending.referredBy,
-          role: 'member',
-          status: 'active',
-        })
-        .returning();
-      user = newUser as unknown as User;
-    } else {
-      const [updated] = await this.db
-        .update(users)
-        .set({
-          isPhoneVerified: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, existingUser.id))
-        .returning();
-      user = updated as unknown as User;
-    }
-
-    // Check if user has an existing profile
-    const [existingProfile] = await this.db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(eq(profiles.userId, user.id))
-      .limit(1);
-
-    const hasProfile = Boolean(existingProfile);
-
-    // Issue JWT Access Token
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
-      phone: user.phone,
-      role: user.role,
-    });
-
-    // Issue JWT Refresh Token
-    const refreshToken = this.jwtService.sign({
-      sub: user.id,
-      type: 'refresh',
-    }, { expiresIn: '7d' });
+    // Persist the refresh token hash so the token can be rotated and revoked server-side
+    await this.db
+      .update(users)
+      .set({ refreshTokenHash: sha256(refreshToken), updatedAt: new Date() })
+      .where(eq(users.id, user.id));
 
     return {
       accessToken,
@@ -172,61 +163,129 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    const hasProfile = await this.userHasProfile(userId);
+
+    return {
+      user: user as unknown as User,
+      hasProfile,
+    };
+  }
+
+  async refreshToken(token: string): Promise<AuthResponse> {
+    let payload: { sub: string; type?: string };
+    try {
+      payload = this.jwtService.verify(token);
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (payload.type !== 'refresh' || !payload.sub) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, payload.sub))
+      .limit(1);
+
+    if (!user || user.status !== 'active') {
+      throw new UnauthorizedException('User not found or inactive');
+    }
+
+    // Reuse detection: a rotated or revoked refresh token no longer matches the stored hash
+    if (!user.refreshTokenHash || user.refreshTokenHash !== sha256(token)) {
+      await this.db.update(users).set({ refreshTokenHash: null }).where(eq(users.id, user.id));
+      throw new UnauthorizedException('Session expired or revoked. Please log in again.');
+    }
+
+    const hasProfile = await this.userHasProfile(user.id);
+
+    const { accessToken, refreshToken } = this.issueTokens(user);
+    await this.db
+      .update(users)
+      .set({ refreshTokenHash: sha256(refreshToken), updatedAt: new Date() })
+      .where(eq(users.id, user.id));
+
+    return {
+      accessToken,
+      refreshToken,
+      user: user as unknown as User,
+      isNewUser: false,
+      hasProfile,
+    };
+  }
+
+  async logout(userId: string): Promise<{ success: boolean }> {
+    await this.db
+      .update(users)
+      .set({ refreshTokenHash: null, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+    return { success: true };
+  }
+
+  private issueTokens(user: { id: string; phone: string; role: string }) {
+    const accessToken = this.jwtService.sign({
+      sub: user.id,
+      phone: user.phone,
+      role: user.role,
+    });
+
+    const refreshToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        type: 'refresh',
+      },
+      { expiresIn: (this.configService.get<string>('auth.refreshTokenExpiresIn') || '7d') as any },
+    );
+
+    return { accessToken, refreshToken };
+  }
+
+  private async userHasProfile(userId: string): Promise<boolean> {
     const [existingProfile] = await this.db
       .select({ id: profiles.id })
       .from(profiles)
       .where(eq(profiles.userId, userId))
       .limit(1);
-
-    return {
-      user: user as unknown as User,
-      hasProfile: Boolean(existingProfile),
-    };
+    return Boolean(existingProfile);
   }
 
-  async refreshToken(token: string): Promise<AuthResponse> {
-    try {
-      const payload = this.jwtService.verify(token);
-      if (payload.type !== 'refresh') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-      
-      const [user] = await this.db
-        .select()
-        .from(users)
-        .where(eq(users.id, payload.sub))
-        .limit(1);
+  private async findOrCreateUser(
+    phone: string,
+    consentAccepted: boolean,
+    referredBy?: string,
+  ): Promise<{ user: User; isNewUser: boolean }> {
+    const [existingUser] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.phone, phone))
+      .limit(1);
 
-      if (!user) {
-        throw new UnauthorizedException('User not found');
-      }
-
-      const [existingProfile] = await this.db
-        .select({ id: profiles.id })
-        .from(profiles)
-        .where(eq(profiles.userId, user.id))
-        .limit(1);
-
-      const accessToken = this.jwtService.sign({
-        sub: user.id,
-        phone: user.phone,
-        role: user.role,
-      });
-
-      const refreshToken = this.jwtService.sign({
-        sub: user.id,
-        type: 'refresh',
-      }, { expiresIn: '7d' });
-
-      return {
-        accessToken,
-        refreshToken,
-        user: user as unknown as User,
-        isNewUser: false,
-        hasProfile: Boolean(existingProfile),
-      };
-    } catch (e) {
-      throw new UnauthorizedException('Invalid refresh token');
+    if (existingUser) {
+      const [updated] = await this.db
+        .update(users)
+        .set({
+          isPhoneVerified: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, existingUser.id))
+        .returning();
+      return { user: updated as unknown as User, isNewUser: false };
     }
+
+    const [newUser] = await this.db
+      .insert(users)
+      .values({
+        phone,
+        isPhoneVerified: true,
+        consentAccepted,
+        consentTimestamp: new Date(),
+        referredBy,
+        role: 'member',
+        status: 'active',
+      })
+      .returning();
+    return { user: newUser as unknown as User, isNewUser: true };
   }
 }

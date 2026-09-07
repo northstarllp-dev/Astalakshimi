@@ -86,10 +86,11 @@ function ShortlistPageInner() {
         </div>
       ) : (
         <div className="space-y-4">
-          {matches.map((match: any) => (
+          {matches.map((match: any, index: number) => (
             <MatchListCard
               key={match.id || match.profileId}
               match={match}
+              priority={index === 0}
               onSkip={(id: string) => toggleMutation.mutate(id)}
               onConnect={(id: string) => connectMutation.mutate(id)}
             />

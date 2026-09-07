@@ -4,12 +4,16 @@ import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { 
-  sendInterestSchema, 
-  updateInterestStatusSchema, 
-  type SendInterestInput, 
-  type UpdateInterestStatusInput 
+import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
+import { z } from 'zod';
+import {
+  sendInterestSchema,
+  updateInterestStatusSchema,
+  type SendInterestInput,
+  type UpdateInterestStatusInput,
 } from '@astalakshimi/validation';
+
+const statusQuerySchema = z.enum(['pending', 'accepted', 'declined', 'withdrawn']).optional();
 
 
 @UseGuards(JwtAuthGuard)
@@ -38,7 +42,7 @@ export class InterestsController {
   @Get('received')
   getReceivedInterests(
     @CurrentUser() user: UserSession,
-    @Query('status') status?: string,
+    @Query(new ZodValidationPipe(statusQuerySchema)) status?: z.infer<typeof statusQuerySchema>,
   ) {
     return this.interestsService.getReceivedInterests(user.userId, status);
   }
@@ -56,7 +60,7 @@ export class InterestsController {
   @Patch(':id/accept')
   patchAccept(
     @CurrentUser() user: UserSession,
-    @Param('id') id: string,
+    @Param('id', UuidValidationPipe) id: string,
   ) {
     return this.interestsService.acceptInterest(user.userId, id);
   }
@@ -64,7 +68,7 @@ export class InterestsController {
   @Patch(':id/decline')
   patchDecline(
     @CurrentUser() user: UserSession,
-    @Param('id') id: string,
+    @Param('id', UuidValidationPipe) id: string,
   ) {
     return this.interestsService.declineInterest(user.userId, id);
   }
@@ -72,7 +76,7 @@ export class InterestsController {
   @Patch(':id/withdraw')
   patchWithdraw(
     @CurrentUser() user: UserSession,
-    @Param('id') id: string,
+    @Param('id', UuidValidationPipe) id: string,
   ) {
     return this.interestsService.withdrawInterest(user.userId, id);
   }
@@ -81,7 +85,7 @@ export class InterestsController {
   @Patch(':id/status')
   updateInterestStatus(
     @CurrentUser() user: UserSession,
-    @Param('id') interestId: string,
+    @Param('id', UuidValidationPipe) interestId: string,
     @Body(new ZodValidationPipe(updateInterestStatusSchema)) body: UpdateInterestStatusInput,
   ) {
     return this.interestsService.updateInterestStatus(user.userId, interestId, body.status);
@@ -90,7 +94,7 @@ export class InterestsController {
   @Post('profile/:profileId/accept')
   acceptByProfileId(
     @CurrentUser() user: UserSession,
-    @Param('profileId') profileId: string,
+    @Param('profileId', UuidValidationPipe) profileId: string,
   ) {
     return this.interestsService.acceptByProfileId(user.userId, profileId);
   }
@@ -98,7 +102,7 @@ export class InterestsController {
   @Post('profile/:profileId/decline')
   declineByProfileId(
     @CurrentUser() user: UserSession,
-    @Param('profileId') profileId: string,
+    @Param('profileId', UuidValidationPipe) profileId: string,
   ) {
     return this.interestsService.declineByProfileId(user.userId, profileId);
   }
@@ -106,7 +110,7 @@ export class InterestsController {
   @Post('profile/:profileId/withdraw')
   withdrawByProfileId(
     @CurrentUser() user: UserSession,
-    @Param('profileId') profileId: string,
+    @Param('profileId', UuidValidationPipe) profileId: string,
   ) {
     return this.interestsService.withdrawByProfileId(user.userId, profileId);
   }

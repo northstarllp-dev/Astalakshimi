@@ -312,6 +312,9 @@ export function clearAdminSession() {
 }
 
 export function adminLogin(email: string, password: string): AdminSession | null {
+  // Demo staff console is client-side only. In production this must be replaced by
+  // real API-backed staff authentication (the API enforces admin/moderator roles).
+  if (process.env.NODE_ENV === "production") return null
   const staff = STAFF.find((s) => s.email.toLowerCase() === email.toLowerCase() && s.password === password)
   if (!staff) return null
   const session: AdminSession = {

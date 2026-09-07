@@ -5,19 +5,16 @@ import {
   Body,
   Param,
   UseGuards,
-  Get,
-  Req,
-  Res,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Request, Response } from 'express';
 import { MediaService } from './media.service';
-import { JwtAuthGuard, OptionalJwtAuthGuard } from '../common/guards/auth.guard';
+import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
 import {
   presignedUploadSchema,
   uploadPurposeSchema,
@@ -38,12 +35,12 @@ type UploadedMediaFile = {
   originalname: string;
 };
 
+@UseGuards(JwtAuthGuard)
 @Controller('media')
 export class MediaController {
   constructor(private readonly mediaService: MediaService) {}
 
   @Post('upload-url')
-  @UseGuards(JwtAuthGuard)
   async getUploadUrl(
     @CurrentUser() user: UserSession,
     @Body(new ZodValidationPipe(presignedUploadSchema)) input: PresignedUploadInput,
@@ -53,7 +50,6 @@ export class MediaController {
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
-  @UseGuards(JwtAuthGuard)
   async uploadFile(
     @CurrentUser() user: UserSession,
     @UploadedFile() file: UploadedMediaFile,
@@ -83,7 +79,6 @@ export class MediaController {
   }
 
   @Post('confirm-photo')
-  @UseGuards(JwtAuthGuard)
   async confirmPhoto(
     @CurrentUser() user: UserSession,
     @Body(new ZodValidationPipe(confirmPhotoSchema)) input: ConfirmPhotoInput,
@@ -92,7 +87,6 @@ export class MediaController {
   }
 
   @Post('confirm-verification')
-  @UseGuards(JwtAuthGuard)
   async confirmVerification(
     @CurrentUser() user: UserSession,
     @Body(new ZodValidationPipe(confirmVerificationSchema)) input: ConfirmVerificationInput,
@@ -101,7 +95,6 @@ export class MediaController {
   }
 
   @Post('confirm-horoscope')
-  @UseGuards(JwtAuthGuard)
   async confirmHoroscope(
     @CurrentUser() user: UserSession,
     @Body(new ZodValidationPipe(confirmHoroscopeSchema)) input: ConfirmHoroscopeInput,
@@ -109,37 +102,10 @@ export class MediaController {
     return this.mediaService.confirmHoroscope(user.userId, input);
   }
 
-  @Get('image')
-  @UseGuards(OptionalJwtAuthGuard)
-  async getMediaImage(
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    const s3Key = req.query.key as string;
-    if (!s3Key) {
-      return res.status(400).send('Missing S3 key');
-    }
-
-    const demo = this.mediaService.getDemoMedia(s3Key);
-    if (demo) {
-      res.set('Content-Type', demo.contentType);
-      res.set('Cache-Control', 'private, max-age=3600');
-      return res.send(demo.buffer);
-    }
-    
-    try {
-      const url = await this.mediaService.getSignedMediaUrl(s3Key);
-      return res.redirect(url);
-    } catch (error) {
-      return res.status(404).send('Media not found');
-    }
-  }
-
   @Delete('photos/:id')
-  @UseGuards(JwtAuthGuard)
   async deletePhoto(
     @CurrentUser() user: UserSession,
-    @Param('id') photoId: string,
+    @Param('id', UuidValidationPipe) photoId: string,
   ) {
     return this.mediaService.deletePhoto(user.userId, photoId);
   }

@@ -1,7 +1,9 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
+import { Public } from '../common/decorators/public.decorator';
 
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(@Inject(DB_CLIENT) private readonly db: Database) {}

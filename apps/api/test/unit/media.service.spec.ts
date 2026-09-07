@@ -16,7 +16,6 @@ describe('MediaService (Unit Tests)', () => {
 
     mockS3Provider = {
       generateUploadUrl: jest.fn(),
-      getSignedMediaUrl: jest.fn(),
       deleteObject: jest.fn(),
     };
 
@@ -57,14 +56,6 @@ describe('MediaService (Unit Tests)', () => {
     });
   });
 
-  describe('getSignedMediaUrl', () => {
-    it('should delegate to S3Provider', async () => {
-      mockS3Provider.getSignedMediaUrl.mockResolvedValue('https://signed.url');
-      const result = await mediaService.getSignedMediaUrl('test.jpg');
-      expect(result).toBe('https://signed.url');
-    });
-  });
-
   describe('confirmPhoto', () => {
     it('should throw NotFoundException if profile not found', async () => {
       mockDb.select = mockQueryBuilder([[]]);
@@ -77,8 +68,10 @@ describe('MediaService (Unit Tests)', () => {
     it('should save photo successfully', async () => {
       mockDb.select = mockQueryBuilder([[{ id: 'prof-1' }]]);
       mockDb.insert = mockQueryBuilder([[{ id: 'photo-1' }]]);
-      
-      const result = await mediaService.confirmPhoto('user-1', { s3Key: 'key.jpg', isPrimary: false, displayOrder: 0 });
+
+      const userId = '11111111-1111-4111-8111-111111111111';
+      const s3Key = `profiles/${userId}/photos/22222222-2222-4222-8222-222222222222.jpeg`;
+      const result = await mediaService.confirmPhoto(userId, { s3Key, isPrimary: false, displayOrder: 0 });
       expect(result.success).toBe(true);
       expect(result.photo.id).toBe('photo-1');
     });
@@ -87,8 +80,10 @@ describe('MediaService (Unit Tests)', () => {
       mockDb.select = mockQueryBuilder([[{ id: 'prof-1' }]]);
       mockDb.insert = mockQueryBuilder([[{ id: 'photo-1' }]]);
       mockDb.update = mockQueryBuilder([[]]);
-      
-      await mediaService.confirmPhoto('user-1', { s3Key: 'key.jpg', isPrimary: true, displayOrder: 0 });
+
+      const userId = '11111111-1111-4111-8111-111111111111';
+      const s3Key = `profiles/${userId}/photos/22222222-2222-4222-8222-222222222222.jpeg`;
+      await mediaService.confirmPhoto(userId, { s3Key, isPrimary: true, displayOrder: 0 });
       expect(mockDb.update).toHaveBeenCalled(); // verified it cleared old primary
     });
   });
@@ -108,8 +103,10 @@ describe('MediaService (Unit Tests)', () => {
     it('should save horoscope details', async () => {
       mockDb.select = mockQueryBuilder([[{ id: 'prof-1' }]]);
       mockDb.insert = mockQueryBuilder([[{ id: 'horo-1' }]]);
-      
-      const result = await mediaService.confirmHoroscope('user-1', { horoscopeS3Key: 'horo.pdf', fileName: 'test.pdf', fileSizeBytes: 100 });
+
+      const userId = '11111111-1111-4111-8111-111111111111';
+      const horoscopeS3Key = `profiles/${userId}/horoscopes/33333333-3333-4333-8333-333333333333.pdf`;
+      const result = await mediaService.confirmHoroscope(userId, { horoscopeS3Key, fileName: 'test.pdf', fileSizeBytes: 100 });
       expect(result.success).toBe(true);
       expect(result.horoscope.id).toBe('horo-1');
     });

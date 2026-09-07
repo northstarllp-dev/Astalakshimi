@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -22,8 +23,16 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('app.apiPrefix') || 'api';
   const corsOrigins = configService.get<string[]>('app.corsOrigins') || ['http://localhost:3000'];
 
+  // Secure HTTP headers
+  app.use(helmet());
+
   // Global filters
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
+
+  // Request-id (must run before everything that needs it)
+  const { RequestIdMiddleware } = await import('./common/middleware/request-id.middleware');
+  const reqIdMw = new RequestIdMiddleware();
+  app.use((req, res, next) => reqIdMw.use(req, res, next));
 
   // API prefix
   app.setGlobalPrefix(apiPrefix);

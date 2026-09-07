@@ -19,7 +19,6 @@ describe('MediaController (Integration Tests)', () => {
       confirmPhoto: jest.fn(),
       confirmVerification: jest.fn(),
       confirmHoroscope: jest.fn(),
-      getSignedMediaUrl: jest.fn(),
       deletePhoto: jest.fn(),
     };
 
@@ -55,26 +54,6 @@ describe('MediaController (Integration Tests)', () => {
       const result = await controller.confirmPhoto(mockUserSession, { s3Key: 'key', isPrimary: false, displayOrder: 0 });
       expect(mediaService.confirmPhoto).toHaveBeenCalledWith(mockUserSession.userId, { s3Key: 'key', isPrimary: false, displayOrder: 0 });
       expect(result.success).toBe(true);
-    });
-  });
-
-  describe('GET /media/image', () => {
-    it('should return 400 if key is missing', async () => {
-      const mockReq = { query: {} };
-      const mockRes = { status: jest.fn().mockReturnThis(), send: jest.fn() };
-      
-      await controller.getMediaImage(mockReq as any, mockRes as any);
-      expect(mockRes.status).toHaveBeenCalledWith(400);
-    });
-
-    it('should redirect to generated url', async () => {
-      const mockReq = { query: { key: 'test.jpg' } };
-      const mockRes = { redirect: jest.fn() };
-      mediaService.getSignedMediaUrl.mockResolvedValue('https://signed.url');
-
-      await controller.getMediaImage(mockReq as any, mockRes as any);
-      expect(mediaService.getSignedMediaUrl).toHaveBeenCalledWith('test.jpg');
-      expect(mockRes.redirect).toHaveBeenCalledWith('https://signed.url');
     });
   });
 

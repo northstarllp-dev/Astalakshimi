@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { ShortlistsService } from './shortlists.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -34,7 +35,7 @@ export class ShortlistsController {
   @Delete(':targetProfileId')
   removeShortlist(
     @CurrentUser() user: UserSession,
-    @Param('targetProfileId') targetProfileId: string,
+    @Param('targetProfileId', UuidValidationPipe) targetProfileId: string,
   ) {
     return this.shortlistsService.removeShortlist(user.userId, targetProfileId);
   }

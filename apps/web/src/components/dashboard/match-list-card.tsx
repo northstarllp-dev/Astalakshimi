@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { ConnectButton } from "@/components/profile/connect-button"
 import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
+import { LockedPhoto } from "@/components/profile/locked-photo"
 import {
   useContactUsageQuery,
   useInterestsQuery,
@@ -67,6 +68,21 @@ function formatHeight(height?: string, heightCm?: number): string {
   return height
 }
 
+/**
+ * Warms the next/image cache for the photo the 3s auto-cycle is about to show,
+ * so advancing the carousel paints instantly instead of re-fetching.
+ * Rendered at 1x1 with the same `sizes` so the browser requests the identical
+ * optimizer URL it will need a moment later.
+ */
+function NextPhotoPreload({ photo, sizes }: { photo?: string; sizes: string }) {
+  if (!photo) return null
+  return (
+    <div aria-hidden className="pointer-events-none absolute left-0 top-0 h-px w-px overflow-hidden opacity-0">
+      <Image src={getMediaUrl(photo)} alt="" fill sizes={sizes} className="object-cover" />
+    </div>
+  )
+}
+
 function formatCommunity(match: any): string {
   const caste = match.caste || match.community || ""
   const subCaste = match.subCaste || match.subcaste || ""
@@ -100,6 +116,8 @@ export function MatchListCard({
   const [justConnected, setJustConnected] = React.useState(false)
 
   const photos = match.photos || []
+  // The API withholds keys entirely when a photo should be blurred.
+  const isHidden = match.blurPhoto || photos.length === 0
 
   const { data: shortlistData = [] } = useShortlistQuery()
   const toggleShortlistMutation = useToggleShortlistMutation()
@@ -188,17 +206,29 @@ export function MatchListCard({
       <div className="relative block md:hidden aspect-[9/15] min-h-[520px] w-full select-none overflow-hidden bg-neutral-900">
         {/* Full card background photo with link to profile */}
         <Link href={`/profiles/${match.id}`} className="absolute inset-0 block">
-          <Image
-            src={getMediaUrl(photos[activePhoto] ?? photos[0])}
-            alt={`${match.fullName}, ${match.age}`}
-            fill
-            priority={priority}
-            className={cn(
-              "object-cover object-[center_20%] transition-all duration-500",
-              match.blurPhoto ? "scale-110 blur-xl" : ""
-            )}
-            sizes="(max-width: 768px) 100vw, 400px"
-          />
+          {isHidden ? (
+            <LockedPhoto label="Photo hidden" />
+          ) : (
+            <>
+              <Image
+                src={getMediaUrl(photos[activePhoto] ?? photos[0])}
+                alt={`${match.fullName}, ${match.age}`}
+                fill
+                priority={priority}
+                className={cn(
+                  "object-cover object-[center_20%] transition-all duration-500",
+                  match.blurPhoto ? "scale-110 blur-xl" : ""
+                )}
+                sizes="(max-width: 768px) 100vw, 400px"
+              />
+              {photos.length > 1 && (
+                <NextPhotoPreload
+                  photo={photos[(activePhoto + 1) % photos.length]}
+                  sizes="(max-width: 768px) 100vw, 400px"
+                />
+              )}
+            </>
+          )}
           {/* Top gradient for badges */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/70 via-black/25 to-transparent" />
           {/* Deep bottom gradient for text & actions */}
@@ -382,17 +412,29 @@ export function MatchListCard({
         <div className="w-[280px] lg:w-[310px] xl:w-[325px] shrink-0 p-3.5 sm:p-4 flex flex-col justify-between border-r border-border/40 bg-secondary/[0.02]">
           <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-neutral-900 shadow-sm border border-border/50">
             <Link href={`/profiles/${match.id}`} className="absolute inset-0 block">
-              <Image
-                src={getMediaUrl(photos[activePhoto] ?? photos[0])}
-                alt={`${match.fullName}, ${match.age}`}
-                fill
-                priority={priority}
-                className={cn(
-                  "object-cover object-[center_18%] transition-all duration-500",
-                  match.blurPhoto ? "blur-xl scale-110" : "hover:scale-105"
-                )}
-                sizes="(max-width: 1200px) 300px, 330px"
-              />
+              {isHidden ? (
+                <LockedPhoto label="Photo hidden" />
+              ) : (
+                <>
+                  <Image
+                    src={getMediaUrl(photos[activePhoto] ?? photos[0])}
+                    alt={`${match.fullName}, ${match.age}`}
+                    fill
+                    priority={priority}
+                    className={cn(
+                      "object-cover object-[center_18%] transition-all duration-500",
+                      match.blurPhoto ? "blur-xl scale-110" : "hover:scale-105"
+                    )}
+                    sizes="(max-width: 1200px) 300px, 330px"
+                  />
+                  {photos.length > 1 && (
+                    <NextPhotoPreload
+                      photo={photos[(activePhoto + 1) % photos.length]}
+                      sizes="(max-width: 1200px) 300px, 330px"
+                    />
+                  )}
+                </>
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
             </Link>
 

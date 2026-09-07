@@ -70,6 +70,19 @@ class ApiClient {
       headers,
     });
 
+    // Unauthenticated: the session is gone. Clear the client flag and bounce to login.
+    if (response.status === 401) {
+      this.clearToken();
+      if (typeof window !== 'undefined') {
+        const currentPath = window.location.pathname + window.location.search;
+        if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
+          const callbackUrl = encodeURIComponent(currentPath);
+          window.location.href = `/login?callbackUrl=${callbackUrl}`;
+        }
+      }
+      throw new Error('Your session has expired. Please log in again.');
+    }
+
     if (!response.ok) {
       let errorMessage = 'An unexpected error occurred';
       try {
@@ -115,6 +128,7 @@ class ApiClient {
 
     logout: async () => {
       await fetch('/api/auth/logout', { method: 'POST' });
+      this.clearToken();
     },
   };
 

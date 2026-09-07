@@ -1,8 +1,9 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { profiles, profilePhotos, userSettings, interests } from '@astalakshimi/database';
+import { profiles, userSettings, interests, verifications } from '@astalakshimi/database';
 import { eq, ne, and, inArray, or } from 'drizzle-orm';
+import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
 
 @Injectable()
 export class MatchesService {
@@ -35,15 +36,7 @@ export class MatchesService {
     const profileIds = topProfiles.map((p) => p.id);
     const userIds = topProfiles.map((p) => p.userId);
 
-    const photos = await this.db
-      .select()
-      .from(profilePhotos)
-      .where(
-        and(
-          inArray(profilePhotos.profileId, profileIds),
-          eq(profilePhotos.isPrimary, true)
-        )
-      );
+    const photos = await getApprovedPrimaryPhotos(this.db, profileIds);
 
     const settings = await this.db
       .select()
@@ -64,16 +57,30 @@ export class MatchesService {
         );
     }
 
+    // Real verification state, so the badge reflects an actual review.
+    const verificationRows = await this.db
+      .select({ profileId: verifications.profileId, status: verifications.status })
+      .from(verifications)
+      .where(inArray(verifications.profileId, profileIds));
+    const verificationByProfile = new Map(verificationRows.map((v) => [v.profileId, v.status]));
+
     // 4. Map photos back to profiles
     return topProfiles.map((p) => {
-      const primaryPhoto = photos.find((photo) => photo.profileId === p.id);
+      const primaryPhoto = photos.get(p.id);
       const setting = settings.find((s) => s.userId === p.userId);
       const isAccepted = connections.some(
         (c) => c.senderProfileId === p.id || c.receiverProfileId === p.id
       );
 
-      const photoBlurSetting = setting?.photoBlur || 'always';
-      const blurPhoto = photoBlurSetting !== 'never' && !isAccepted;
+      const { blurPhoto, withholdKey } = computeBlurDecision({
+        photoBlur: setting?.photoBlur,
+        isAccepted,
+        viewerUserId: userId,
+        ownerUserId: p.userId,
+      });
+
+      const verificationStatus = verificationByProfile.get(p.id) ?? 'idle';
+      const isVerified = verificationStatus === 'verified';
 
       return {
         id: p.id,
@@ -92,10 +99,12 @@ export class MatchesService {
         occupation: p.profession,
         companyName: p.companyName,
         annualIncome: p.annualIncome,
-        photos: primaryPhoto ? [primaryPhoto.s3Key] : [],
-        photoVerified: true,
+        // Key is withheld when blurred — the bucket is public, so sending it
+        // would let anyone view the photo regardless of the blur flag.
+        photos: withholdKey || !primaryPhoto ? [] : [primaryPhoto.s3Key],
+        photoVerified: isVerified,
         isPremium: false,
-        isVerified: true,
+        isVerified,
         blurPhoto,
         matchPercent: 78 + (p.fullName.length % 15),
       };

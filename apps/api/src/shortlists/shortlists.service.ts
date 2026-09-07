@@ -1,8 +1,9 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { shortlists, profiles, profilePhotos } from '@astalakshimi/database';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { shortlists, profiles, userSettings, interests, verifications } from '@astalakshimi/database';
+import { eq, and, or, desc, inArray } from 'drizzle-orm';
+import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
 
 @Injectable()
 export class ShortlistsService {
@@ -41,24 +42,63 @@ export class ShortlistsService {
 
     const targetProfileIds = userShortlists.map((s) => s.targetProfileId);
 
-    const photos = await this.db
-      .select()
-      .from(profilePhotos)
+    const photos = await getApprovedPrimaryPhotos(this.db, targetProfileIds);
+
+    // Shortlisting is one-directional, so shortlisting someone does not grant
+    // photo access — we still honour their blur preference.
+    const settings = await this.db
+      .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
+      .from(userSettings)
+      .where(inArray(userSettings.userId, userShortlists.map((s) => s.targetProfile.userId)));
+    const blurByUser = new Map(settings.map((s) => [s.userId, s.photoBlur]));
+
+    // Shortlisting is not a connection, but an accepted interest may exist
+    // either way (viewer→target OR target→viewer).
+    const accepted = await this.db
+      .select({ senderProfileId: interests.senderProfileId, receiverProfileId: interests.receiverProfileId })
+      .from(interests)
       .where(
         and(
-          inArray(profilePhotos.profileId, targetProfileIds),
-          eq(profilePhotos.isPrimary, true)
-        )
+          eq(interests.status, 'accepted'),
+          or(
+            and(
+              inArray(interests.senderProfileId, targetProfileIds),
+              eq(interests.receiverProfileId, profileId),
+            ),
+            and(
+              inArray(interests.receiverProfileId, targetProfileIds),
+              eq(interests.senderProfileId, profileId),
+            ),
+          ),
+        ),
       );
+    const acceptedIds = new Set<string>();
+    for (const row of accepted) {
+      acceptedIds.add(row.senderProfileId);
+      acceptedIds.add(row.receiverProfileId);
+    }
 
-    const photoMap = new Map(photos.map((p) => [p.profileId, p.s3Key]));
+    const verificationRows = await this.db
+      .select({ profileId: verifications.profileId, status: verifications.status })
+      .from(verifications)
+      .where(inArray(verifications.profileId, targetProfileIds));
+    const verificationByProfile = new Map(verificationRows.map((v) => [v.profileId, v.status]));
 
     return userShortlists.map((item) => {
       const p = item.targetProfile;
-      const primaryPhoto = photoMap.get(p.id);
+      const primaryPhoto = photos.get(p.id);
       const age = p.dob
         ? Math.floor((new Date().getTime() - new Date(p.dob).getTime()) / 31557600000)
         : 25;
+
+      const { blurPhoto, withholdKey } = computeBlurDecision({
+        photoBlur: blurByUser.get(p.userId),
+        isAccepted: acceptedIds.has(p.id),
+        viewerUserId: userId,
+        ownerUserId: p.userId,
+      });
+      const visibleKey = withholdKey ? null : (primaryPhoto?.s3Key ?? null);
+      const isVerified = verificationByProfile.get(p.id) === 'verified';
 
       return {
         id: p.id,
@@ -79,11 +119,12 @@ export class ShortlistsService {
         income: p.annualIncome || 'Not specified',
         annualIncome: p.annualIncome || 'Not specified',
         motherTongue: p.motherTongue || 'Tamil',
-        photos: primaryPhoto ? [primaryPhoto] : [],
-        photo: primaryPhoto || null,
+        photos: visibleKey ? [visibleKey] : [],
+        photo: visibleKey,
         matchPercent: 92,
-        photoVerified: true,
-        blurPhoto: false,
+        photoVerified: isVerified,
+        isVerified,
+        blurPhoto,
         createdAt: item.createdAt,
         profile: {
           id: p.id,

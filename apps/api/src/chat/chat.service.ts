@@ -7,6 +7,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ContactGuardService } from './guard/contact-guard.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { BlocksService } from '../blocks/blocks.service';
+import { getApprovedPrimaryPhotos } from '../common/photo-access';
 import type { SendMessageInput } from '@astalakshimi/validation';
 
 @Injectable()
@@ -185,6 +186,31 @@ export class ChatService {
       throw new BadRequestException('Cannot send message to yourself');
     }
 
+    // Mutual match required: only an accepted interest may start/continue a conversation.
+    const [acceptedInterest] = await this.db
+      .select({ id: interests.id })
+      .from(interests)
+      .where(
+        and(
+          eq(interests.status, 'accepted'),
+          or(
+            and(
+              eq(interests.senderProfileId, senderProfile.id),
+              eq(interests.receiverProfileId, targetProfile.id),
+            ),
+            and(
+              eq(interests.senderProfileId, targetProfile.id),
+              eq(interests.receiverProfileId, senderProfile.id),
+            ),
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (!acceptedInterest) {
+      throw new BadRequestException('You can only message members you have mutually matched with.');
+    }
+
     const profile1Id = senderProfile.id < targetProfile.id ? senderProfile.id : targetProfile.id;
     const profile2Id = senderProfile.id > targetProfile.id ? senderProfile.id : targetProfile.id;
 
@@ -252,7 +278,6 @@ export class ChatService {
   }
 
   async getThreads(userId: string) {
-
     const userProfile = await this.getProfileByUserId(userId);
 
     // Find accepted interest connections
@@ -281,87 +306,86 @@ export class ChatService {
 
     const otherProfileIds = acceptedInterests.map((r) => r.otherProfile.id);
 
-    const photos = await this.db
-      .select()
-      .from(profilePhotos)
-      .where(
-        and(
-          inArray(profilePhotos.profileId, otherProfileIds),
-          eq(profilePhotos.isPrimary, true)
-        )
-      );
-
-    const photoMap = new Map(photos.map((p) => [p.profileId, p.s3Key]));
-
-    const threads = await Promise.all(
-      acceptedInterests.map(async (item) => {
-        const p = item.otherProfile;
-        const threadId = item.interest.id;
-
-        // Fetch last message
-        const [lastMsg] = await this.db
-          .select()
-          .from(messages)
-          .where(
-            or(
-              and(
-                eq(messages.senderProfileId, userProfile.id),
-                eq(messages.receiverProfileId, p.id)
-              ),
-              and(
-                eq(messages.senderProfileId, p.id),
-                eq(messages.receiverProfileId, userProfile.id)
-              )
-            )
-          )
-          .orderBy(desc(messages.createdAt))
-          .limit(1);
-        // Fetch unread count for incoming messages from this partner
-        const [unreadRow] = await this.db
-          .select({ count: sql<number>`count(*)` })
-          .from(messages)
-          .where(
-            and(
-              eq(messages.receiverProfileId, userProfile.id),
-              eq(messages.senderProfileId, p.id),
-              eq(messages.isRead, false)
-            )
-          );
-
-        const age = p.dob
-          ? Math.floor((new Date().getTime() - new Date(p.dob).getTime()) / 31557600000)
-          : 25;
-
-        return {
-          threadId: p.id,
-          interestId: item.interest.id,
-          profileId: p.id,
-          profile: {
-            id: p.id,
-            fullName: p.fullName,
-            age,
-            city: p.city || 'Unknown',
-            state: p.state || '',
-            caste: p.caste || '',
-            profession: p.profession || 'Professional',
-            photo: photoMap.get(p.id) || null,
-          },
-          lastMessage: lastMsg?.text || 'Connected! Start the conversation.',
-          lastMessageTime: lastMsg?.createdAt
-            ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : 'Recently',
-          unreadCount: Number(unreadRow?.count || 0),
-        };
+    // BATCH: fetch all messages between the user and any of the partners in one
+    // query. We then derive the latest-per-partner in JS to avoid fighting
+    // DISTINCT ON + drizzle's typed sql<> template. 2 queries total for both
+    // directions: previously this was N×2 sequential round trips.
+    const allMessages = await this.db
+      .select({
+        threadId: messages.threadId,
+        senderProfileId: messages.senderProfileId,
+        receiverProfileId: messages.receiverProfileId,
+        text: messages.text,
+        createdAt: messages.createdAt,
+        isRead: messages.isRead,
       })
+      .from(messages)
+      .where(
+        or(
+          and(
+            eq(messages.senderProfileId, userProfile.id),
+            inArray(messages.receiverProfileId, otherProfileIds),
+          ),
+          and(
+            eq(messages.receiverProfileId, userProfile.id),
+            inArray(messages.senderProfileId, otherProfileIds),
+          ),
+        ),
+      )
+      .orderBy(desc(messages.createdAt));
+
+    const lastMessageByPartner = new Map<string, { text: string; createdAt: Date }>();
+    const unreadByPartner = new Map<string, number>();
+    for (const m of allMessages) {
+      const partnerId = m.senderProfileId === userProfile.id ? m.receiverProfileId : m.senderProfileId;
+      if (!lastMessageByPartner.has(partnerId)) {
+        lastMessageByPartner.set(partnerId, { text: m.text, createdAt: m.createdAt });
+      }
+      if (!m.isRead && m.receiverProfileId === userProfile.id) {
+        unreadByPartner.set(partnerId, (unreadByPartner.get(partnerId) ?? 0) + 1);
+      }
+    }
+
+    const photos = await getApprovedPrimaryPhotos(this.db, otherProfileIds);
+    const photoMap = new Map(
+      Array.from(photos.entries()).map(([profileId, photo]) => [profileId, photo.s3Key]),
     );
 
-    return threads;
+    return acceptedInterests.map((item) => {
+      const p = item.otherProfile;
+      const last = lastMessageByPartner.get(p.id);
+      const age = p.dob ? Math.floor((Date.now() - new Date(p.dob).getTime()) / 31557600000) : 25;
+
+      return {
+        threadId: p.id,
+        interestId: item.interest.id,
+        profileId: p.id,
+        profile: {
+          id: p.id,
+          fullName: p.fullName,
+          age,
+          city: p.city || 'Unknown',
+          state: p.state || '',
+          caste: p.caste || '',
+          profession: p.profession || 'Professional',
+          photo: photoMap.get(p.id) || null,
+        },
+        lastMessage: last?.text || 'Connected! Start the conversation.',
+        lastMessageTime: last
+          ? new Date(last.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : 'Recently',
+        unreadCount: unreadByPartner.get(p.id) || 0,
+      };
+    });
   }
 
 
   async markThreadRead(userId: string, threadId: string) {
     const userProfile = await this.getProfileByUserId(userId);
 
+    // Only mark messages *received by me* from the given partner/thread as read.
+    // The original implementation OR'd `senderProfileId = threadId` which also
+    // flipped messages *I sent* to that partner, hiding my own outgoing text.
     await this.db
       .update(messages)
       .set({ isRead: true })
@@ -370,9 +394,10 @@ export class ChatService {
           eq(messages.receiverProfileId, userProfile.id),
           or(
             eq(messages.threadId, threadId),
-            eq(messages.senderProfileId, threadId)
-          )
-        )
+            eq(messages.senderProfileId, threadId),
+            eq(messages.receiverProfileId, threadId),
+          ),
+        ),
       );
 
     return { success: true };

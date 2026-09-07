@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { plans } from './plans';
+import { profiles } from './profiles';
 
 export const paymentProviderEnum = pgEnum('payment_provider', ['razorpay', 'phonepe']);
 export const paymentStatusEnum = pgEnum('payment_status', [
@@ -26,6 +27,8 @@ export const payments = pgTable('payments', {
     .references(() => users.id, { onDelete: 'cascade' }),
   planId: uuid('plan_id')
     .references(() => plans.id, { onDelete: 'cascade' }),
+  targetProfileId: uuid('target_profile_id')
+    .references(() => profiles.id, { onDelete: 'set null' }),
   amountPaise: integer('amount_paise').notNull(),
   currency: varchar('currency', { length: 3 }).default('INR').notNull(),
   provider: paymentProviderEnum('provider').notNull(),

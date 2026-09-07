@@ -9,6 +9,7 @@ describe('Feature 1: Authentication - JwtStrategy (Unit Tests)', () => {
   beforeEach(() => {
     mockConfigService = {
       get: jest.fn().mockReturnValue('test-jwt-secret'),
+      getOrThrow: jest.fn().mockReturnValue('test-jwt-secret'),
     };
 
     mockDb = {

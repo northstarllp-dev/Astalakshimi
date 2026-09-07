@@ -1,4 +1,4 @@
-import { Injectable, Inject, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Inject, InternalServerErrorException, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
@@ -10,14 +10,15 @@ import * as crypto from 'crypto';
 @Injectable()
 export class PaymentsService {
   private razorpay: Razorpay;
+  private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly configService: ConfigService,
   ) {
     this.razorpay = new Razorpay({
-      key_id: this.configService.get<string>('RAZORPAY_KEY_ID') || 'test_key',
-      key_secret: this.configService.get<string>('RAZORPAY_KEY_SECRET') || 'test_secret',
+      key_id: this.configService.get<string>('payments.razorpayKeyId'),
+      key_secret: this.configService.get<string>('payments.razorpayKeySecret'),
     });
   }
 
@@ -86,7 +87,7 @@ export class PaymentsService {
       try {
         order = await this.razorpay.orders.create(options);
       } catch (rError) {
-        console.error('Razorpay order creation failed:', rError);
+        this.logger.error('Razorpay order creation failed:', rError);
         throw new InternalServerErrorException('Failed to create payment order with provider');
       }
 
@@ -105,13 +106,13 @@ export class PaymentsService {
         orderId: order.id,
         amount: order.amount,
         currency: order.currency,
-        keyId: this.configService.get<string>('RAZORPAY_KEY_ID') || 'test_key',
+        keyId: this.configService.get<string>('payments.razorpayKeyId'),
         planId: plan.id,
         planSlug: plan.slug,
         planName: plan.name,
       };
     } catch (err) {
-      console.error('Error creating payment order:', err);
+      this.logger.error('Error creating payment order:', err);
       throw new InternalServerErrorException('Failed to create payment order');
     }
   }
@@ -185,8 +186,8 @@ export class PaymentsService {
     razorpayPaymentId: string,
     razorpaySignature: string,
   ) {
-    const secret = this.configService.get<string>('RAZORPAY_KEY_SECRET') || 'test_secret';
-    
+    const secret = this.configService.getOrThrow<string>('payments.razorpayKeySecret');
+
     // Verify signature
     const generatedSignature = crypto
       .createHmac('sha256', secret)
@@ -313,8 +314,15 @@ export class PaymentsService {
     const [profile] = await this.db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
 
+    // Reject self-unlock and nonexistent targets up front
+    if (profile.id === targetProfileId) {
+      throw new BadRequestException('Cannot unlock your own contact');
+    }
+    const [target] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, targetProfileId)).limit(1);
+    if (!target) throw new NotFoundException('Target profile not found');
+
     const amountPaise = 2900; // ₹29 extra contact unlock
-    const keyId = this.configService.get<string>('RAZORPAY_KEY_ID') || 'test_key';
+    const keyId = this.configService.get<string>('payments.razorpayKeyId');
 
     try {
       let orderId = `order_cu_${Date.now()}`;
@@ -339,6 +347,7 @@ export class PaymentsService {
         orderCurrency = order.currency;
       }
 
+      // Bind the order to the target at creation so verify can never redirect it.
       await this.db.insert(payments).values({
         userId,
         amountPaise,
@@ -346,6 +355,7 @@ export class PaymentsService {
         provider: 'razorpay',
         providerOrderId: orderId,
         status: 'created',
+        targetProfileId,
       });
 
       return {
@@ -356,7 +366,7 @@ export class PaymentsService {
         targetProfileId,
       };
     } catch (err) {
-      console.error('Error creating contact unlock order:', err);
+      this.logger.error('Error creating contact unlock order:', err);
       throw new InternalServerErrorException('Failed to create payment order');
     }
   }
@@ -368,15 +378,18 @@ export class PaymentsService {
     razorpayPaymentId: string,
     razorpaySignature: string,
   ) {
-    const secret = this.configService.get<string>('RAZORPAY_KEY_SECRET') || 'test_secret';
-    
+    const secret = this.configService.getOrThrow<string>('payments.razorpayKeySecret');
+
+    // Signature check. The demo path is dev-only (env-gated) so it can never ship
+    // to production, and production itself refuses to start without a real secret.
     const generatedSignature = crypto
       .createHmac('sha256', secret)
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
-    const isDemo = secret === 'test_secret' && razorpaySignature === 'demo_signature';
-    if (generatedSignature !== razorpaySignature && !isDemo) {
+    const isDevDemo =
+      process.env.NODE_ENV !== 'production' && razorpaySignature === 'demo_signature';
+    if (generatedSignature !== razorpaySignature && !isDevDemo) {
       throw new BadRequestException('Invalid payment signature');
     }
 
@@ -387,16 +400,23 @@ export class PaymentsService {
       .limit(1);
 
     if (!payment) throw new NotFoundException('Payment record not found');
+
+    // The order is bound to a specific target at creation; the client cannot
+    // redirect a paid order to a different profile, and only the owner may verify it.
+    if (payment.userId !== userId) {
+      throw new ForbiddenException('Payment does not belong to this user');
+    }
+    const boundTargetId = payment.targetProfileId;
+    if (!boundTargetId) {
+      throw new BadRequestException('Payment order is not bound to a target profile');
+    }
+    if (targetProfileId && targetProfileId !== boundTargetId) {
+      throw new BadRequestException('Target profile does not match the paid order');
+    }
+
+    // Already captured: idempotent — only the bound target's phone is ever returned.
     if (payment.status === 'captured') {
-      const [target] = await this.db
-        .select({ userId: profiles.userId })
-        .from(profiles)
-        .where(eq(profiles.id, targetProfileId))
-        .limit(1);
-      const [owner] = target
-        ? await this.db.select({ phone: users.phone }).from(users).where(eq(users.id, target.userId)).limit(1)
-        : [];
-      return { success: true, contactPhone: owner?.phone ?? null };
+      return { success: true, contactPhone: await this.resolveTargetPhone(boundTargetId) };
     }
 
     const [profile] = await this.db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
@@ -411,21 +431,33 @@ export class PaymentsService {
       })
       .where(eq(payments.id, payment.id));
 
-    // Record unlocked contact
-    await this.db.insert(unlockedContacts).values({
-      unlockerProfileId: profile.id,
-      unlockedProfileId: targetProfileId,
-      paymentId: payment.id,
-    });
+    // Record the unlock idempotently (no unique constraint on the pair, so check-then-insert)
+    const [existingUnlock] = await this.db
+      .select({ id: unlockedContacts.id })
+      .from(unlockedContacts)
+      .where(
+        and(
+          eq(unlockedContacts.unlockerProfileId, profile.id),
+          eq(unlockedContacts.unlockedProfileId, boundTargetId),
+        ),
+      )
+      .limit(1);
+    if (!existingUnlock) {
+      await this.db.insert(unlockedContacts).values({
+        unlockerProfileId: profile.id,
+        unlockedProfileId: boundTargetId,
+        paymentId: payment.id,
+      });
+    }
 
-    // Block the chat session
+    // Block the chat session for this pair
     const [existingSession] = await this.db
       .select()
       .from(chatSessions)
       .where(
         and(
           eq(chatSessions.profile1Id, profile.id),
-          eq(chatSessions.profile2Id, targetProfileId)
+          eq(chatSessions.profile2Id, boundTargetId)
         )
       )
       .limit(1);
@@ -438,21 +470,27 @@ export class PaymentsService {
     } else {
       await this.db.insert(chatSessions).values({
         profile1Id: profile.id,
-        profile2Id: targetProfileId,
+        profile2Id: boundTargetId,
         isBlocked: true,
         blockedReason: 'contact_unlocked',
       });
     }
 
+    return { success: true, contactPhone: await this.resolveTargetPhone(boundTargetId) };
+  }
+
+  private async resolveTargetPhone(targetProfileId: string): Promise<string | null> {
     const [target] = await this.db
       .select({ userId: profiles.userId })
       .from(profiles)
       .where(eq(profiles.id, targetProfileId))
       .limit(1);
-    const [owner] = target
-      ? await this.db.select({ phone: users.phone }).from(users).where(eq(users.id, target.userId)).limit(1)
-      : [];
-
-    return { success: true, contactPhone: owner?.phone ?? null };
+    if (!target) return null;
+    const [owner] = await this.db
+      .select({ phone: users.phone })
+      .from(users)
+      .where(eq(users.id, target.userId))
+      .limit(1);
+    return owner?.phone ?? null;
   }
 }

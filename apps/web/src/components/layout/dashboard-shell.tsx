@@ -3,10 +3,11 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import Image from "next/image"
 import { getMediaUrl } from "@/lib/utils"
 import { Logo } from "@/components/ui/logo"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
 import { useProfileQuery, useUnreadCountQuery } from "@/hooks/queries"
 import { cn } from "@/lib/utils"
@@ -90,10 +91,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Link href="/profile" aria-label="My profile">
               <Avatar className="size-9 border-2 border-primary/20">
                 {profile?.photos[0] ? (
-                  <AvatarImage
+                  <Image
                     src={getMediaUrl(profile.photos[0])}
                     alt={firstName}
-                    className={cn("object-cover", pending && "blur-[2px]")}
+                    width={36}
+                    height={36}
+                    className={cn("aspect-square size-full rounded-full object-cover", pending && "blur-[2px]")}
                   />
                 ) : null}
                 <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">

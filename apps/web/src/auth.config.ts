@@ -48,7 +48,8 @@ export const authConfig = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // If user object is available (on sign in), save the tokens to the JWT
+      // If user object is available (on sign in), save the tokens to the JWT.
+      // The JWT stays server-side; tokens are never copied onto the client session.
       if (user) {
         token.accessToken = (user as any).accessToken
         token.refreshToken = (user as any).refreshToken
@@ -56,13 +57,5 @@ export const authConfig = {
       }
       return token
     },
-    async session({ session, token }) {
-      // Pass the access token to the client if needed
-      // @ts-ignore
-      session.accessToken = token.accessToken
-      // @ts-ignore
-      session.user = token.user as any
-      return session
-    }
-  }
+  },
 } satisfies NextAuthConfig

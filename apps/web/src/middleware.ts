@@ -1,16 +1,16 @@
-import NextAuth from "next-auth"
-import { authConfig } from "./auth.config"
 import { NextResponse, type NextRequest } from "next/server"
-
-const { auth } = NextAuth(authConfig)
 
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
-  
+
   if (isAdminRoute) {
-    // Let NextAuth handle admin routes
-    return (auth as any)(req)
+    // There is no production staff login yet (the console is a dev-only demo).
+    // Block the admin surface at the edge rather than trusting the client-side gate.
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.redirect(new URL("/", req.nextUrl))
+    }
+    return NextResponse.next()
   }
 
   const token = req.cookies.get("astalakshimi.auth_token")?.value

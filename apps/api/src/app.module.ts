@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { configs } from './config/index';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -25,6 +27,8 @@ import { LocationsModule } from './locations/locations.module';
 import { EducationsModule } from './educations/educations.module';
 import { CareersModule } from './careers/careers.module';
 import { CommunitiesModule } from './communities/communities.module';
+import { CommonModule } from './common/common.module';
+import { EnrollmentGuard } from './common/guards/enrollment.guard';
 
 @Module({
   imports: [
@@ -33,6 +37,8 @@ import { CommunitiesModule } from './communities/communities.module';
       load: configs,
       envFilePath: ['../../.env', '.env'],
     }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
+    CommonModule,
     DatabaseModule,
     HealthModule,
     AuthModule,
@@ -57,6 +63,14 @@ import { CommunitiesModule } from './communities/communities.module';
     EducationsModule,
     CareersModule,
     CommunitiesModule,
+  ],
+  providers: [
+    // Global rate limiting (per-IP). Auth endpoints apply stricter per-route limits.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Single uniform authz resolver. Routes that declare @Roles() or
+    // @RequireEntitlement() get checked here; everything else is unaffected.
+    // Runs after JwtAuthGuard populates request.user (see JwtAuthGuard comment).
+    { provide: APP_GUARD, useClass: EnrollmentGuard },
   ],
 })
 export class AppModule {}

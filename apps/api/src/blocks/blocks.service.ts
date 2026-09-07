@@ -1,8 +1,9 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { blockedProfiles, profiles, profilePhotos } from '@astalakshimi/database';
+import { blockedProfiles, profiles, userSettings, interests } from '@astalakshimi/database';
 import { eq, and, or, desc, inArray } from 'drizzle-orm';
+import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
 
 @Injectable()
 export class BlocksService {
@@ -41,24 +42,40 @@ export class BlocksService {
 
     const targetProfileIds = blocks.map((b) => b.targetProfileId);
 
-    const photos = await this.db
-      .select()
-      .from(profilePhotos)
-      .where(
-        and(
-          inArray(profilePhotos.profileId, targetProfileIds),
-          eq(profilePhotos.isPrimary, true)
-        )
-      );
+    const photos = await getApprovedPrimaryPhotos(this.db, targetProfileIds);
 
-    const photoMap = new Map(photos.map((p) => [p.profileId, p.s3Key]));
+    // Blocking someone does not grant photo access, so their blur preference
+    // still applies on this management list.
+    const settings = await this.db
+      .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
+      .from(userSettings)
+      .where(inArray(userSettings.userId, blocks.map((b) => b.targetProfile.userId)));
+    const blurByUser = new Map(settings.map((s) => [s.userId, s.photoBlur]));
+
+    const accepted = await this.db
+      .select({ senderProfileId: interests.senderProfileId, receiverProfileId: interests.receiverProfileId })
+      .from(interests)
+      .where(and(inArray(interests.senderProfileId, targetProfileIds), eq(interests.status, 'accepted')));
+    const acceptedIds = new Set<string>();
+    for (const row of accepted) {
+      acceptedIds.add(row.senderProfileId);
+      acceptedIds.add(row.receiverProfileId);
+    }
 
     return blocks.map((item) => {
       const p = item.targetProfile;
-      const primaryPhoto = photoMap.get(p.id);
       const age = p.dob
         ? Math.floor((new Date().getTime() - new Date(p.dob).getTime()) / 31557600000)
         : 25;
+
+      // A block and an accepted connection can coexist, so check rather than assume.
+      const isAccepted = acceptedIds.has(p.id);
+      const { withholdKey } = computeBlurDecision({
+        photoBlur: blurByUser.get(p.userId),
+        isAccepted,
+        ownerUserId: p.userId,
+      });
+      const visiblePhoto = withholdKey ? null : (photos.get(p.id)?.s3Key ?? null);
 
       return {
         id: p.id,
@@ -68,7 +85,7 @@ export class BlocksService {
         age,
         city: p.city || 'Unknown',
         caste: p.caste || 'Unknown',
-        photo: primaryPhoto || null,
+        photo: visiblePhoto,
         createdAt: item.createdAt,
       };
     });

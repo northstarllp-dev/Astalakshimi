@@ -12,6 +12,7 @@ export const users = pgTable('users', {
   referredBy: varchar('referred_by', { length: 50 }),
   role: userRoleEnum('role').default('member').notNull(),
   status: userStatusEnum('status').default('active').notNull(),
+  refreshTokenHash: varchar('refresh_token_hash', { length: 64 }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

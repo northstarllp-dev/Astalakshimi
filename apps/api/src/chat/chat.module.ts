@@ -7,11 +7,12 @@ import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { ContactGuardService } from './guard/contact-guard.service';
 import { MessageService } from './message.service';
 import { ChatGateway } from './chat.gateway';
+import { AuthModule } from '../auth/auth.module';
 
 import { BlocksModule } from '../blocks/blocks.module';
 
 @Module({
-  imports: [DatabaseModule, NotificationsModule, EntitlementsModule, BlocksModule],
+  imports: [DatabaseModule, AuthModule, NotificationsModule, EntitlementsModule, BlocksModule],
   controllers: [ChatController],
   providers: [ChatGateway, ChatService, ContactGuardService, MessageService],
   exports: [ChatService, MessageService],

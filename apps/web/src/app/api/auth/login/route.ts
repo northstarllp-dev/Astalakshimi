@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json(data, { status: res.status });
     
     if (res.ok && data.accessToken) {
-      // Set HTTP-only cookies
+      // Set HTTP-only cookies. The access token itself is short-lived; the BFF
+      // auto-refreshes via /api/proxy on 401 and re-sets these cookies.
       response.cookies.set({
         name: 'astalakshimi.auth_token',
         value: data.accessToken,
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 30 * 24 * 60 * 60, // 30 days
+        maxAge: 7 * 24 * 60 * 60, // 7 days (matches refresh cookie; API enforces token expiry)
       });
       
       if (data.refreshToken) {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(data, { status: res.status, headers: response.headers });
-  } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ message: error instanceof Error ? error.message : 'Login failed' }, { status: 500 });
   }
 }

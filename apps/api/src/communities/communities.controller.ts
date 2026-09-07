@@ -1,6 +1,8 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CommunitiesService } from './communities.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { JwtAuthGuard } from '../common/guards/auth.guard';
 import {
   communityAutocompleteQuerySchema,
   subcasteAutocompleteQuerySchema,
@@ -10,6 +12,8 @@ import {
   type GotraAutocompleteQuery,
 } from '@astalakshimi/validation';
 
+@UseGuards(JwtAuthGuard)
+@Throttle({ default: { limit: 120, ttl: 60_000 } })
 @Controller('communities')
 export class CommunitiesController {
   constructor(private readonly communitiesService: CommunitiesService) {}

@@ -114,6 +114,8 @@ export class S3Provider {
         Bucket: bucket,
         Key: s3Key,
         ContentType: contentType,
+        CacheControl: 'public, max-age=31536000, immutable',
+        ContentDisposition: 'inline',
       });
 
       const uploadUrl = await getSignedUrl(this.s3Client, command, {
@@ -145,19 +147,6 @@ export class S3Provider {
     return getSignedUrl(this.s3Client, command, { expiresIn: 900 }); // 15 minutes
   }
 
-  async getSignedMediaUrl(s3Key: string): Promise<string> {
-    if (!this.isConfigured) {
-      return `https://${this.mediaBucket}.s3.amazonaws.com/${s3Key}?mock-view-token=valid`;
-    }
-
-    const command = new GetObjectCommand({
-      Bucket: this.mediaBucket,
-      Key: s3Key,
-    });
-
-    return getSignedUrl(this.s3Client, command, { expiresIn: 3600 }); // 1 hour for standard media
-  }
-
   async putObject(s3Key: string, body: Buffer, contentType: string, bucket?: string): Promise<void> {
     const normalizedType = this.normalizeImageContentType(contentType);
 
@@ -182,10 +171,6 @@ export class S3Provider {
       );
       demoUploadStore.set(s3Key, body, normalizedType);
     }
-  }
-
-  getDemoObject(s3Key: string) {
-    return demoUploadStore.get(s3Key);
   }
 
   async deleteObject(s3Key: string, isVault = false): Promise<void> {

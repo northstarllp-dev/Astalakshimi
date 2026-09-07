@@ -2,7 +2,8 @@ import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
 import { ContactGuardService } from './guard/contact-guard.service';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { messages } from '@astalakshimi/database';
+import { messages, interests } from '@astalakshimi/database';
+import { and, eq, or } from 'drizzle-orm';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { BlocksService } from '../blocks/blocks.service';
 
@@ -16,6 +17,35 @@ export class MessageService {
   ) {}
 
   async processMessage(senderProfileId: string, receiverProfileId: string, text: string, threadId: string) {
+    if (senderProfileId === receiverProfileId) {
+      throw new ForbiddenException('Cannot send message to yourself');
+    }
+
+    // Mutual match required: only an accepted interest may start/continue a conversation.
+    const [acceptedInterest] = await this.db
+      .select({ id: interests.id })
+      .from(interests)
+      .where(
+        and(
+          eq(interests.status, 'accepted'),
+          or(
+            and(
+              eq(interests.senderProfileId, senderProfileId),
+              eq(interests.receiverProfileId, receiverProfileId),
+            ),
+            and(
+              eq(interests.senderProfileId, receiverProfileId),
+              eq(interests.receiverProfileId, senderProfileId),
+            ),
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (!acceptedInterest) {
+      throw new ForbiddenException('You can only message members you have mutually matched with.');
+    }
+
     const profile1Id = senderProfileId < receiverProfileId ? senderProfileId : receiverProfileId;
     const profile2Id = senderProfileId > receiverProfileId ? senderProfileId : receiverProfileId;
 

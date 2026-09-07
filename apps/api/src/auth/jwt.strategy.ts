@@ -12,6 +12,7 @@ interface JwtPayload {
   sub: string;
   phone: string;
   role: 'member' | 'admin' | 'moderator';
+  type?: 'refresh';
 }
 
 @Injectable()
@@ -23,11 +24,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('auth.jwtSecret') || 'astalakshimi-dev-secret',
+      secretOrKey: configService.getOrThrow<string>('auth.jwtSecret'),
     });
   }
 
   async validate(payload: JwtPayload): Promise<UserSession> {
+    if (payload.type === 'refresh') {
+      throw new UnauthorizedException('Refresh tokens cannot be used for authentication');
+    }
+
     const [user] = await this.db
       .select({
         id: users.id,

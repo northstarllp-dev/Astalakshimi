@@ -1,4 +1,5 @@
 export * from './auth';
+export * from './search';
 export * from './profile';
 export * from './preferences';
 export * from './media';

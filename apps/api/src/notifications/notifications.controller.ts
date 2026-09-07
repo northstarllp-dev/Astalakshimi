@@ -1,6 +1,7 @@
 import { Controller, Get, Patch, Post, Delete, Param, UseGuards } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
 
@@ -27,7 +28,7 @@ export class NotificationsController {
   @Patch(':id/read')
   markAsRead(
     @CurrentUser() user: UserSession,
-    @Param('id') id: string,
+    @Param('id', UuidValidationPipe) id: string,
   ) {
     return this.notificationsService.markAsRead(user.userId, id);
   }

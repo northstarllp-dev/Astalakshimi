@@ -65,7 +65,11 @@ export class ContactsService {
       .innerJoin(users, eq(profiles.userId, users.id))
       .leftJoin(
         profilePhotos,
-        and(eq(profilePhotos.profileId, profiles.id), eq(profilePhotos.isPrimary, true)),
+        and(
+          eq(profilePhotos.profileId, profiles.id),
+          eq(profilePhotos.isPrimary, true),
+          eq(profilePhotos.status, 'approved'),
+        ),
       )
       .where(eq(unlockedContacts.unlockerProfileId, viewer.id))
       .orderBy(desc(unlockedContacts.createdAt));

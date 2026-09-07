@@ -1,6 +1,8 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CareersService } from './careers.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { JwtAuthGuard } from '../common/guards/auth.guard';
 import {
   companySearchQuerySchema,
   resolveCompanyQuerySchema,
@@ -10,6 +12,8 @@ import {
   type ResolveOccupationQuery,
 } from '@astalakshimi/validation';
 
+@UseGuards(JwtAuthGuard)
+@Throttle({ default: { limit: 120, ttl: 60_000 } })
 @Controller('careers')
 export class CareersController {
   constructor(private readonly careersService: CareersService) {}

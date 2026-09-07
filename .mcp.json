@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "aws": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "node",
+      "args": [
+        "scripts/mcp/run-aws.mjs"
+      ]
+    }
+  }
+}

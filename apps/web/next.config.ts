@@ -10,24 +10,28 @@ const nextConfig: NextConfig = {
   },
   images: {
     dangerouslyAllowLocalIP: true,
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     localPatterns: [
       {
         pathname: '/**',
       },
-      {
-        pathname: '/api/proxy/**',
-        search: '?*',
-      },
-      {
-        pathname: '/api/proxy/media/image',
-        search: '?key=*',
-      },
-      {
-        pathname: '/api/proxy/media/image/**',
-        search: '?key=*',
-      },
     ],
     remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'ashtalakshmi-media.s3.ap-south-1.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ashtalakshmi-media.s3.*.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.cloudfront.net',
+      },
       {
         protocol: "http",
         hostname: "localhost",

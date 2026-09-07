@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { formatHeightFromCm } from "@/lib/input-units"
 import { apiClient } from "@/lib/api-client"
+import { getApiBaseUrl } from "@/lib/api-config"
 import {
   Briefcase,
   CheckCircle2,
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ profileId
   
   if (profileId === 'me' || profileId === 'undefined') return { title: "Profile | Astalakshimi" }
 
-  const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+  const NEXT_PUBLIC_API_URL = getApiBaseUrl();
   const rawProfile = await fetch(`${NEXT_PUBLIC_API_URL}/profiles/${profileId}`)
     .then(res => res.ok ? res.json() : null)
     .catch(() => null);
@@ -85,7 +86,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
   const cookieStore = await cookies();
   const token = cookieStore.get('astalakshimi.auth_token')?.value;
 
-  const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+  const NEXT_PUBLIC_API_URL = getApiBaseUrl();
   const data = await fetch(`${NEXT_PUBLIC_API_URL}/profiles/${profileId}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     cache: 'no-store'

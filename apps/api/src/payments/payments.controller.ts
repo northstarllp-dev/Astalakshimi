@@ -2,56 +2,64 @@ import { Controller, Post, Get, Body, UseGuards, BadRequestException } from '@ne
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { z } from 'zod';
 import type { UserSession } from '@astalakshimi/types';
 
+const createOrderSchema = z.object({
+  planId: z.string().min(1).max(200),
+});
+
+const verifyPaymentSchema = z.object({
+  razorpayOrderId: z.string().min(3).max(200),
+  razorpayPaymentId: z.string().min(3).max(200),
+  razorpaySignature: z.string().min(8).max(1000),
+});
+
+const demoActivateSchema = z.object({
+  planId: z.string().min(1).max(200),
+});
+
+@UseGuards(JwtAuthGuard)
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post('orders')
   createOrder(
     @CurrentUser() user: UserSession,
-    @Body() body: { planId: string },
+    @Body(new ZodValidationPipe(createOrderSchema)) body: { planId: string },
   ) {
-    if (!body.planId) throw new BadRequestException('planId is required');
     return this.paymentsService.createOrder(user.userId, body.planId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('verify')
   verifyPayment(
     @CurrentUser() user: UserSession,
-    @Body() body: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+    @Body(new ZodValidationPipe(verifyPaymentSchema))
+    body: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
   ) {
-    if (!body.razorpayOrderId || !body.razorpayPaymentId || !body.razorpaySignature) {
-      throw new BadRequestException('Missing payment verification details');
-    }
     return this.paymentsService.verifyPayment(
       user.userId,
       body.razorpayOrderId,
       body.razorpayPaymentId,
-      body.razorpaySignature
+      body.razorpaySignature,
     );
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('demo-activate')
   activateDemoPlan(
     @CurrentUser() user: UserSession,
-    @Body() body: { planId: string },
+    @Body(new ZodValidationPipe(demoActivateSchema)) body: { planId: string },
   ) {
-    if (!body.planId) throw new BadRequestException('planId is required');
     return this.paymentsService.activateDemoPlan(user.userId, body.planId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('subscription')
   getSubscription(@CurrentUser() user: UserSession) {
     return this.paymentsService.getUserSubscription(user.userId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('invoices')
   getInvoices(@CurrentUser() user: UserSession) {
     return this.paymentsService.getUserInvoices(user.userId);

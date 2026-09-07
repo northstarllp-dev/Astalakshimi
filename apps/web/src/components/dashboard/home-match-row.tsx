@@ -8,6 +8,7 @@ import { cn, getMediaUrl } from "@/lib/utils"
 import { useSendInterestMutation, useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
 import { BadgeCheck, Bookmark, Heart } from "lucide-react"
 import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
+import { LockedPhoto } from "@/components/profile/locked-photo"
 
 import { formatHeightFromCm } from "@/lib/input-units"
 
@@ -32,6 +33,7 @@ export function HomeMatchRow({
   )
 
   const photo = match.photos?.[0]
+  const isHidden = match.blurPhoto || !photo
   const height = match.height || formatHeightFromCm(match.heightCm)
   const profession = match.profession || match.occupation
   const education = match.degree || match.education || match.educationLevel
@@ -46,18 +48,17 @@ export function HomeMatchRow({
         href={locked ? "/profile/edit" : `/profiles/${match.id}`}
         className="relative h-[132px] w-[96px] shrink-0 overflow-hidden rounded-md bg-muted sm:h-[168px] sm:w-[128px]"
       >
-        {photo ? (
+        {photo && !isHidden ? (
           <Image
             src={getMediaUrl(photo)}
             alt={match.fullName}
             fill
-            className={cn(
-              "object-cover object-[center_18%]",
-              (match.blurPhoto || locked) && "scale-110 blur-[7px]"
-            )}
+            className={cn("object-cover object-[center_18%]", locked && "scale-110 blur-[7px]")}
             sizes="(max-width: 640px) 96px, 128px"
           />
-        ) : null}
+        ) : (
+          <LockedPhoto compact label="Photo hidden" />
+        )}
         {match.isVerified || match.photoVerified ? (
           <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-[#fffbf4]/95 px-1 py-0.5 text-[9px] font-semibold text-foreground shadow-xs sm:text-[10px]">
             <BadgeCheck className="h-3 w-3 text-primary" />

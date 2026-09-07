@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import {
@@ -20,6 +20,7 @@ import type { AdminCreateProfileInput } from '@astalakshimi/validation';
 import { NotificationsService } from '../notifications/notifications.service';
 import { S3Provider } from '../media/providers/s3.provider';
 import { calculateProfileCompleteness } from './profile-completeness';
+import { isOwnedPhotoKey } from '../common/photo-access';
 
 @Injectable()
 export class AdminService {
@@ -67,6 +68,61 @@ export class AdminService {
       .innerJoin(profiles, eq(verifications.profileId, profiles.id))
       .innerJoin(users, eq(profiles.userId, users.id))
       .where(eq(verifications.status, 'pending'));
+  }
+
+  /**
+   * Photo moderation queue. Photos are inserted as 'pending' and are hidden
+   * from every public read until a moderator approves them.
+   */
+  async getPendingPhotos() {
+    return this.db
+      .select({
+        id: profilePhotos.id,
+        profileId: profilePhotos.profileId,
+        s3Key: profilePhotos.s3Key,
+        isPrimary: profilePhotos.isPrimary,
+        displayOrder: profilePhotos.displayOrder,
+        createdAt: profilePhotos.createdAt,
+        fullName: profiles.fullName,
+        city: profiles.city,
+      })
+      .from(profilePhotos)
+      .innerJoin(profiles, eq(profilePhotos.profileId, profiles.id))
+      .where(eq(profilePhotos.status, 'pending'))
+      .orderBy(profilePhotos.createdAt);
+  }
+
+  async updatePhotoStatus(photoId: string, status: 'approved' | 'rejected', rejectionReason?: string) {
+    const [updated] = await this.db
+      .update(profilePhotos)
+      .set({ status })
+      .where(eq(profilePhotos.id, photoId))
+      .returning();
+
+    if (!updated) {
+      throw new NotFoundException('Photo not found');
+    }
+
+    const [profile] = await this.db
+      .select({ userId: profiles.userId })
+      .from(profiles)
+      .where(eq(profiles.id, updated.profileId));
+
+    if (profile) {
+      await this.notificationsService.createNotification({
+        userId: profile.userId,
+        title: status === 'approved' ? 'Photo approved' : 'Photo rejected',
+        body:
+          status === 'approved'
+            ? 'One of your photos has been approved and is now visible on your profile.'
+            : `One of your photos was rejected. Reason: ${rejectionReason || 'Please contact support.'}`,
+        category: 'account',
+        kind: 'verification',
+        href: '/profile/edit',
+      });
+    }
+
+    return updated;
   }
 
   async updateVerificationStatus(profileId: string, status: 'verified' | 'rejected', rejectionReason?: string) {
@@ -485,8 +541,13 @@ export class AdminService {
   }
 
   async attachPhotos(profileId: string, s3Keys: string[]) {
-    const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, profileId)).limit(1);
+    const [profile] = await this.db.select({ id: profiles.id, userId: profiles.userId }).from(profiles).where(eq(profiles.id, profileId)).limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
+
+    const badKey = s3Keys.find((key) => !isOwnedPhotoKey(key, profile.userId, 'profile_photo'));
+    if (badKey) {
+      throw new BadRequestException('s3Keys must be profile photos uploaded through the profile owner\'s presigned URL');
+    }
 
     const existing = await this.db.select().from(profilePhotos).where(eq(profilePhotos.profileId, profileId));
     const startOrder = existing.length;

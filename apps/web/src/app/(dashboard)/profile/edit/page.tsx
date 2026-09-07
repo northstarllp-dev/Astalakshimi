@@ -716,7 +716,7 @@ export default function ProfileEditPage() {
                 }}
                 className="group relative aspect-[3/4] overflow-hidden rounded-xl border-2 border-border bg-muted"
               >
-                <Image src={getMediaUrl(photo.url)} alt={`Photo ${i + 1}`} fill className="object-cover" sizes="120px" unoptimized />
+                <Image src={getMediaUrl(photo.url)} alt={`Photo ${i + 1}`} fill className="object-cover" sizes="120px" />
                 {i === 0 && (
                   <span className="absolute left-1 top-1 rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold text-secondary-foreground">
                     <Star className="mr-0.5 inline h-2.5 w-2.5 fill-current" />Primary

@@ -1,35 +1,32 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
-import { getApiBaseUrl } from '@/lib/api-config';
+
+const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 async function handleProxy(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const resolvedParams = await params;
   const path = resolvedParams.path.join('/');
+
+  // Media URLs are served directly from S3 (or CloudFront) via getMediaUrl().
+  // Refuse proxying them so next/image is forced onto the public, optimized path.
+  if (path === 'media/image' || path.startsWith('media/image/')) {
+    return NextResponse.json(
+      { message: 'Media is served directly. Use getMediaUrl() to build a public S3/CloudFront URL.' },
+      { status: 410 },
+    );
+  }
+
   const searchParams = request.nextUrl.searchParams.toString();
   const queryString = searchParams ? `?${searchParams}` : '';
-  const url = `${getApiBaseUrl()}/${path}${queryString}`;
+  const url = `${NEXT_PUBLIC_API_URL}/${path}${queryString}`;
 
   const cookieStore = await cookies();
   const token = cookieStore.get('astalakshimi.auth_token')?.value;
 
   const headers = new Headers(request.headers);
-  for (const name of [
-    'host',
-    'cookie',
-    'connection',
-    'keep-alive',
-    'transfer-encoding',
-    'te',
-    'trailer',
-    'upgrade',
-    'expect',
-    'proxy-connection',
-    'proxy-authenticate',
-    'proxy-authorization',
-  ]) {
-    headers.delete(name);
-  }
+  headers.delete('host');
+  headers.delete('cookie');
   
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
@@ -60,7 +57,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       const refreshToken = cookieStore.get('astalakshimi.refresh_token')?.value;
       
       if (refreshToken) {
-        const refreshRes = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
+        const refreshRes = await fetch(`${NEXT_PUBLIC_API_URL}/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),
@@ -90,9 +87,9 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
             value: newAccessToken,
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
+            sameSite: 'strict',
             path: '/',
-            maxAge: 30 * 24 * 60 * 60,
+            maxAge: 7 * 24 * 60 * 60,
           });
 
           if (newRefreshToken) {
@@ -101,7 +98,7 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
               value: newRefreshToken,
               httpOnly: true,
               secure: process.env.NODE_ENV === 'production',
-              sameSite: 'lax',
+              sameSite: 'strict',
               path: '/',
               maxAge: 7 * 24 * 60 * 60,
             });
@@ -130,23 +127,10 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
       statusText: res.statusText,
       headers: responseHeaders,
     });
-  } catch (error: any) {
-    const causeCode = error?.cause?.code || error?.code;
-    const apiUnavailable =
-      causeCode === 'ECONNREFUSED' ||
-      causeCode === 'ECONNRESET' ||
-      error?.message?.includes('fetch failed');
-
+  } catch (error) {
     console.error('Proxy error fetching', url, ':', error);
-
     return NextResponse.json(
-      {
-        message: apiUnavailable
-          ? 'API server is not running. Start it with `pnpm dev` and wait for "Nest application successfully started".'
-          : 'Proxy error',
-        error: error.message,
-        cause: error.cause,
-      },
+      { message: 'Proxy error', error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 502 },
     );
   }

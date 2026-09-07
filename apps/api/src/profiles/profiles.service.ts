@@ -20,11 +20,18 @@ import {
   subscriptions,
   specializations,
 } from '@astalakshimi/database';
-import { eq, asc, and, or } from 'drizzle-orm';
+import { eq, asc, and, or, inArray, sql } from 'drizzle-orm';
 import type { CompleteRegistrationPayload, FullProfileView } from '@astalakshimi/types';
+import { getApprovedPhotos, computeBlurDecision, isOwnedPhotoKey } from '../common/photo-access';
+import { LruCache } from '../common/cache/lru-cache';
 
 @Injectable()
 export class ProfilesService {
+  // Short-lived cache for the assembled profile view. Keyed by profile id;
+  // mutated when the profile is updated via the same service. Stale after a
+  // restart, bounded by `maxEntries`. Single-instance only.
+  private profileViewCache = new LruCache<string, FullProfileView>(500, 60_000);
+
   constructor(
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly blocksService: BlocksService,
@@ -32,6 +39,10 @@ export class ProfilesService {
     private readonly educationsService: EducationsService,
     private readonly careersService: CareersService,
   ) {}
+
+  private invalidateProfileCache(profileId: string) {
+    this.profileViewCache.delete(profileId);
+  }
 
   private async buildEducationUpdate(
     payload: Partial<CompleteRegistrationPayload>,
@@ -477,8 +488,13 @@ export class ProfilesService {
           },
         });
 
-      // 7. Insert Photos
+      // 7. Insert Photos — reject keys not minted for this user via presigned upload.
       if (payload.photoS3Keys && payload.photoS3Keys.length > 0) {
+        const badPhoto = payload.photoS3Keys.find((key) => !isOwnedPhotoKey(key, userId, 'profile_photo'));
+        if (badPhoto) {
+          throw new BadRequestException('photoS3Keys must be profile photos uploaded through your own presigned URL');
+        }
+
         // Clear previous photos if updating
         await tx.delete(profilePhotos).where(eq(profilePhotos.profileId, profileId));
 
@@ -497,6 +513,14 @@ export class ProfilesService {
       const selfieS3Key = payload.selfieS3Key && payload.selfieS3Key.trim() !== '' ? payload.selfieS3Key : null;
       const govtIdType = payload.govtIdType && payload.govtIdType.trim() !== '' ? (payload.govtIdType as any) : null;
       const govtIdS3Key = payload.govtIdS3Key && payload.govtIdS3Key.trim() !== '' ? payload.govtIdS3Key : null;
+
+      if (selfieS3Key && !isOwnedPhotoKey(selfieS3Key, userId, 'selfie')) {
+        throw new BadRequestException('selfieS3Key must be a selfie uploaded through your own presigned URL');
+      }
+
+      if (govtIdS3Key && !isOwnedPhotoKey(govtIdS3Key, userId, 'govt_id')) {
+        throw new BadRequestException('govtIdS3Key must be an ID uploaded through your own presigned URL');
+      }
 
       await tx
         .insert(verifications)
@@ -569,6 +593,7 @@ export class ProfilesService {
       .limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
     const profileId = profile.id;
+    this.invalidateProfileCache(profileId);
     const educationFields = await this.buildEducationUpdate(payload, profile.educationId);
     const careerFields = await this.buildCareerUpdate(payload);
 
@@ -693,6 +718,11 @@ export class ProfilesService {
     const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
     const profileId = profile.id;
+    this.invalidateProfileCache(profileId);
+
+    if (!isOwnedPhotoKey(s3Key, userId, 'profile_photo')) {
+      throw new BadRequestException('s3Key must be a profile photo uploaded through your own presigned URL');
+    }
 
     const existingPhotos = await this.db.select().from(profilePhotos).where(eq(profilePhotos.profileId, profileId)).orderBy(asc(profilePhotos.displayOrder));
     const isPrimary = existingPhotos.length === 0;
@@ -733,15 +763,43 @@ export class ProfilesService {
   async reorderPhotos(userId: string, photoIds: string[]) {
     const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
+    this.invalidateProfileCache(profile.id);
 
-    return this.db.transaction(async (tx) => {
-      for (let i = 0; i < photoIds.length; i++) {
-        await tx.update(profilePhotos)
-          .set({ displayOrder: i, isPrimary: i === 0 })
-          .where(eq(profilePhotos.id, photoIds[i]));
-      }
-      return this.getMyProfile(userId);
+    // Reject foreign keys first so a caller cannot reorder another user's photos.
+    const owned = await this.db
+      .select({ id: profilePhotos.id })
+      .from(profilePhotos)
+      .where(
+        and(eq(profilePhotos.profileId, profile.id), inArray(profilePhotos.id, photoIds)),
+      );
+    const ownedIds = new Set(owned.map((p) => p.id));
+    if (photoIds.some((id) => !ownedIds.has(id))) {
+      throw new ForbiddenException('One or more photos do not belong to your profile');
+    }
+
+    // Single batched UPDATE via CASE/VALUES instead of N sequential round trips.
+    // CASE maps photo id -> new position; isPrimary follows displayOrder 0.
+    const orderPairs = photoIds.map((id, i) => ({ id, order: i }));
+    const idsSql = sql.join(
+      orderPairs.map((p) => sql`${p.id}::uuid`),
+      sql`, `,
+    );
+    const caseSql = sql.join(
+      orderPairs.map((p) => sql`WHEN id = ${p.id}::uuid THEN ${p.order}`),
+      sql` `,
+    );
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE profile_photos
+        SET display_order = CASE ${caseSql} END,
+            is_primary = (CASE ${caseSql} END = 0)
+        WHERE profile_id = ${profile.id} AND id IN (${idsSql})
+      `);
     });
+
+    // Read on a separate connection after commit — getMyProfile uses this.db.
+    return this.getMyProfile(userId);
   }
 
   async getMyProfile(userId: string): Promise<FullProfileView> {
@@ -755,40 +813,31 @@ export class ProfilesService {
       throw new NotFoundException('Profile not found for this user. Please complete registration.');
     }
 
-    const [family] = await this.db
-      .select()
-      .from(familyDetails)
-      .where(eq(familyDetails.profileId, profile.id))
-      .limit(1);
+    const [family, lifestyle, horoscope, verificationRes, photos] = await Promise.all([
+      this.db
+        .select()
+        .from(familyDetails)
+        .where(eq(familyDetails.profileId, profile.id))
+        .limit(1),
+      this.db
+        .select()
+        .from(lifestyleInterests)
+        .where(eq(lifestyleInterests.profileId, profile.id))
+        .limit(1),
+      this.db
+        .select()
+        .from(horoscopes)
+        .where(eq(horoscopes.profileId, profile.id))
+        .limit(1),
+      this.db
+        .select()
+        .from(verifications)
+        .where(eq(verifications.profileId, profile.id))
+        .limit(1),
+      getApprovedPhotos(this.db, profile.id),
+    ]);
 
-    const [lifestyle] = await this.db
-      .select()
-      .from(lifestyleInterests)
-      .where(eq(lifestyleInterests.profileId, profile.id))
-      .limit(1);
-
-    const [horoscope] = await this.db
-      .select()
-      .from(horoscopes)
-      .where(eq(horoscopes.profileId, profile.id))
-      .limit(1);
-
-    const [verification] = await this.db
-      .select()
-      .from(verifications)
-      .where(eq(verifications.profileId, profile.id))
-      .limit(1);
-
-    const photos = await this.db
-      .select({
-        id: profilePhotos.id,
-        s3Key: profilePhotos.s3Key,
-        isPrimary: profilePhotos.isPrimary,
-        displayOrder: profilePhotos.displayOrder,
-      })
-      .from(profilePhotos)
-      .where(eq(profilePhotos.profileId, profile.id))
-      .orderBy(asc(profilePhotos.displayOrder));
+    const verification = Array.isArray(verificationRes) ? verificationRes[0] : verificationRes;
 
     return {
       profile: await this.enrichProfileDetails(profile as any),
@@ -801,18 +850,86 @@ export class ProfilesService {
   }
 
   async getProfileById(profileId: string, viewerUserId?: string): Promise<FullProfileView> {
-    const [profile] = await this.db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, profileId))
-      .limit(1);
+    // Cache only the viewer-independent parts. Viewer-specific decisions
+    // (withholdKey, contactAccess, isMutualConnect) are re-applied per call.
+    const cachedBase = this.profileViewCache.get(`base:${profileId}`);
+
+    let profile: typeof profiles.$inferSelect | undefined;
+    let family: any = null;
+    let lifestyle: any = null;
+    let horoscopeRow: any = null;
+    let verification: any = null;
+    let photos: Array<{ id: string; s3Key: string; isPrimary: boolean; displayOrder: number }> = [];
+
+    if (cachedBase) {
+      const c = cachedBase as any;
+      profile = c.profile;
+      family = c.family;
+      lifestyle = c.lifestyle;
+      horoscopeRow = c.horoscopeRow;
+      verification = c.verification;
+      photos = c.photos;
+    } else {
+      [profile] = await this.db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, profileId))
+        .limit(1);
+
+      if (!profile) {
+        throw new NotFoundException('Profile not found');
+      }
+
+      [family, lifestyle, horoscopeRow, verification, photos] = await Promise.all([
+        this.db
+          .select()
+          .from(familyDetails)
+          .where(eq(familyDetails.profileId, profile.id))
+          .limit(1),
+        this.db
+          .select()
+          .from(lifestyleInterests)
+          .where(eq(lifestyleInterests.profileId, profile.id))
+          .limit(1),
+        this.db
+          .select()
+          .from(horoscopes)
+          .where(eq(horoscopes.profileId, profile.id))
+          .limit(1),
+        this.db
+          .select()
+          .from(verifications)
+          .where(eq(verifications.profileId, profile.id))
+          .limit(1),
+        this.db
+          .select({
+            id: profilePhotos.id,
+            s3Key: profilePhotos.s3Key,
+            isPrimary: profilePhotos.isPrimary,
+            displayOrder: profilePhotos.displayOrder,
+          })
+          .from(profilePhotos)
+          .where(eq(profilePhotos.profileId, profile.id))
+          .orderBy(asc(profilePhotos.displayOrder)),
+      ]);
+
+      this.profileViewCache.set(`base:${profileId}`, {
+        profile,
+        family,
+        lifestyle,
+        horoscopeRow,
+        verification,
+        photos,
+        setting: null, // fetched fresh on every read; cheap single-row lookup
+      } as unknown as FullProfileView);
+    }
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
     }
 
     if (viewerUserId) {
-      // Find viewer's profile id
+      // Find viewer's profile id (also cached implicitly by the early-return).
       const [viewerProfile] = await this.db
         .select({ id: profiles.id })
         .from(profiles)
@@ -837,40 +954,14 @@ export class ProfilesService {
       }
     }
 
-    const [family] = await this.db
-      .select()
-      .from(familyDetails)
-      .where(eq(familyDetails.profileId, profile.id))
-      .limit(1);
-
-    const [lifestyle] = await this.db
-      .select()
-      .from(lifestyleInterests)
-      .where(eq(lifestyleInterests.profileId, profile.id))
-      .limit(1);
-
-    const [horoscopeRow] = await this.db
-      .select()
-      .from(horoscopes)
-      .where(eq(horoscopes.profileId, profile.id))
-      .limit(1);
-
-    const [verification] = await this.db
-      .select()
-      .from(verifications)
-      .where(eq(verifications.profileId, profile.id))
-      .limit(1);
-
-    const photos = await this.db
-      .select({
-        id: profilePhotos.id,
-        s3Key: profilePhotos.s3Key,
-        isPrimary: profilePhotos.isPrimary,
-        displayOrder: profilePhotos.displayOrder,
-      })
-      .from(profilePhotos)
-      .where(eq(profilePhotos.profileId, profile.id))
-      .orderBy(asc(profilePhotos.displayOrder));
+    // `setting` (photoBlur) is owner-scoped (viewer-independent) so we cache
+    // it alongside the rest of the profile data.
+    const setting = await this.db
+      .select({ photoBlur: userSettings.photoBlur })
+      .from(userSettings)
+      .where(eq(userSettings.userId, profile.userId))
+      .limit(1)
+      .then((r) => r[0]);
 
     const { isMutualConnect, contactPhone } = await this.getMutualConnectState(
       viewerUserId,
@@ -902,22 +993,12 @@ export class ProfilesService {
       contactAccess.canView = true;
     }
 
-    let blurPhoto = false;
-
-    // Only fetch blur settings and compute connection if viewer is not the profile owner
-    if (viewerUserId && viewerUserId !== profile.userId) {
-      const [setting] = await this.db
-        .select()
-        .from(userSettings)
-        .where(eq(userSettings.userId, profile.userId))
-        .limit(1);
-
-      const photoBlurSetting = setting?.photoBlur || 'always';
-
-      if (photoBlurSetting !== 'never') {
-        blurPhoto = !isMutualConnect;
-      }
-    }
+    const { blurPhoto, withholdKey } = computeBlurDecision({
+      photoBlur: setting?.photoBlur,
+      isAccepted: isMutualConnect,
+      viewerUserId,
+      ownerUserId: profile.userId,
+    });
 
     const canViewHoroscope = isOwnProfile || (isMutualConnect && contactAccess.isMutualBenefit);
 
@@ -952,9 +1033,13 @@ export class ProfilesService {
       family: (family as any) || null,
       lifestyle: (lifestyle as any) || null,
       horoscope: horoscopePayload,
-      photos,
+      // Withhold keys entirely when blurred: the bucket is public, so sending
+      // them would let anyone view the photo regardless of the blur flag.
+      photos: withholdKey ? [] : photos,
       verificationStatus: verification?.status || 'idle',
       blurPhoto,
+      isVerified: verification?.status === 'verified',
+      photoVerified: verification?.status === 'verified',
       isMutualConnect,
       contactPhone: visiblePhone,
       hasHoroscope: Boolean(horoscopeRow?.horoscopeS3Key),

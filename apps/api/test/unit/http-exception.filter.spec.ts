@@ -30,7 +30,8 @@ describe('GlobalHttpExceptionFilter (Unit Tests)', () => {
     expect(mockJson).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: 500,
-        message: 'Database connection failed',
+        // Internal error details are intentionally not leaked to clients.
+        message: 'Internal server error',
         path: '/test',
         timestamp: expect.any(String),
       })

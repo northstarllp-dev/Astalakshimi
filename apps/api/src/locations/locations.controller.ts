@@ -1,6 +1,8 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { LocationsService } from './locations.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { JwtAuthGuard } from '../common/guards/auth.guard';
 import {
   cityAutocompleteQuerySchema,
   resolveCityQuerySchema,
@@ -8,6 +10,8 @@ import {
   type ResolveCityQuery,
 } from '@astalakshimi/validation';
 
+@UseGuards(JwtAuthGuard)
+@Throttle({ default: { limit: 120, ttl: 60_000 } })
 @Controller('locations')
 export class LocationsController {
   constructor(private readonly locationsService: LocationsService) {}

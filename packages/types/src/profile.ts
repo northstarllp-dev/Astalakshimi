@@ -107,6 +107,9 @@ export interface FullProfileView {
   }[];
   verificationStatus: 'idle' | 'pending' | 'verified' | 'rejected';
   blurPhoto?: boolean;
+  /** True only when an actual verification review came back `verified`. */
+  isVerified?: boolean;
+  photoVerified?: boolean;
   isMutualConnect?: boolean;
   contactPhone?: string | null;
   hasHoroscope?: boolean;

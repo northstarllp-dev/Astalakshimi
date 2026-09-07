@@ -5,6 +5,7 @@ import Image from "next/image"
 import { BadgeCheck, ChevronLeft, ChevronRight, FileText, MapPin, ShieldCheck, X } from "lucide-react"
 import { cn, getMediaUrl } from "@/lib/utils"
 import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
+import { LockedPhoto } from "@/components/profile/locked-photo"
 
 type ProfileGalleryProps = {
   name: string
@@ -56,6 +57,9 @@ export function ProfileGallery({
   const hero = photos[activeIndex] ?? photos[0]
   const extra = photos.slice(1)
   const hasMany = photos.length > 1
+  // The API withholds keys entirely when a photo should be blurred, so an
+  // empty list here means "not visible to this viewer" rather than "no photos".
+  const isHidden = Boolean(blurPhoto) || photos.length === 0
 
   const openLightbox = (index: number) => {
     setActiveIndex(index)
@@ -92,17 +96,21 @@ export function ProfileGallery({
     <>
       <div className="flex h-full flex-col">
         <div className="group relative h-full min-h-0 w-full overflow-hidden bg-muted">
-          <Image
-            src={getMediaUrl(hero)}
-            alt={`${name}, ${age}`}
-            fill
-            priority
-            className={cn(
-              "object-cover object-[center_12%] transition-transform duration-300 group-hover:scale-[1.02]",
-              blurPhoto ? "blur-xl scale-110" : ""
-            )}
-            sizes="(max-width: 1024px) 90vw, 40vw"
-          />
+          {isHidden ? (
+            <LockedPhoto label={`${name}'s photo is hidden`} />
+          ) : (
+            <Image
+              src={getMediaUrl(hero)}
+              alt={`${name}, ${age}`}
+              fill
+              priority
+              className={cn(
+                "object-cover object-[center_12%] transition-transform duration-300 group-hover:scale-[1.02]",
+                blurPhoto ? "blur-xl scale-110" : ""
+              )}
+              sizes="(max-width: 1024px) 90vw, 40vw"
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/15" />
 
           <div
@@ -297,13 +305,17 @@ export function ProfileGallery({
           )}
 
           <div className="relative h-full w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
-            <Image
-              src={getMediaUrl(photos[activeIndex])}
-              alt={`${name} photo ${activeIndex + 1}`}
-              fill
-              className={cn("object-contain", blurPhoto ? "blur-2xl scale-105" : "")}
-              sizes="100vw"
-            />
+            {isHidden ? (
+              <LockedPhoto label={`${name}'s photo is hidden`} />
+            ) : (
+              <Image
+                src={getMediaUrl(photos[activeIndex])}
+                alt={`${name} photo ${activeIndex + 1}`}
+                fill
+                className={cn("object-contain", blurPhoto ? "blur-2xl scale-105" : "")}
+                sizes="100vw"
+              />
+            )}
           </div>
 
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#fffbf4] px-3 py-1 text-xs font-semibold text-primary">

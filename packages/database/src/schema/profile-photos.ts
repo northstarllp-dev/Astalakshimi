@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, boolean, integer, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, boolean, integer, timestamp, pgEnum, index, text } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
 
 export const photoStatusEnum = pgEnum('photo_status', ['pending', 'approved', 'rejected']);
@@ -11,6 +11,7 @@ export const profilePhotos = pgTable('profile_photos', {
   isPrimary: boolean('is_primary').default(false).notNull(),
   displayOrder: integer('display_order').default(0).notNull(), // 0 = primary, 1-4 = additional
   status: photoStatusEnum('status').default('pending').notNull(),
+  blurDataURL: text('blur_data_url'), // ~200 byte base64 LQIP for next/image placeholder="blur"
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({

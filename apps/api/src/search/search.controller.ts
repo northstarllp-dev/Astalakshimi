@@ -2,6 +2,8 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { searchQuerySchema, type SearchQuery } from '@astalakshimi/validation';
 import type { UserSession } from '@astalakshimi/types';
 
 @UseGuards(JwtAuthGuard)
@@ -12,8 +14,8 @@ export class SearchController {
   @Get()
   searchProfiles(
     @CurrentUser() user: UserSession,
-    @Query() query: any, // In a real app we'd use a DTO
+    @Query(new ZodValidationPipe(searchQuerySchema)) query: SearchQuery,
   ) {
-    return this.searchService.searchProfiles(user.userId, query);
+    return this.searchService.searchProfiles(user.userId, query as Record<string, unknown>);
   }
 }

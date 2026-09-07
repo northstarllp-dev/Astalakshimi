@@ -1,14 +1,54 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans } from '@astalakshimi/database';
+import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans, verifications } from '@astalakshimi/database';
 import { eq, and, ne, inArray, gte, lte, or, desc, sql, isNotNull, gt } from 'drizzle-orm';
+import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 
 @Injectable()
 export class SearchService {
-  constructor(@Inject(DB_CLIENT) private readonly db: Database) {}
+  // Short-lived per-user search cache. Absorbs double-tap / refresh / bot loads
+  // without burning DB round trips on a fan-out of 5 sequential queries.
+  // Single-instance only; staleness is fine here.
+  private cache = new Map<string, { ts: number; value: unknown }>();
+  private readonly cacheTtlMs = 15_000;
+
+  constructor(
+    @Inject(DB_CLIENT) private readonly db: Database,
+    private readonly entitlementsService: EntitlementsService,
+  ) {}
+
+  private cacheKey(userId: string, filters: any): string {
+    // Stable stringify (sorted keys) so equivalent filters share a key.
+    const ordered: Record<string, unknown> = {};
+    for (const k of Object.keys(filters).sort()) ordered[k] = filters[k];
+    return `${userId}:${JSON.stringify(ordered)}`;
+  }
 
   async searchProfiles(userId: string, filters: any) {
+    // Cache check
+    const key = this.cacheKey(userId, filters);
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.ts < this.cacheTtlMs) {
+      return cached.value as ReturnType<typeof this.executeSearch>;
+    }
+
+    const result = await this.executeSearch(userId, filters);
+
+    // Evict oldest when the cache grows too large (simple LRU-by-insertion)
+    if (this.cache.size > 200) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, { ts: Date.now(), value: result });
+    return result;
+  }
+
+  private async executeSearch(userId: string, filters: any): Promise<{
+    profiles: Array<Record<string, unknown>>;
+    totalCount: number;
+  }> {
     const [currentUser] = await this.db
       .select({ id: profiles.id, gender: profiles.gender })
       .from(profiles)
@@ -42,24 +82,38 @@ export class SearchService {
     conditions.push(isNotNull(profiles.aboutMe));
     conditions.push(sql`EXISTS (SELECT 1 FROM profile_photos WHERE profile_photos.profile_id = profiles.id AND profile_photos.is_primary = true)`);
     
-    // advanced filters
+    // advanced filters (paid entitlement)
     if (filters.advanced) {
-      try {
-        const adv = typeof filters.advanced === 'string' ? JSON.parse(filters.advanced) : filters.advanced;
-        if (adv.heights && adv.heights.length > 0) conditions.push(inArray(profiles.heightCm, adv.heights.map((h: string) => {
-          // Simplistic mapping, in reality we'd parse the range or have consistent data.
-          // For now, if there's any filter, just use a dummy '0' if it doesn't parse well,
-          // or ideally mapping it properly. We will just check if profiles.heightCm matches logic if possible, 
-          // or for now just avoid crashing. If the DB just stores heights as strings, we do inArray.
-          // In the database schema heightCm is integer.
-          return parseInt(h) || 165; 
-        })));
-        if (adv.educations && adv.educations.length > 0) conditions.push(inArray(profiles.educationLevel, adv.educations));
-        if (adv.incomes && adv.incomes.length > 0) conditions.push(inArray(profiles.annualIncome, adv.incomes));
-        if (adv.occupations && adv.occupations.length > 0) conditions.push(inArray(profiles.profession, adv.occupations));
-      } catch (e) {
-        // ignore advanced parsing errors
+      const hasAdvanced = await this.entitlementsService.checkEntitlement(userId, 'advanced_filters');
+      if (!hasAdvanced) {
+        throw new ForbiddenException('Advanced filters require a paid plan. Please upgrade your plan.');
       }
+
+      // Only swallow JSON.parse failures. Validation throws (BadRequestException)
+      // must propagate so the client gets a real 400 instead of a silent pass.
+      let adv: any;
+      try {
+        adv =
+          typeof filters.advanced === 'string' ? JSON.parse(filters.advanced) : filters.advanced;
+      } catch {
+        throw new BadRequestException('Invalid "advanced" payload (must be JSON)');
+      }
+
+      if (adv.heights && adv.heights.length > 0) {
+        // Reject the request when any height is unparseable — silently rewriting
+        // input to 165cm returned wrong matches without telling the caller.
+        const heights = adv.heights.map((h: string) => {
+          const n = parseInt(h, 10);
+          if (!Number.isFinite(n) || n < 100 || n > 250) {
+            throw new BadRequestException(`Invalid height value: ${h}`);
+          }
+          return n;
+        });
+        conditions.push(inArray(profiles.heightCm, heights));
+      }
+      if (adv.educations && adv.educations.length > 0) conditions.push(inArray(profiles.educationLevel, adv.educations));
+      if (adv.incomes && adv.incomes.length > 0) conditions.push(inArray(profiles.annualIncome, adv.incomes));
+      if (adv.occupations && adv.occupations.length > 0) conditions.push(inArray(profiles.profession, adv.occupations));
     }
 
     // pagination
@@ -114,84 +168,123 @@ export class SearchService {
     const profileIds = result.map((p) => p.id);
     const userIds = result.map((p) => p.userId);
     
-    let photos: any[] = [];
+    let photos: Map<string, { s3Key: string; id: string }> = new Map();
     let settings: any[] = [];
     let connections: any[] = [];
     let activeSubs: any[] = [];
+    let verificationRows: any[] = [];
 
     if (profileIds.length > 0) {
-      photos = await this.db
-        .select()
-        .from(profilePhotos)
-        .where(
-          and(
-            inArray(profilePhotos.profileId, profileIds),
-            eq(profilePhotos.isPrimary, true)
-          )
-        );
-
-      settings = await this.db
-        .select()
+      // Run all five lookups concurrently — they are independent and the
+      // sequential await chain was the dominant cost on the hot path.
+      const photosPromise = getApprovedPrimaryPhotos(this.db, profileIds);
+      const settingsPromise = this.db
+        .select({
+          userId: userSettings.userId,
+          photoBlur: userSettings.photoBlur,
+        })
         .from(userSettings)
         .where(inArray(userSettings.userId, userIds));
+      const subsPromise = this.db
+        .select({
+          userId: subscriptions.userId,
+          planSlug: plans.slug,
+          planName: plans.name,
+        })
+        .from(subscriptions)
+        .innerJoin(plans, eq(subscriptions.planId, plans.id))
+        .where(
+          and(
+            inArray(subscriptions.userId, userIds),
+            eq(subscriptions.status, 'active'),
+            gt(subscriptions.expiresAt, new Date()),
+          ),
+        );
+      const connectionsPromise = currentUser
+        ? this.db
+            .select({
+              senderProfileId: interests.senderProfileId,
+              receiverProfileId: interests.receiverProfileId,
+            })
+            .from(interests)
+            .where(
+              and(
+                eq(interests.status, 'accepted'),
+                // (viewer is sender OR viewer is receiver) AND (other party is in result set)
+                or(
+                  and(
+                    eq(interests.senderProfileId, currentUser.id),
+                    inArray(interests.receiverProfileId, profileIds),
+                  ),
+                  and(
+                    eq(interests.receiverProfileId, currentUser.id),
+                    inArray(interests.senderProfileId, profileIds),
+                  ),
+                ),
+              ),
+            )
+        : Promise.resolve([] as Array<{ senderProfileId: string; receiverProfileId: string }>);
+      const verificationPromise = this.db
+        .select({ profileId: verifications.profileId, status: verifications.status })
+        .from(verifications)
+        .where(inArray(verifications.profileId, profileIds));
 
       try {
-        activeSubs = await this.db
-          .select({
-            userId: subscriptions.userId,
-            planSlug: plans.slug,
-            planName: plans.name,
-          })
-          .from(subscriptions)
-          .innerJoin(plans, eq(subscriptions.planId, plans.id))
-          .where(
-            and(
-              inArray(subscriptions.userId, userIds),
-              eq(subscriptions.status, 'active'),
-              gt(subscriptions.expiresAt, new Date())
-            )
-          );
+        const [photosRes, settingsRes, subsRes, connectionsRes, verificationRes] =
+          await Promise.all([
+            photosPromise,
+            settingsPromise,
+            subsPromise,
+            connectionsPromise.catch(() => []),
+            verificationPromise,
+          ]);
+        photos = photosRes;
+        settings = settingsRes;
+        activeSubs = subsRes;
+        connections = connectionsRes;
+        verificationRows = verificationRes;
       } catch (err) {
-        // Fallback if subscription join fails
+        // subscriptions table may be empty in some setups; keep going with what we have
+        photos = await photosPromise.catch(() => new Map());
+        settings = await settingsPromise.catch(() => []);
         activeSubs = [];
-      }
-
-      if (currentUser) {
-        connections = await this.db
-          .select()
-          .from(interests)
-          .where(
-            and(
-              or(eq(interests.senderProfileId, currentUser.id), eq(interests.receiverProfileId, currentUser.id)),
-              or(inArray(interests.senderProfileId, profileIds), inArray(interests.receiverProfileId, profileIds)),
-              eq(interests.status, 'accepted')
-            )
-          );
+        connections = [];
+        verificationRows = await verificationPromise.catch(() => []);
       }
     }
 
+    const verificationByProfile = new Map(
+      verificationRows.map((v: any) => [v.profileId, v.status]),
+    );
+
     const mappedResult = result.map((profile) => {
-      const primaryPhoto = photos.find((photo) => photo.profileId === profile.id);
+      const primaryPhoto = photos.get(profile.id);
       const setting = settings.find((s) => s.userId === profile.userId);
       const userSub = activeSubs.find((s) => s.userId === profile.userId);
       const isAccepted = connections.some(
         (c) => c.senderProfileId === profile.id || c.receiverProfileId === profile.id
       );
 
-      // Determine blur logic:
-      // 'always': means always blur (until accepted, which overrides it conceptually)
-      // 'when_not_connected': blur if not accepted
-      // 'never': never blur
-      // Default interpretation: if it's 'never', it's visible. Otherwise, require accepted connection.
-      const photoBlurSetting = setting?.photoBlur || 'always';
-      const blurPhoto = photoBlurSetting !== 'never' && !isAccepted;
+      const { blurPhoto, withholdKey } = computeBlurDecision({
+        photoBlur: setting?.photoBlur,
+        isAccepted,
+        viewerUserId: userId,
+        ownerUserId: profile.userId,
+      });
+
+      const verificationStatus = verificationByProfile.get(profile.id) ?? 'idle';
+      const isVerified = verificationStatus === 'verified';
 
       return {
         ...profile,
         // map for frontend component compatibility
         age: profile.dob ? new Date().getFullYear() - new Date(profile.dob).getFullYear() : 25,
-        photos: primaryPhoto ? [primaryPhoto.s3Key] : [], 
+        // Key is withheld when blurred — the bucket is public, so sending it
+        // would let anyone view the photo regardless of the blur flag.
+        photos: withholdKey || !primaryPhoto ? [] : [primaryPhoto.s3Key],
         blurPhoto,
+        photoVerified: isVerified,
+        isVerified,
         planSlug: userSub?.planSlug || 'free',
         planName: userSub?.planName || 'Free',
         education: profile.educationLevel || 'Not specified',

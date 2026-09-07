@@ -1,12 +1,13 @@
 import { Injectable, Inject, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { interests, profiles, profilePhotos } from '@astalakshimi/database';
+import { interests, profiles, userSettings, verifications } from '@astalakshimi/database';
 import { eq, or, and, sql, desc, inArray, ne } from 'drizzle-orm';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 import { BlocksService } from '../blocks/blocks.service';
+import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
 
 @Injectable()
 export class InterestsService {
@@ -272,19 +273,35 @@ export class InterestsService {
     if (rows.length === 0) return [];
 
     const senderIds = rows.map((r) => r.sender.id);
-    const photos = await this.db
-      .select()
-      .from(profilePhotos)
-      .where(
-        and(
-          inArray(profilePhotos.profileId, senderIds),
-          eq(profilePhotos.isPrimary, true)
-        )
+    const photos = await getApprovedPrimaryPhotos(this.db, senderIds);
+
+    const settings = await this.db
+      .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
+      .from(userSettings)
+      .where(inArray(userSettings.userId, rows.map((r) => r.sender.userId)));
+    const blurByUser = new Map(settings.map((s) => [s.userId, s.photoBlur]));
+
+    const verificationRows = await this.db
+      .select({ profileId: verifications.profileId, status: verifications.status })
+      .from(verifications)
+      .where(inArray(verifications.profileId, senderIds));
+    const verificationByProfile = new Map(verificationRows.map((v) => [v.profileId, v.status]));
+
+    return rows.map((r) => {
+      // A received interest is only a connection once it has been accepted.
+      const isAccepted = r.interest.status === 'accepted';
+      const { blurPhoto, withholdKey } = computeBlurDecision({
+        photoBlur: blurByUser.get(r.sender.userId),
+        isAccepted,
+        ownerUserId: r.sender.userId,
+      });
+      return this.formatInterestItem(
+        r.interest,
+        r.sender,
+        withholdKey ? null : (photos.get(r.sender.id)?.s3Key ?? null),
+        { blurPhoto, isVerified: verificationByProfile.get(r.sender.id) === 'verified' },
       );
-
-    const photoMap = new Map(photos.map((p) => [p.profileId, p.s3Key]));
-
-    return rows.map((r) => this.formatInterestItem(r.interest, r.sender, photoMap.get(r.sender.id)));
+    });
   }
 
   async getSentInterests(userId: string) {
@@ -303,19 +320,34 @@ export class InterestsService {
     if (rows.length === 0) return [];
 
     const receiverIds = rows.map((r) => r.receiver.id);
-    const photos = await this.db
-      .select()
-      .from(profilePhotos)
-      .where(
-        and(
-          inArray(profilePhotos.profileId, receiverIds),
-          eq(profilePhotos.isPrimary, true)
-        )
+    const photos = await getApprovedPrimaryPhotos(this.db, receiverIds);
+
+    const settings = await this.db
+      .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
+      .from(userSettings)
+      .where(inArray(userSettings.userId, rows.map((r) => r.receiver.userId)));
+    const blurByUser = new Map(settings.map((s) => [s.userId, s.photoBlur]));
+
+    const verificationRows = await this.db
+      .select({ profileId: verifications.profileId, status: verifications.status })
+      .from(verifications)
+      .where(inArray(verifications.profileId, receiverIds));
+    const verificationByProfile = new Map(verificationRows.map((v) => [v.profileId, v.status]));
+
+    return rows.map((r) => {
+      const isAccepted = r.interest.status === 'accepted';
+      const { blurPhoto, withholdKey } = computeBlurDecision({
+        photoBlur: blurByUser.get(r.receiver.userId),
+        isAccepted,
+        ownerUserId: r.receiver.userId,
+      });
+      return this.formatInterestItem(
+        r.interest,
+        r.receiver,
+        withholdKey ? null : (photos.get(r.receiver.id)?.s3Key ?? null),
+        { blurPhoto, isVerified: verificationByProfile.get(r.receiver.id) === 'verified' },
       );
-
-    const photoMap = new Map(photos.map((p) => [p.profileId, p.s3Key]));
-
-    return rows.map((r) => this.formatInterestItem(r.interest, r.receiver, photoMap.get(r.receiver.id)));
+    });
   }
 
   async getMutualInterests(userId: string) {
@@ -345,19 +377,22 @@ export class InterestsService {
     if (rows.length === 0) return [];
 
     const profileIds = rows.map((r) => r.sender.id);
-    const photos = await this.db
-      .select()
-      .from(profilePhotos)
-      .where(
-        and(
-          inArray(profilePhotos.profileId, profileIds),
-          eq(profilePhotos.isPrimary, true)
-        )
-      );
+    const photos = await getApprovedPrimaryPhotos(this.db, profileIds);
 
-    const photoMap = new Map(photos.map((p) => [p.profileId, p.s3Key]));
+    const verificationRows = await this.db
+      .select({ profileId: verifications.profileId, status: verifications.status })
+      .from(verifications)
+      .where(inArray(verifications.profileId, profileIds));
+    const verificationByProfile = new Map(verificationRows.map((v) => [v.profileId, v.status]));
 
-    return rows.map((r) => this.formatInterestItem(r.interest, r.sender, photoMap.get(r.sender.id)));
+    return rows.map((r) =>
+      this.formatInterestItem(
+        r.interest,
+        r.sender,
+        photos.get(r.sender.id)?.s3Key ?? null,
+        { isVerified: verificationByProfile.get(r.sender.id) === 'verified' },
+      ),
+    );
   }
 
   async getUsage(userId: string) {
@@ -591,7 +626,12 @@ export class InterestsService {
     return this.withdrawInterest(userId, targetProfileId);
   }
 
-  private formatInterestItem(interest: any, otherProfile: any, photoS3Key?: string) {
+  private formatInterestItem(
+    interest: any,
+    otherProfile: any,
+    photoS3Key?: string | null,
+    options: { blurPhoto?: boolean; isVerified?: boolean } = {},
+  ) {
     const age = otherProfile.dob
       ? Math.floor((new Date().getTime() - new Date(otherProfile.dob).getTime()) / 31557600000)
       : 25;
@@ -616,7 +656,13 @@ export class InterestsService {
         profession: otherProfile.profession || 'Professional',
         photo: photoS3Key || null,
         photos: photoS3Key ? [photoS3Key] : [],
+        blurPhoto: options.blurPhoto ?? false,
+        photoVerified: options.isVerified ?? false,
+        isVerified: options.isVerified ?? false,
       },
+      blurPhoto: options.blurPhoto ?? false,
+      photoVerified: options.isVerified ?? false,
+      isVerified: options.isVerified ?? false,
     };
   }
 }

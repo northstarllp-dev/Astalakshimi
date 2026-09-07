@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, UseGuards, BadRequestException } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
 
@@ -22,50 +23,36 @@ export class ContactsController {
   @Post('unlock')
   async unlock(
     @CurrentUser() user: UserSession,
-    @Body() body: { targetProfileId?: string },
+    @Body('targetProfileId', UuidValidationPipe) targetProfileId: string,
   ) {
-    if (!body?.targetProfileId) {
-      throw new BadRequestException('targetProfileId is required');
-    }
-    return this.contactsService.unlock(user.userId, body.targetProfileId);
+    return this.contactsService.unlock(user.userId, targetProfileId);
   }
 
   @Post('unlock/order')
   createPaidOrder(
     @CurrentUser() user: UserSession,
-    @Body() body: { targetProfileId?: string },
+    @Body('targetProfileId', UuidValidationPipe) targetProfileId: string,
   ) {
-    if (!body?.targetProfileId) {
-      throw new BadRequestException('targetProfileId is required');
-    }
-    return this.contactsService.createPaidUnlockOrder(user.userId, body.targetProfileId);
+    return this.contactsService.createPaidUnlockOrder(user.userId, targetProfileId);
   }
 
   @Post('unlock/verify')
   verifyPaidUnlock(
     @CurrentUser() user: UserSession,
-    @Body()
-    body: {
-      targetProfileId?: string;
-      razorpayOrderId?: string;
-      razorpayPaymentId?: string;
-      razorpaySignature?: string;
-    },
+    @Body('targetProfileId', UuidValidationPipe) targetProfileId: string,
+    @Body('razorpayOrderId') razorpayOrderId: string,
+    @Body('razorpayPaymentId') razorpayPaymentId: string,
+    @Body('razorpaySignature') razorpaySignature: string,
   ) {
-    if (
-      !body?.targetProfileId ||
-      !body.razorpayOrderId ||
-      !body.razorpayPaymentId ||
-      !body.razorpaySignature
-    ) {
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       throw new BadRequestException('Missing paid unlock verification details');
     }
     return this.contactsService.verifyPaidUnlock(
       user.userId,
-      body.targetProfileId,
-      body.razorpayOrderId,
-      body.razorpayPaymentId,
-      body.razorpaySignature,
+      targetProfileId,
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
     );
   }
 }
