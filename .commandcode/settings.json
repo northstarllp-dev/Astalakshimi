@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Shell(type:*)",
-      "Shell(findstr:*)"
+      "Shell(findstr:*)",
+      "powershell"
     ],
     "deny": [],
     "defaultMode": "default"
