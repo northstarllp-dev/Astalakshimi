@@ -54,6 +54,8 @@ const REFERRED_BY_KEY = "astalakshimi.referredBy"
 function SignupPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const presetPhone = (searchParams.get("phone") ?? "").replace(/\D/g, "").slice(0, 10)
+  const fromLogin = searchParams.get("new") === "1"
   const [hydrated, setHydrated] = useState(false)
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
@@ -68,26 +70,35 @@ function SignupPageInner() {
       return
     }
     if (draft) {
-      const restored: SignupData = {
-        ...draft.data,
-        photos: (draft.data.photoS3Keys?.length
-          ? draft.data.photoS3Keys
-          : draft.data.photos
-        )
-          .filter(Boolean)
-          .map((path) => getMediaUrl(path)),
-        selfiePhoto: draft.data.selfieS3Key
-          ? getMediaUrl(draft.data.selfieS3Key)
-          : draft.data.selfiePhoto || "",
-        govtIdPhoto: draft.data.govtIdS3Key
-          ? getMediaUrl(draft.data.govtIdS3Key)
-          : draft.data.govtIdPhoto || "",
+      const draftPhone = String(draft.data.phone ?? "").replace(/\D/g, "").slice(0, 10)
+      if (fromLogin && presetPhone && draftPhone && draftPhone !== presetPhone) {
+        setData({ ...emptySignupData(), phone: presetPhone })
+        setStep(1)
+      } else {
+        const restored: SignupData = {
+          ...draft.data,
+          phone: presetPhone || draft.data.phone,
+          photos: (draft.data.photoS3Keys?.length
+            ? draft.data.photoS3Keys
+            : draft.data.photos
+          )
+            .filter(Boolean)
+            .map((path) => getMediaUrl(path)),
+          selfiePhoto: draft.data.selfieS3Key
+            ? getMediaUrl(draft.data.selfieS3Key)
+            : draft.data.selfiePhoto || "",
+          govtIdPhoto: draft.data.govtIdS3Key
+            ? getMediaUrl(draft.data.govtIdS3Key)
+            : draft.data.govtIdPhoto || "",
+        }
+        setData(restored)
+        setStep(draft.step)
       }
-      setData(restored)
-      setStep(draft.step)
+    } else if (presetPhone) {
+      setData({ ...emptySignupData(), phone: presetPhone })
     }
     setHydrated(true)
-  }, [router])
+  }, [router, presetPhone, fromLogin])
 
   React.useEffect(() => {
     const ref = searchParams.get("ref")
@@ -199,7 +210,14 @@ function SignupPageInner() {
               <VerificationSubmitted onContinue={() => router.push("/home")} />
             ) : (
               <>
-                {step === 1 && <Step1AccountCreation data={data} updateData={updateData} nextStep={nextStep} />}
+                {step === 1 && (
+                  <Step1AccountCreation
+                    data={data}
+                    updateData={updateData}
+                    nextStep={nextStep}
+                    newAccountHint={fromLogin}
+                  />
+                )}
                 {step === 2 && <Step2Identity data={data} updateData={updateData} nextStep={nextStep} />}
                 {step === 3 && <Step3Community data={data} updateData={updateData} nextStep={nextStep} />}
                 {step === 4 && (
@@ -242,10 +260,12 @@ function Step1AccountCreation({
   data,
   updateData,
   nextStep,
+  newAccountHint = false,
 }: {
   data: SignupData
   updateData: (fields: Partial<SignupData>) => void
   nextStep: () => void
+  newAccountHint?: boolean
 }) {
   const [loading, setLoading] = useState(false)
   const form = useForm({
@@ -301,6 +321,11 @@ function Step1AccountCreation({
         title="Create your account"
         subtitle="Who is this profile for? Enter your mobile  we'll send an OTP after you've set up the profile."
       />
+      {newAccountHint && data.phone ? (
+        <p className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+          This number isn&apos;t registered yet. Create a free account to continue.
+        </p>
+      ) : null}
 
       {/* Profile for */}
       <div className="space-y-3">

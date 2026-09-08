@@ -55,6 +55,11 @@ function LoginPageInner() {
   }, [presetPhone, phoneForm])
 
   const phone = phoneForm.watch("phone")
+  const phoneDigits = (phone ?? "").replace(/\D/g, "").slice(0, 10)
+  const registerHref =
+    phoneDigits.length === 10
+      ? `/register?phone=${encodeURIComponent(phoneDigits)}&new=1`
+      : "/register"
 
   React.useEffect(() => {
     if (!otpSent || seconds <= 0) return
@@ -65,8 +70,9 @@ function LoginPageInner() {
   const handleSendOtp = async (values: LoginPhoneValues) => {
     setError("")
     setLoading(true)
+    const digits = values.phone.replace(/\D/g, "").slice(0, 10)
     try {
-      const res = await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true })
+      const res = await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true, type: "login" })
       setOtpSent(true)
       setSeconds(30)
       if (res.mockOtp) {
@@ -75,7 +81,12 @@ function LoginPageInner() {
         otpForm.reset({ otp: "" })
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to send OTP. Please check the mobile number.")
+      const message = err instanceof Error ? err.message : "Failed to send OTP. Please check the mobile number."
+      if (message.toLowerCase().includes("not registered")) {
+        router.push(digits ? `/register?phone=${encodeURIComponent(digits)}&new=1` : "/register")
+        return
+      }
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -101,10 +112,16 @@ function LoginPageInner() {
   const handleResend = async () => {
     setError("")
     try {
-      await apiClient.auth.sendOtp({ phone: phoneForm.getValues("phone"), consentAccepted: true })
+      await apiClient.auth.sendOtp({ phone: phoneForm.getValues("phone"), consentAccepted: true, type: "login" })
       setSeconds(30)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to resend OTP.")
+      const message = err instanceof Error ? err.message : "Failed to resend OTP."
+      if (message.toLowerCase().includes("not registered")) {
+        const digits = phoneForm.getValues("phone").replace(/\D/g, "").slice(0, 10)
+        router.push(digits ? `/register?phone=${encodeURIComponent(digits)}&new=1` : "/register")
+        return
+      }
+      setError(message)
     }
   }
 
@@ -266,7 +283,7 @@ function LoginPageInner() {
 
                     <p className="text-center text-sm text-muted-foreground">
                       New to Astalakshimi?{" "}
-                      <Link href="/register" className="font-semibold text-primary underline-offset-4 hover:underline">
+                      <Link href={registerHref} className="font-semibold text-primary underline-offset-4 hover:underline">
                         Register free
                       </Link>
                     </p>

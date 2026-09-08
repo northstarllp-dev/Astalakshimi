@@ -51,7 +51,11 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
       update: jest.fn(),
     };
 
-    authService = new AuthService(mockDb, mockJwtService, mockConfigService);
+    const mockSmsService = {
+      sendOtp: jest.fn().mockResolvedValue(undefined),
+    };
+
+    authService = new AuthService(mockDb, mockJwtService, mockConfigService, mockSmsService as any);
   });
 
   describe('sendOtp', () => {
@@ -119,6 +123,26 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
       );
       expect(result.mockOtp).toBeUndefined();
       expect(result.message).toContain('OTP sent successfully');
+    });
+
+    it('should reject login OTP when the phone is not registered', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+      await expect(
+        authService.sendOtp({
+          phone: '9876543210',
+          consentAccepted: true,
+          type: 'login',
+        }),
+      ).rejects.toThrow('This mobile number is not registered. Please sign up.');
+
+      expect(mockDb.insert).not.toHaveBeenCalled();
     });
   });
 

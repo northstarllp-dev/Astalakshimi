@@ -34,6 +34,10 @@ export class AuthService {
     const formattedPhone = input.phone.replace(/\s+/g, '');
     
     const [existingUser] = await this.db.select().from(users).where(eq(users.phone, formattedPhone)).limit(1);
+
+    if (input.type === 'login' && !existingUser) {
+      throw new BadRequestException('This mobile number is not registered. Please sign up.');
+    }
     
     if (input.type === 'register' && existingUser) {
       const [existingProfile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, existingUser.id)).limit(1);
