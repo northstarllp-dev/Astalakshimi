@@ -10,6 +10,7 @@ import type { UserSession, CompleteRegistrationPayload } from '@astalakshimi/typ
 
 const addPhotoSchema = z.object({
   s3Key: z.string().min(1, 'S3 key is required').max(500),
+  contentHash: z.string().length(64).optional(),
 });
 
 const reorderPhotosSchema = z.object({
@@ -95,9 +96,9 @@ export class ProfilesController {
   @Post('me/photos')
   async addPhoto(
     @CurrentUser() user: UserSession,
-    @Body(new ZodValidationPipe(addPhotoSchema)) payload: { s3Key: string },
+    @Body(new ZodValidationPipe(addPhotoSchema)) payload: { s3Key: string; contentHash?: string },
   ) {
-    return this.profilesService.addPhoto(user.userId, payload.s3Key);
+    return this.profilesService.addPhoto(user.userId, payload.s3Key, payload.contentHash);
   }
 
   @Delete('me/photos/:photoId')

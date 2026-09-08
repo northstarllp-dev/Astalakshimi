@@ -8,6 +8,7 @@ export const profilePhotos = pgTable('profile_photos', {
   profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull(),
 
   s3Key: varchar('s3_key', { length: 500 }).notNull(), // profiles/{userId}/photos/{uuid}.webp
+  contentHash: varchar('content_hash', { length: 64 }), // sha256 of the uploaded bytes
   isPrimary: boolean('is_primary').default(false).notNull(),
   displayOrder: integer('display_order').default(0).notNull(), // 0 = primary, 1-4 = additional
   status: photoStatusEnum('status').default('pending').notNull(),
@@ -16,6 +17,7 @@ export const profilePhotos = pgTable('profile_photos', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   profilePhotoIdx: index('profile_photos_profile_idx').on(table.profileId, table.displayOrder),
+  profileContentHashIdx: index('profile_photos_content_hash_idx').on(table.profileId, table.contentHash),
 }));
 
 export type ProfilePhoto = typeof profilePhotos.$inferSelect;

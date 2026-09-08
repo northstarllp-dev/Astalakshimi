@@ -3,6 +3,7 @@
 import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { Button } from "@/components/ui/button"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
+import { MatchSnapFeed, MatchSnapSlide } from "@/components/dashboard/match-snap-feed"
 import * as React from "react"
 import Link from "next/link"
 import { useQueryClient } from "@tanstack/react-query"
@@ -203,8 +204,8 @@ function DiscoverPage() {
   const stars = STARS
 
   return (
-    <main className="mx-auto max-w-7xl px-3 py-4 sm:px-4 md:py-8">
-      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <main className="mx-auto flex h-[calc(100dvh-3.5rem)] max-w-7xl flex-col overflow-hidden px-3 pt-4 sm:px-4 md:h-[calc(100dvh-4rem)] md:pt-8">
+      <div className="mb-5 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Search & browse</p>
           <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">Discover</h1>
@@ -247,7 +248,7 @@ function DiscoverPage() {
       )}
 
       {/* Compact Filters Button Bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
           {/* Small Filters Button */}
           <Button
@@ -380,7 +381,7 @@ function DiscoverPage() {
       )}
 
       {/* Browse tabs */}
-      <div className="-mx-3 mb-4 flex gap-2 overflow-x-auto px-3 pb-1 hide-scrollbar sm:mx-0 sm:px-0">
+      <div className="-mx-3 mb-4 flex shrink-0 gap-2 overflow-x-auto px-3 pb-1 hide-scrollbar sm:mx-0 sm:px-0">
         {BROWSE_TABS.map((tab) => {
           const locked = Boolean(tab.paid) && !paid
           const active = query.tab === tab.id
@@ -408,6 +409,7 @@ function DiscoverPage() {
         })}
       </div>
 
+      <div className="shrink-0">
       <p className="mb-3 text-sm text-muted-foreground">
         {isSearchLoading ? (
           <span>Loading profiles...</span>
@@ -417,21 +419,25 @@ function DiscoverPage() {
           </>
         )}
       </p>
+      </div>
 
-      <div className="space-y-3">
+      <MatchSnapFeed className="pb-24 md:pb-2">
         {visibleMatches.map((match: any, index: any) => (
+          <MatchSnapSlide key={match.id}>
             <MatchListCard
-              key={match.id}
               match={match}
-            featured={index === 0 && query.tab === "all"}
+              featured={index === 0 && query.tab === "all"}
               priority={index === 0}
-            onSkip={(id: any) => skipMutation.mutate(id)}
-            onConnect={(id: any) => connectMutation.mutate(id)}
+              fillViewport
+              className="h-full"
+              onSkip={(id: any) => skipMutation.mutate(id)}
+              onConnect={(id: any) => connectMutation.mutate(id)}
             />
-          ))}
-          {visibleMatches.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
-              <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
+          </MatchSnapSlide>
+        ))}
+        {visibleMatches.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+            <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
             <p className="mt-3 font-semibold">No profiles for this search</p>
             <p className="mt-1 text-sm text-muted-foreground">Widen age, city, or community  results update as you adjust.</p>
             <Button
@@ -446,10 +452,10 @@ function DiscoverPage() {
             </Button>
           </div>
         )}
-      </div>
+      </MatchSnapFeed>
 
       {visibleMatches.length > 0 && totalCount > visibleMatches.length && (
-        <div className="mt-6 flex items-center justify-center gap-4">
+        <div className="mt-3 hidden shrink-0 items-center justify-center gap-4 pb-4 md:flex">
           <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
             Previous
           </Button>

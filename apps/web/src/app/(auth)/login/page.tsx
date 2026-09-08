@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { motion, AnimatePresence } from "framer-motion"
@@ -18,7 +18,22 @@ import { ArrowLeft, Clock3, Loader2, ShieldCheck } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 
 export default function LoginPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex min-h-dvh items-center justify-center text-sm text-muted-foreground">Loading…</div>
+      }
+    >
+      <LoginPageInner />
+    </React.Suspense>
+  )
+}
+
+function LoginPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const presetPhone = (searchParams.get("phone") ?? "").replace(/\D/g, "").slice(0, 10)
+  const fromExisting = searchParams.get("existing") === "1"
   const [otpSent, setOtpSent] = React.useState(false)
   const [seconds, setSeconds] = React.useState(30)
   const [loading, setLoading] = React.useState(false)
@@ -26,7 +41,7 @@ export default function LoginPage() {
 
   const phoneForm = useForm<LoginPhoneValues>({
     resolver: zodResolver(loginPhoneSchema),
-    defaultValues: { phone: "" },
+    defaultValues: { phone: presetPhone },
     mode: "onChange",
   })
   const otpForm = useForm<LoginOtpValues>({
@@ -34,6 +49,10 @@ export default function LoginPage() {
     defaultValues: { otp: "" },
     mode: "onChange",
   })
+
+  React.useEffect(() => {
+    if (presetPhone) phoneForm.setValue("phone", presetPhone, { shouldValidate: true })
+  }, [presetPhone, phoneForm])
 
   const phone = phoneForm.watch("phone")
 
@@ -199,6 +218,11 @@ export default function LoginPage() {
                       <h2 className="font-serif text-3xl font-bold md:text-[2.15rem]">Welcome back</h2>
                       <TempleDivider className="mx-auto max-w-[11rem] pt-1" />
                       <p className="text-sm text-muted-foreground">Enter the mobile number on your profile.</p>
+                      {fromExisting && presetPhone ? (
+                        <p className="text-sm font-medium text-primary">
+                          This number is already registered. Sign in to continue.
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="space-y-2">

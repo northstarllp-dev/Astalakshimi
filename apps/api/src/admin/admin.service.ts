@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Injectable, Inject, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
@@ -528,6 +529,16 @@ export class AdminService {
       .limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
 
+    const contentHash = createHash('sha256').update(buffer).digest('hex');
+    const [existing] = await this.db
+      .select({ id: profilePhotos.id })
+      .from(profilePhotos)
+      .where(and(eq(profilePhotos.profileId, profileId), eq(profilePhotos.contentHash, contentHash)))
+      .limit(1);
+    if (existing) {
+      throw new BadRequestException('This photo is already on the profile.');
+    }
+
     const { s3Key, bucket } = await this.s3Provider.generateUploadUrl(
       profile.userId,
       'profile_photo',
@@ -537,7 +548,7 @@ export class AdminService {
 
     await this.s3Provider.putObject(s3Key, buffer, contentType, bucket);
     
-    return { s3Key };
+    return { s3Key, contentHash };
   }
 
   async attachPhotos(profileId: string, s3Keys: string[]) {

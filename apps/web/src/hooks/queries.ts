@@ -411,8 +411,8 @@ export function useUpdateProfileMutation() {
 export function useAddPhotoMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (s3Key: string) => {
-      await apiClient.photos.add(s3Key);
+    mutationFn: async ({ s3Key, contentHash }: { s3Key: string; contentHash?: string }) => {
+      await apiClient.photos.add(s3Key, contentHash);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.profile })

@@ -15,6 +15,7 @@ export interface PresignedUploadResponse {
   s3Key: string;
   bucket: string;
   expiresInSeconds: number;
+  contentHash?: string;
 }
 
 export interface ConfirmPhotoRequest {

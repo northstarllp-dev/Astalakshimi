@@ -96,12 +96,16 @@ export function MatchListCard({
   match,
   featured = false,
   priority = false,
+  fillViewport = false,
+  className,
   onSkip,
   onConnect,
 }: {
   match: any
   featured?: boolean
   priority?: boolean
+  fillViewport?: boolean
+  className?: string
   onSkip: (id: string) => void
   onConnect?: (id: string) => void
 }) {
@@ -193,7 +197,9 @@ export function MatchListCard({
     <article
       className={cn(
         "overflow-hidden rounded-2xl md:rounded-3xl border bg-card shadow-sm transition-shadow hover:shadow-md",
-        featured ? "border-secondary/60 ring-2 ring-secondary/25" : "border-secondary/20"
+        featured ? "border-secondary/60 ring-2 ring-secondary/25" : "border-secondary/20",
+        fillViewport && "flex h-full min-h-0 flex-col",
+        className,
       )}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -203,11 +209,14 @@ export function MatchListCard({
       {/* ────────────────────────────────────────────────────────────────
           MOBILE VIEW: Exact match to mobile reference
           ──────────────────────────────────────────────────────────────── */}
-      <div className="relative block md:hidden aspect-[9/15] min-h-[520px] w-full select-none overflow-hidden bg-neutral-900">
+      <div className={cn(
+        "relative block w-full select-none overflow-hidden bg-neutral-900 md:hidden",
+        fillViewport ? "min-h-0 flex-1" : "aspect-[9/15] min-h-[520px]",
+      )}>
         {/* Full card background photo with link to profile */}
         <Link href={`/profiles/${match.id}`} className="absolute inset-0 block">
           {isHidden ? (
-            <LockedPhoto label="Photo hidden" />
+            <LockedPhoto src={photos[activePhoto] ?? photos[0]} label="Photo hidden" />
           ) : (
             <>
               <Image
@@ -407,13 +416,13 @@ export function MatchListCard({
       {/* ────────────────────────────────────────────────────────────────
           DESKTOP VIEW: High-end, spacious 2-column showcase layout
           ──────────────────────────────────────────────────────────────── */}
-      <div className="hidden md:flex md:flex-row items-stretch">
+      <div className={cn("hidden md:flex md:flex-row items-stretch", fillViewport && "md:min-h-0 md:flex-1")}>
         {/* Left: Photo Showcase Column */}
         <div className="w-[280px] lg:w-[310px] xl:w-[325px] shrink-0 p-3.5 sm:p-4 flex flex-col justify-between border-r border-border/40 bg-secondary/[0.02]">
           <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-neutral-900 shadow-sm border border-border/50">
             <Link href={`/profiles/${match.id}`} className="absolute inset-0 block">
               {isHidden ? (
-                <LockedPhoto label="Photo hidden" />
+                <LockedPhoto src={photos[activePhoto] ?? photos[0]} label="Photo hidden" />
               ) : (
                 <>
                   <Image

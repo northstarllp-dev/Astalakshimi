@@ -42,7 +42,21 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       }),
     };
 
-    profilesService = new ProfilesService(mockDb, mockBlocks as any, mockEntitlements as any);
+    profilesService = new ProfilesService(
+      mockDb,
+      mockBlocks as any,
+      mockEntitlements as any,
+      {
+        getLevelName: jest.fn().mockResolvedValue(null),
+        getSpecializationName: jest.fn().mockResolvedValue(null),
+      } as any,
+      {
+        getOccupationName: jest.fn().mockResolvedValue(null),
+        getCompanyName: jest.fn().mockResolvedValue(null),
+        resolveOccupation: jest.fn().mockResolvedValue(null),
+        resolveCompany: jest.fn().mockResolvedValue(null),
+      } as any,
+    );
   });
 
   const sampleCompletePayload: CompleteRegistrationPayload = {
@@ -303,8 +317,8 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
 
   describe('photo management (addPhoto, deletePhoto, reorderPhotos)', () => {
     it('should add photo as primary if it is the first photo', async () => {
-      // 1st select: profile ID
-      // 2nd select: existing photos -> []
+      const userId = '11111111-1111-4111-8111-111111111111';
+      const s3Key = `profiles/${userId}/photos/22222222-2222-4222-8222-222222222222.jpeg`;
       let selectCount = 0;
       mockDb.select.mockImplementation(() => {
         selectCount++;
@@ -328,19 +342,45 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
 
       jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
         profile: { id: 'prof-1' } as any,
-        photos: [{ id: 'p1', s3Key: 'photo.jpg', isPrimary: true, displayOrder: 0 }],
+        photos: [{ id: 'p1', s3Key, isPrimary: true, displayOrder: 0 }],
         verificationStatus: 'idle',
       });
 
-      await profilesService.addPhoto('user-1', 'photo.jpg');
+      await profilesService.addPhoto(userId, s3Key);
 
       expect(mockValues).toHaveBeenCalledWith(
         expect.objectContaining({
           profileId: 'prof-1',
-          s3Key: 'photo.jpg',
+          s3Key,
           isPrimary: true,
           displayOrder: 0,
         })
+      );
+    });
+
+    it('should reject a duplicate photo hash', async () => {
+      const userId = '11111111-1111-4111-8111-111111111111';
+      const s3Key = `profiles/${userId}/photos/33333333-3333-4333-8333-333333333333.jpeg`;
+      const contentHash = 'a'.repeat(64);
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([{ id: 'prof-1' }]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockResolvedValue([{ id: 'p1', s3Key: 'other.jpeg', contentHash }]),
+        };
+      });
+
+      await expect(profilesService.addPhoto(userId, s3Key, contentHash)).rejects.toThrow(
+        'This photo is already on your profile.',
       );
     });
 

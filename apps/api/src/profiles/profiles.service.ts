@@ -490,7 +490,8 @@ export class ProfilesService {
 
       // 7. Insert Photos — reject keys not minted for this user via presigned upload.
       if (payload.photoS3Keys && payload.photoS3Keys.length > 0) {
-        const badPhoto = payload.photoS3Keys.find((key) => !isOwnedPhotoKey(key, userId, 'profile_photo'));
+        const uniqueKeys = [...new Set(payload.photoS3Keys)];
+        const badPhoto = uniqueKeys.find((key) => !isOwnedPhotoKey(key, userId, 'profile_photo'));
         if (badPhoto) {
           throw new BadRequestException('photoS3Keys must be profile photos uploaded through your own presigned URL');
         }
@@ -498,7 +499,7 @@ export class ProfilesService {
         // Clear previous photos if updating
         await tx.delete(profilePhotos).where(eq(profilePhotos.profileId, profileId));
 
-        const photoRecords = payload.photoS3Keys.map((s3Key, index) => ({
+        const photoRecords = uniqueKeys.map((s3Key, index) => ({
           profileId,
           s3Key,
           isPrimary: index === 0,
@@ -714,7 +715,7 @@ export class ProfilesService {
     });
   }
 
-  async addPhoto(userId: string, s3Key: string) {
+  async addPhoto(userId: string, s3Key: string, contentHash?: string) {
     const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
     const profileId = profile.id;
@@ -725,12 +726,20 @@ export class ProfilesService {
     }
 
     const existingPhotos = await this.db.select().from(profilePhotos).where(eq(profilePhotos.profileId, profileId)).orderBy(asc(profilePhotos.displayOrder));
+    if (existingPhotos.some((photo) => photo.s3Key === s3Key)) {
+      throw new BadRequestException('This photo is already on your profile.');
+    }
+    if (contentHash && existingPhotos.some((photo) => photo.contentHash === contentHash)) {
+      throw new BadRequestException('This photo is already on your profile.');
+    }
+
     const isPrimary = existingPhotos.length === 0;
     const maxOrder = existingPhotos.length > 0 ? existingPhotos[existingPhotos.length - 1].displayOrder + 1 : 0;
 
     await this.db.insert(profilePhotos).values({
       profileId,
       s3Key,
+      contentHash: contentHash ?? null,
       isPrimary,
       displayOrder: maxOrder,
       status: 'pending' as const,

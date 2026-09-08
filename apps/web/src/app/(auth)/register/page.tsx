@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select"
 import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
+import { getMediaUrl } from "@/lib/utils"
 import {
   emptySignupData,
   formatSiblings,
@@ -27,6 +28,10 @@ import {
   MARITAL_STATUSES,
   FAMILY_TYPES,
   FAMILY_STATUS,
+  loadSignupDraft,
+  saveSignupDraft,
+  clearSignupDraft,
+  SIGNUP_TOTAL_STEPS,
   type SignupData,
 } from "@/lib/profile-store"
 import { StepHeading, StepProgress, TapCard } from "@/components/signup/shared"
@@ -43,23 +48,59 @@ import {
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = SIGNUP_TOTAL_STEPS
 const REFERRED_BY_KEY = "astalakshimi.referredBy"
 
 function SignupPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [hydrated, setHydrated] = useState(false)
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
   const [data, setData] = useState<SignupData>(emptySignupData)
   const saveProfileMutation = useSaveProfileMutation()
 
   React.useEffect(() => {
+    const draft = loadSignupDraft()
+    if (draft?.data.submittedAt) {
+      clearSignupDraft()
+      router.replace("/home")
+      return
+    }
+    if (draft) {
+      const restored: SignupData = {
+        ...draft.data,
+        photos: (draft.data.photoS3Keys?.length
+          ? draft.data.photoS3Keys
+          : draft.data.photos
+        )
+          .filter(Boolean)
+          .map((path) => getMediaUrl(path)),
+        selfiePhoto: draft.data.selfieS3Key
+          ? getMediaUrl(draft.data.selfieS3Key)
+          : draft.data.selfiePhoto || "",
+        govtIdPhoto: draft.data.govtIdS3Key
+          ? getMediaUrl(draft.data.govtIdS3Key)
+          : draft.data.govtIdPhoto || "",
+      }
+      setData(restored)
+      setStep(draft.step)
+    }
+    setHydrated(true)
+  }, [router])
+
+  React.useEffect(() => {
     const ref = searchParams.get("ref")
     if (ref && typeof window !== "undefined") {
       sessionStorage.setItem(REFERRED_BY_KEY, ref)
+      setData((prev) => (prev.referredBy === ref ? prev : { ...prev, referredBy: ref }))
     }
   }, [searchParams])
+
+  React.useEffect(() => {
+    if (!hydrated || submitted) return
+    saveSignupDraft(data, step)
+  }, [data, step, hydrated, submitted])
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -101,7 +142,16 @@ function SignupPageInner() {
       submittedAt: new Date().toISOString(),
     }
     await saveProfileMutation.mutateAsync(payload)
+    clearSignupDraft()
     setSubmitted(true)
+  }
+
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background text-sm text-muted-foreground">
+        Restoring your progress…
+      </div>
+    )
   }
 
   return (
@@ -204,6 +254,11 @@ function Step1AccountCreation({
     mode: "onChange",
   })
   const profileFor = form.watch("profileFor")
+  const step1Phone = form.watch("phone") ?? ""
+  const loginHref =
+    step1Phone.replace(/\D/g, "").length === 10
+      ? `/login?phone=${encodeURIComponent(step1Phone.replace(/\D/g, ""))}`
+      : "/login"
 
   const profileOptions = [
     { id: "Myself", icon: "👤" },
@@ -227,7 +282,8 @@ function Step1AccountCreation({
     } catch (err: any) {
       console.warn("sendOtp error:", err)
       if (err.message && err.message.toLowerCase().includes("already registered")) {
-        router.push("/login")
+        const phone = String(values.phone ?? "").replace(/\D/g, "").slice(0, 10)
+        router.push(phone ? `/login?phone=${encodeURIComponent(phone)}&existing=1` : "/login")
       } else {
         form.setError("phone", { message: err.message || "Failed to send OTP. Please try again." })
       }
@@ -324,7 +380,7 @@ function Step1AccountCreation({
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               Already a member?{" "}
-              <Link href="/login" className="font-semibold text-primary">
+              <Link href={loginHref} className="font-semibold text-primary">
                 Login
               </Link>
             </p>

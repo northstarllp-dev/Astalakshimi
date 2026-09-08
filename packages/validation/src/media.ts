@@ -49,6 +49,7 @@ export const confirmPhotoSchema = z.object({
   s3Key: z.string().min(1, 'S3 key is required'),
   isPrimary: z.boolean().default(false),
   displayOrder: z.number().int().min(0).max(5).default(0),
+  contentHash: z.string().length(64).optional(),
 });
 
 export const confirmVerificationSchema = z.object({

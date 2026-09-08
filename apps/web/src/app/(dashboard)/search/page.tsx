@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
+import { MatchSnapFeed, MatchSnapSlide } from "@/components/dashboard/match-snap-feed"
 import * as React from "react"
 import Link from "next/link"
 import { useMatchesQuery, useSkipMatchMutation, useSkippedQuery, useSendInterestMutation } from "@/hooks/queries"
@@ -85,8 +86,8 @@ function SearchPageInner() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-4 px-3 py-5 sm:px-4 md:py-8">
-      <div className="flex items-end justify-between gap-3">
+    <main className="mx-auto flex h-[calc(100dvh-3.5rem)] max-w-5xl flex-col overflow-hidden px-3 pt-5 sm:px-4 md:h-[calc(100dvh-4rem)] md:pt-8">
+      <div className="flex shrink-0 items-end justify-between gap-3">
         <div>
           <h1 className="font-serif text-3xl font-bold">Search matches</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -98,7 +99,7 @@ function SearchPageInner() {
         </Button>
       </div>
 
-      <label className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm shadow-sm">
+      <label className="mt-4 flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-4 py-2.5 text-sm shadow-sm">
         <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
         <input
           type="search"
@@ -109,15 +110,18 @@ function SearchPageInner() {
         />
       </label>
 
-      <div className="space-y-3">
+      <MatchSnapFeed className="mt-4 pb-24 md:pb-2">
         {results.map((match: any, index: any) => (
-          <MatchListCard
-            key={match.id}
-            match={match}
-            priority={index === 0}
-            onSkip={(id: any) => skipMutation.mutate(id)}
-            onConnect={(id: any) => connectMutation.mutate(id)}
-          />
+          <MatchSnapSlide key={match.id}>
+            <MatchListCard
+              match={match}
+              priority={index === 0}
+              fillViewport
+              className="h-full"
+              onSkip={(id: any) => skipMutation.mutate(id)}
+              onConnect={(id: any) => connectMutation.mutate(id)}
+            />
+          </MatchSnapSlide>
         ))}
         {results.length === 0 && (
           <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
@@ -128,7 +132,7 @@ function SearchPageInner() {
             </Button>
           </div>
         )}
-      </div>
+      </MatchSnapFeed>
 
       {open && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">

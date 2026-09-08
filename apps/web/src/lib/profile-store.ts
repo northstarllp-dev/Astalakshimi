@@ -93,6 +93,127 @@ export type SignupData = {
 }
 
 export const PROFILE_STORAGE_KEY = "astalakshimi.profile"
+export const SIGNUP_DRAFT_KEY = "astalakshimi.signup_draft"
+export const SIGNUP_TOTAL_STEPS = 5
+
+export type SignupDraft = {
+  step: number
+  data: SignupData
+  updatedAt: string
+}
+
+function isTransientMediaUrl(value: string | undefined | null): boolean {
+  if (!value) return false
+  return value.startsWith("data:") || value.startsWith("blob:")
+}
+
+/** Drop blob/data URLs (they break after reload); keep S3 keys for media restore. */
+export function sanitizeSignupDraftData(data: SignupData): SignupData {
+  const photoS3Keys = (data.photoS3Keys || []).filter(Boolean)
+  const photosFromKeys = photoS3Keys.length
+    ? photoS3Keys
+    : (data.photos || []).filter((url) => url && !isTransientMediaUrl(url))
+
+  return {
+    ...data,
+    otp: "",
+    photos: photosFromKeys,
+    photoS3Keys,
+    selfiePhoto:
+      !isTransientMediaUrl(data.selfiePhoto) && data.selfiePhoto
+        ? data.selfiePhoto
+        : data.selfieS3Key || "",
+    govtIdPhoto:
+      !isTransientMediaUrl(data.govtIdPhoto) && data.govtIdPhoto
+        ? data.govtIdPhoto
+        : data.govtIdS3Key || "",
+  }
+}
+
+/** Furthest incomplete step based on filled fields (1–5). */
+export function inferSignupResumeStep(data: SignupData): number {
+  const step1Ok =
+    Boolean(data.profileFor?.trim()) &&
+    /^[6-9]\d{9}$/.test((data.phone || "").replace(/\D/g, ""))
+  if (!step1Ok) return 1
+
+  const step2Ok =
+    Boolean(data.fullName?.trim()) &&
+    Boolean(data.gender) &&
+    /^\d{2}$/.test(data.dobDay || "") &&
+    /^\d{2}$/.test(data.dobMonth || "") &&
+    /^\d{4}$/.test(data.dobYear || "") &&
+    Boolean(data.maritalStatus) &&
+    Boolean(data.city?.trim())
+  if (!step2Ok) return 2
+
+  const step3Ok =
+    Boolean(data.religion) &&
+    Boolean(data.caste?.trim()) &&
+    Boolean(data.motherTongue)
+  if (!step3Ok) return 3
+
+  const hasPhoto = (data.photos?.length ?? 0) >= 1 || (data.photoS3Keys?.length ?? 0) >= 1
+  const identityReady =
+    (data.verificationMethod === "selfie" && Boolean(data.selfiePhoto || data.selfieS3Key)) ||
+    (data.verificationMethod === "govt_id" &&
+      Boolean(data.govtIdPhoto || data.govtIdS3Key) &&
+      Boolean(data.govtIdType))
+  if (!hasPhoto || !identityReady) return 4
+
+  return 5
+}
+
+export function saveSignupDraft(data: SignupData, step: number) {
+  if (typeof window === "undefined") return
+  try {
+    const draft: SignupDraft = {
+      step: Math.min(Math.max(step, 1), SIGNUP_TOTAL_STEPS),
+      data: sanitizeSignupDraftData(data),
+      updatedAt: new Date().toISOString(),
+    }
+    localStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify(draft))
+  } catch (err) {
+    console.warn("Could not save signup draft:", err)
+  }
+}
+
+export function loadSignupDraft(): SignupDraft | null {
+  if (typeof window === "undefined") return null
+  const raw = localStorage.getItem(SIGNUP_DRAFT_KEY)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Partial<SignupDraft>
+    const data = sanitizeSignupDraftData({
+      ...emptySignupData(),
+      ...(parsed.data || {}),
+    })
+    const inferred = inferSignupResumeStep(data)
+    const savedStep =
+      typeof parsed.step === "number" && Number.isFinite(parsed.step)
+        ? Math.min(Math.max(Math.round(parsed.step), 1), SIGNUP_TOTAL_STEPS)
+        : inferred
+    // Prefer the furthest of saved position and inferred progress so users
+    // resume where they left off even if step wasn't written yet.
+    const step = Math.max(savedStep, inferred)
+    return {
+      step,
+      data,
+      updatedAt: parsed.updatedAt || new Date().toISOString(),
+    }
+  } catch {
+    return null
+  }
+}
+
+export function clearSignupDraft() {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.removeItem(SIGNUP_DRAFT_KEY)
+  } catch {
+    // ignore
+  }
+}
 
 export const emptySignupData = (): SignupData => ({
   phone: "",

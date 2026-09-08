@@ -57,8 +57,6 @@ export function ProfileGallery({
   const hero = photos[activeIndex] ?? photos[0]
   const extra = photos.slice(1)
   const hasMany = photos.length > 1
-  // The API withholds keys entirely when a photo should be blurred, so an
-  // empty list here means "not visible to this viewer" rather than "no photos".
   const isHidden = Boolean(blurPhoto) || photos.length === 0
 
   const openLightbox = (index: number) => {
@@ -97,7 +95,7 @@ export function ProfileGallery({
       <div className="flex h-full flex-col">
         <div className="group relative h-full min-h-0 w-full overflow-hidden bg-muted">
           {isHidden ? (
-            <LockedPhoto label={`${name}'s photo is hidden`} />
+            <LockedPhoto src={hero} label={`${name}'s photo is hidden`} />
           ) : (
             <Image
               src={getMediaUrl(hero)}
@@ -306,7 +304,7 @@ export function ProfileGallery({
 
           <div className="relative h-full w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
             {isHidden ? (
-              <LockedPhoto label={`${name}'s photo is hidden`} />
+              <LockedPhoto src={photos[activeIndex] ?? hero} label={`${name}'s photo is hidden`} />
             ) : (
               <Image
                 src={getMediaUrl(photos[activeIndex])}

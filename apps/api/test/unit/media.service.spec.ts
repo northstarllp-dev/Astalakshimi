@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { MediaService } from '../../src/media/media.service';
 
 describe('MediaService (Unit Tests)', () => {
@@ -17,6 +17,7 @@ describe('MediaService (Unit Tests)', () => {
     mockS3Provider = {
       generateUploadUrl: jest.fn(),
       deleteObject: jest.fn(),
+      putObject: jest.fn(),
     };
 
     mediaService = new MediaService(mockDb, mockS3Provider);
@@ -39,6 +40,24 @@ describe('MediaService (Unit Tests)', () => {
       };
     });
   };
+
+  describe('uploadFileBuffer', () => {
+    it('should reject a profile photo that is already on the profile', async () => {
+      mockDb.select = mockQueryBuilder([
+        [{ id: 'prof-1' }],
+        [{ id: 'photo-1' }],
+      ]);
+
+      await expect(
+        mediaService.uploadFileBuffer('user-1', Buffer.from('same-bytes'), {
+          purpose: 'profile_photo',
+          contentType: 'image/jpeg',
+          fileSize: 10,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockS3Provider.putObject).not.toHaveBeenCalled();
+    });
+  });
 
   describe('getUploadUrl', () => {
     it('should call S3Provider and return url', async () => {

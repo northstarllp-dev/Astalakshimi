@@ -24,7 +24,7 @@ export function MatchThumbCard({
     >
       <div className="relative aspect-[3/4]">
         {isHidden ? (
-          <LockedPhoto label="Photo hidden" />
+          <LockedPhoto src={photo} label="Photo hidden" />
         ) : (
           <Image
             src={getMediaUrl(photo)}

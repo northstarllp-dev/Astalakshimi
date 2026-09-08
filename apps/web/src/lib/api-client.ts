@@ -239,10 +239,10 @@ class ApiClient {
   
   // --- Photos APIs ---
   photos = {
-    add: (s3Key: string) =>
+    add: (s3Key: string, contentHash?: string) =>
       this.request<FullProfileView>('/profiles/me/photos', {
         method: 'POST',
-        body: JSON.stringify({ s3Key }),
+        body: JSON.stringify({ s3Key, contentHash }),
       }),
 
     remove: (photoId: string) =>

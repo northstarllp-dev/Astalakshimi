@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
@@ -33,6 +34,12 @@ export class MediaService {
     buffer: Buffer,
     input: PresignedUploadInput,
   ) {
+    const contentHash = createHash('sha256').update(buffer).digest('hex');
+
+    if (input.purpose === 'profile_photo') {
+      await this.assertUniqueProfilePhotoHash(userId, contentHash);
+    }
+
     const { s3Key, bucket } = await this.s3Provider.generateUploadUrl(
       userId,
       input.purpose,
@@ -47,7 +54,28 @@ export class MediaService {
       bucket,
       uploadUrl: '',
       expiresInSeconds: 0,
+      contentHash,
     };
+  }
+
+  private async assertUniqueProfilePhotoHash(userId: string, contentHash: string) {
+    const [profile] = await this.db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .limit(1);
+
+    if (!profile) return;
+
+    const [existing] = await this.db
+      .select({ id: profilePhotos.id })
+      .from(profilePhotos)
+      .where(and(eq(profilePhotos.profileId, profile.id), eq(profilePhotos.contentHash, contentHash)))
+      .limit(1);
+
+    if (existing) {
+      throw new BadRequestException('This photo is already on your profile.');
+    }
   }
 
   async confirmPhoto(userId: string, input: ConfirmPhotoInput) {
@@ -83,6 +111,7 @@ export class MediaService {
         isPrimary: input.isPrimary ?? false,
         displayOrder: input.displayOrder ?? 0,
         status: 'pending',
+        contentHash: input.contentHash ?? null,
       })
       .returning();
 

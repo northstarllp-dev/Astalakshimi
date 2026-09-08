@@ -71,6 +71,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeft, Camera, Check, ExternalLink, Eye, FileText, GripVertical, Star, Trash2, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { hashFile } from "@/lib/file-hash"
 
 const ABOUT_MAX = 300
 const MAX_PHOTOS = 10
@@ -177,6 +178,7 @@ export default function ProfileEditPage() {
   const invalidCls = REQUIRED_FIELD_INVALID_CLASS
   const [saved, setSaved] = React.useState(false)
   const [dragIndex, setDragIndex] = React.useState<number | null>(null)
+  const photoHashesRef = React.useRef(new Set<string>())
   const fileRef = React.useRef<HTMLInputElement>(null)
   const horoscopeRef = React.useRef<HTMLInputElement>(null)
 
@@ -265,11 +267,19 @@ export default function ProfileEditPage() {
 
     for (const file of filesToUpload) {
       try {
-        const { s3Key } = await apiClient.media.uploadMediaFile(file, "profile_photo")
-        await addPhotoMutation.mutateAsync(s3Key)
+        const hash = await hashFile(file)
+        if (photoHashesRef.current.has(hash)) {
+          alert("This photo is already on your profile.")
+          continue
+        }
+        const { s3Key, contentHash } = await apiClient.media.uploadMediaFile(file, "profile_photo")
+        const storedHash = contentHash || hash
+        photoHashesRef.current.add(storedHash)
+        await addPhotoMutation.mutateAsync({ s3Key, contentHash: storedHash })
       } catch (err) {
         console.error("[Media] Upload failed:", err)
-        alert("Failed to upload photo. Please try again.")
+        const message = err instanceof Error ? err.message : "Failed to upload photo. Please try again."
+        alert(message)
       }
     }
   }

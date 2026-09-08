@@ -25,9 +25,10 @@ export type BlurDecision = {
   /** True when the viewer is not allowed to see the photo. */
   blurPhoto: boolean;
   /**
-   * True when the caller must not send the S3 key to the client at all.
-   * The bucket is publicly readable, so a leaked key is directly viewable —
-   * when a photo is blurred we withhold the key rather than relying on CSS.
+   * True when the caller should hide the original photo from the viewer.
+   * The key is still sent so the client can render a CSS-blurred preview
+   * under a lock overlay — CSS blur is not a secrecy control (the media
+   * bucket is public), it is the product treatment for locked photos.
    */
   withholdKey: boolean;
 };
@@ -54,7 +55,7 @@ export function computeBlurDecision(params: {
   const setting = normalizePhotoBlur(photoBlur);
   if (setting === 'never') return { blurPhoto: false, withholdKey: false };
 
-  return { blurPhoto: true, withholdKey: true };
+  return { blurPhoto: true, withholdKey: false };
 }
 
 /**

@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils"
 import type { SignupData, VerificationMethod } from "@/lib/profile-store"
 import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import { apiClient } from "@/lib/api-client"
+import { hashFile } from "@/lib/file-hash"
 
 const MAX_PHOTOS = 6
 const MAX_IMAGE_MB = 5
@@ -69,6 +70,7 @@ export function Step6Verify({
   const photoInputRef = React.useRef<HTMLInputElement>(null)
   const idInputRef = React.useRef<HTMLInputElement>(null)
   const horoscopeInputRef = React.useRef<HTMLInputElement>(null)
+  const photoHashesRef = React.useRef<string[]>([])
 
   const stopCamera = React.useCallback(() => {
     if (streamRef.current) {
@@ -221,16 +223,25 @@ export function Step6Verify({
           setError(invalid)
           continue
         }
+        const hash = await hashFile(file)
+        if (photoHashesRef.current.includes(hash)) {
+          setError("This photo is already on your profile.")
+          continue
+        }
         const previewUrl = await readFileAsDataUrl(file)
         let key = `profiles/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
 
         if (apiClient.getToken()) {
           try {
-            const { s3Key } = await apiClient.media.uploadMediaFile(file, "profile_photo")
+            const { s3Key, contentHash } = await apiClient.media.uploadMediaFile(file, "profile_photo")
             key = s3Key
+            photoHashesRef.current.push(contentHash || hash)
           } catch (uploadErr) {
             console.warn("[Media] Upload fallback to mock key:", uploadErr)
+            photoHashesRef.current.push(hash)
           }
+        } else {
+          photoHashesRef.current.push(hash)
         }
 
         nextPhotos.push(previewUrl)
@@ -319,6 +330,7 @@ export function Step6Verify({
   const removePhoto = (index: number) => {
     const nextPhotos = data.photos.filter((_, i) => i !== index)
     const nextKeys = (data.photoS3Keys || []).filter((_, i) => i !== index)
+    photoHashesRef.current = photoHashesRef.current.filter((_, i) => i !== index)
     updateData({ photos: nextPhotos, photoS3Keys: nextKeys })
   }
 

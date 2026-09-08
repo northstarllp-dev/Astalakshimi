@@ -23,6 +23,7 @@ import {
   SIBLING_COUNTS,
 } from "@/lib/profile-store"
 import { adminCreateProfileSchema, type AdminCreateProfileValues } from "@/lib/validation"
+import { hashFile } from "@/lib/file-hash"
 import { ArrowLeft, Loader2, Upload, X } from "lucide-react"
 
 const MAX_PHOTOS = 6
@@ -34,6 +35,7 @@ export default function AdminCreateProfilePage() {
   const createProfile = useCreateAdminProfileMutation()
   const [photos, setPhotos] = React.useState<File[]>([])
   const [previews, setPreviews] = React.useState<string[]>([])
+  const [photoHashes, setPhotoHashes] = React.useState<string[]>([])
   const [error, setError] = React.useState("")
   const photoInputRef = React.useRef<HTMLInputElement>(null)
 
@@ -66,12 +68,13 @@ export default function AdminCreateProfilePage() {
     }
   }, [previews])
 
-  const addPhotos = (files: FileList | null) => {
+  const addPhotos = async (files: FileList | null) => {
     if (!files?.length) return
     setError("")
     const remaining = MAX_PHOTOS - photos.length
     const nextFiles = [...photos]
     const nextPreviews = [...previews]
+    const nextHashes = [...photoHashes]
 
     for (const file of Array.from(files).slice(0, remaining)) {
       if (!IMAGE_TYPES.includes(file.type) && !file.type.startsWith("image/")) {
@@ -82,12 +85,19 @@ export default function AdminCreateProfilePage() {
         setError(`Each photo must be under ${MAX_IMAGE_MB} MB.`)
         continue
       }
+      const hash = await hashFile(file)
+      if (nextHashes.includes(hash)) {
+        setError("This photo is already on the profile.")
+        continue
+      }
       nextFiles.push(file)
       nextPreviews.push(URL.createObjectURL(file))
+      nextHashes.push(hash)
     }
 
     setPhotos(nextFiles)
     setPreviews(nextPreviews)
+    setPhotoHashes(nextHashes)
   }
 
   const removePhoto = (index: number) => {
@@ -95,6 +105,7 @@ export default function AdminCreateProfilePage() {
     if (url?.startsWith("blob:")) URL.revokeObjectURL(url)
     setPhotos((current) => current.filter((_, i) => i !== index))
     setPreviews((current) => current.filter((_, i) => i !== index))
+    setPhotoHashes((current) => current.filter((_, i) => i !== index))
   }
 
   const onSubmit = async (values: AdminCreateProfileValues) => {
