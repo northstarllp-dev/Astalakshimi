@@ -5,6 +5,19 @@ export const maritalStatusSchema = z.enum(['Never Married', 'Divorced', 'Widowed
 export const educationLevelSchema = z.enum(['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'High School']);
 export const employmentStatusSchema = z.enum(['Employed', 'Business Owner', 'Freelancer', 'Not Working']);
 export const companySectorSchema = z.enum(['Private', 'Govt', 'MNC', 'Startup', 'Business']);
+/** Accept omitted / empty string from forms; never pass "" to Postgres enums. */
+export const optionalCompanySectorSchema = z.preprocess(
+  (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+  companySectorSchema.optional(),
+);
+export const optionalEducationLevelSchema = z.preprocess(
+  (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+  educationLevelSchema.optional(),
+);
+export const optionalEmploymentStatusSchema = z.preprocess(
+  (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+  employmentStatusSchema.optional(),
+);
 export const photoPrivacySchema = z.enum(['blurred', 'accepted', 'visible']);
 export const familyValuesSchema = z.enum(['Traditional', 'Moderate', 'Liberal']);
 export const familyTypeSchema = z.enum(['Nuclear', 'Joint', 'Extended']);
@@ -88,13 +101,13 @@ export const step3CommunitySchema = z.object({
 
 // Step 4: Education & Career
 export const step4CareerSchema = z.object({
-  educationLevel: educationLevelSchema.optional(),
+  educationLevel: optionalEducationLevelSchema,
   degree: z.string().trim().optional(),
   collegeName: z.string().trim().optional(),
-  employmentStatus: employmentStatusSchema.optional(),
+  employmentStatus: optionalEmploymentStatusSchema,
   profession: z.string().trim().optional(),
   companyName: z.string().trim().optional(),
-  companySector: companySectorSchema.optional(),
+  companySector: optionalCompanySectorSchema,
   annualIncome: z.string().optional(),
 });
 
@@ -166,13 +179,13 @@ export const updateProfileSchema = z.object({
   subcaste: z.string().optional(),
   gotra: z.string().optional(),
   motherTongue: z.string().optional(),
-  educationLevel: educationLevelSchema.optional(),
+  educationLevel: optionalEducationLevelSchema,
   degree: z.string().optional(),
   collegeName: z.string().optional(),
-  employmentStatus: employmentStatusSchema.optional(),
+  employmentStatus: optionalEmploymentStatusSchema,
   profession: z.string().optional(),
   companyName: z.string().optional(),
-  companySector: companySectorSchema.optional(),
+  companySector: optionalCompanySectorSchema,
   annualIncome: z.string().optional(),
   photoPrivacy: photoPrivacySchema.optional(),
   diet: dietSchema.optional(),
@@ -195,3 +208,59 @@ export const updateProfileSchema = z.object({
   occupationId: z.number().int().positive().optional(),
   companyId: z.number().int().positive().optional(),
 });
+
+/** Full registration payload — empty strings for optional enums become undefined. */
+const emptyToUndefined = (v: unknown) =>
+  typeof v === 'string' && v.trim() === '' ? undefined : v;
+
+export const completeRegistrationSchema = step2IdentitySchema
+  .and(step3CommunitySchema)
+  .and(step4CareerSchema)
+  .and(
+    z.object({
+      diet: z.preprocess(emptyToUndefined, dietSchema.optional()),
+      smoking: z.preprocess(emptyToUndefined, habitFrequencySchema.optional()),
+      alcohol: z.preprocess(emptyToUndefined, habitFrequencySchema.optional()),
+      interests: z.array(z.string()).max(7).optional(),
+      birthTime: z.preprocess(emptyToUndefined, z.string().optional()),
+      birthPlace: z.preprocess(emptyToUndefined, z.string().optional()),
+      manglik: z.preprocess(emptyToUndefined, manglikStatusSchema.optional()),
+      rashi: z.preprocess(emptyToUndefined, z.string().optional()),
+      nakshatra: z.preprocess(emptyToUndefined, z.string().optional()),
+    }),
+  )
+  .and(
+    z.object({
+      phone: z.string().optional(),
+      otp: z.string().optional(),
+      consentAccepted: z.boolean().optional(),
+      referredBy: z.string().optional(),
+      educationId: z.number().int().positive().optional().nullable(),
+      specializationId: z.number().int().positive().optional().nullable(),
+      occupationId: z.number().int().positive().optional().nullable(),
+      companyId: z.number().int().positive().optional().nullable(),
+      prefAgeMin: z.number().int().min(18).max(80).optional(),
+      prefAgeMax: z.number().int().min(18).max(80).optional(),
+      prefHeightMinCm: z.number().int().optional(),
+      prefHeightMaxCm: z.number().int().optional(),
+      prefMaritalStatuses: z.array(z.string()).optional(),
+      prefReligions: z.array(z.string()).optional(),
+      prefCastes: z.array(z.string()).optional(),
+      prefMotherTongues: z.array(z.string()).optional(),
+      prefMinEducation: z.string().optional(),
+      prefAcceptableIncomes: z.array(z.string()).optional(),
+      prefLocations: z.array(z.string()).optional(),
+      photoS3Keys: z.array(z.string()).optional(),
+      photoPrivacy: z.preprocess(emptyToUndefined, photoPrivacySchema.optional()),
+      verificationMethod: z.preprocess(
+        emptyToUndefined,
+        z.enum(['selfie', 'govt_id']).optional(),
+      ),
+      selfieS3Key: z.string().optional().nullable().or(z.literal('')),
+      govtIdType: z.preprocess(emptyToUndefined, govtIdTypeSchema.optional().nullable()),
+      govtIdS3Key: z.string().optional().nullable().or(z.literal('')),
+      horoscopeS3Key: z.string().optional().nullable().or(z.literal('')),
+      horoscopeFileName: z.string().optional().nullable().or(z.literal('')),
+      horoscopeFileSizeBytes: z.number().optional().nullable(),
+    }),
+  );

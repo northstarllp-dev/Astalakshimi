@@ -6,6 +6,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
 import { z } from 'zod';
+import { completeRegistrationSchema, updateProfileSchema } from '@astalakshimi/validation';
 import type { UserSession, CompleteRegistrationPayload } from '@astalakshimi/types';
 
 const addPhotoSchema = z.object({
@@ -20,12 +21,7 @@ const reorderPhotosSchema = z.object({
     .max(5, 'At most 5 photos can be ordered'),
 });
 
-const completeRegistrationSchema = z.object({
-  // Mirror the existing CompleteRegistrationPayload schema shape — minimal here
-  // since the deeper validation lives in profiles.service.
-}).passthrough();
-
-const partialProfileSchema = z.object({}).passthrough();
+const partialProfileSchema = updateProfileSchema;
 
 @UseGuards(JwtAuthGuard)
 @Controller('profiles')

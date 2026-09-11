@@ -13,12 +13,20 @@ update_kv() {
 }
 
 update_kv NODE_ENV production
-update_kv MOCK_OTP_ENABLED false
 update_kv JWT_EXPIRES_IN 1h
 update_kv REFRESH_TOKEN_EXPIRES_IN 7d
-update_kv AWS_S3_MEDIA_BUCKET ashtalakshmi-media
-update_kv AWS_S3_VAULT_BUCKET ashtalakshmi-verification
-update_kv CORS_ORIGIN "http://localhost:3000"
+update_kv AWS_S3_MEDIA_BUCKET ashtalakshimi-media
+update_kv AWS_S3_VAULT_BUCKET ashtalakshimi-verification
+update_kv CORS_ORIGIN "https://astalakshimi-web.vercel.app,http://localhost:3000"
+
+# Remove stale keys from the old mock-OTP setup (no longer read by the API)
+sed -i '/^MOCK_OTP_ENABLED=/d; /^DEFAULT_MOCK_OTP=/d' "$ENV"
+
+# Production refuses to boot without a real SMS provider — verify before restarting
+if ! grep -qE '^SMS_PROVIDER=..*' "$ENV" || ! grep -qE '^APITXT_AUTH_KEY=..*' "$ENV"; then
+  echo "ERROR: SMS_PROVIDER and APITXT_AUTH_KEY must be set — the API fails closed without them." >&2
+  exit 1
+fi
 
 # Generate a strong JWT_SECRET if missing or still a known weak/default value
 if ! grep -q '^JWT_SECRET=' "$ENV" \

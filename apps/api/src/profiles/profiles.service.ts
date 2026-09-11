@@ -44,6 +44,170 @@ export class ProfilesService {
     this.profileViewCache.delete(profileId);
   }
 
+  /** Treat blank strings as missing so Postgres enums/varchars never get "". */
+  private emptyToNull(value?: string | null): string | null {
+    if (value == null) return null;
+    const trimmed = String(value).trim();
+    return trimmed === '' ? null : trimmed;
+  }
+
+  private requireEnum<T extends string>(
+    value: string | null | undefined,
+    allowed: readonly T[],
+    field: string,
+    fallback?: T,
+  ): T {
+    const normalized = this.emptyToNull(value);
+    if (normalized && (allowed as readonly string[]).includes(normalized)) {
+      return normalized as T;
+    }
+    if (fallback) return fallback;
+    throw new BadRequestException(`Invalid or missing ${field}`);
+  }
+
+  private optionalEnum<T extends string>(
+    value: string | null | undefined,
+    allowed: readonly T[],
+  ): T | null {
+    const normalized = this.emptyToNull(value);
+    if (!normalized) return null;
+    if ((allowed as readonly string[]).includes(normalized)) return normalized as T;
+    throw new BadRequestException(`Invalid value for enum field: ${normalized}`);
+  }
+
+  private sanitizeRegistrationPayload(payload: CompleteRegistrationPayload): CompleteRegistrationPayload {
+    const gender = this.requireEnum(payload.gender, ['Male', 'Female', 'Other'] as const, 'gender');
+    const maritalStatus = this.requireEnum(
+      payload.maritalStatus,
+      ['Never Married', 'Divorced', 'Widowed', 'Awaiting Divorce'] as const,
+      'maritalStatus',
+    );
+    const familyValues = this.requireEnum(
+      payload.familyValues,
+      ['Traditional', 'Moderate', 'Liberal'] as const,
+      'familyValues',
+      'Moderate',
+    );
+    const familyType = this.requireEnum(
+      payload.familyType,
+      ['Nuclear', 'Joint', 'Extended'] as const,
+      'familyType',
+      'Nuclear',
+    );
+    const fatherOccupation = this.requireEnum(
+      payload.fatherOccupation,
+      ['Employed', 'Business', 'Retired', 'Homemaker', 'Passed Away'] as const,
+      'fatherOccupation',
+      'Employed',
+    );
+    const motherOccupation = this.requireEnum(
+      payload.motherOccupation,
+      ['Employed', 'Business', 'Retired', 'Homemaker', 'Passed Away'] as const,
+      'motherOccupation',
+      'Homemaker',
+    );
+    const diet = this.requireEnum(
+      payload.diet,
+      ['Vegetarian', 'Non-vegetarian', 'Eggetarian', 'Jain', 'Vegan'] as const,
+      'diet',
+      'Vegetarian',
+    );
+    const smoking = this.requireEnum(
+      payload.smoking,
+      ['Never', 'Occasionally', 'Regularly', 'Planning to quit'] as const,
+      'smoking',
+      'Never',
+    );
+    const alcohol = this.requireEnum(
+      payload.alcohol,
+      ['Never', 'Occasionally', 'Regularly', 'Planning to quit'] as const,
+      'alcohol',
+      'Never',
+    );
+    const manglik = this.requireEnum(
+      payload.manglik,
+      ['Yes', 'No', "Don't Know", 'Both'] as const,
+      'manglik',
+      "Don't Know",
+    );
+    const photoPrivacy = this.requireEnum(
+      payload.photoPrivacy,
+      ['blurred', 'accepted', 'visible'] as const,
+      'photoPrivacy',
+      'blurred',
+    );
+    const verificationMethod = this.requireEnum(
+      payload.verificationMethod,
+      ['selfie', 'govt_id'] as const,
+      'verificationMethod',
+      'selfie',
+    );
+
+    return {
+      ...payload,
+      profileFor: this.emptyToNull(payload.profileFor) || 'Myself',
+      fullName: this.emptyToNull(payload.fullName) || payload.fullName,
+      gender,
+      maritalStatus,
+      aboutMe: this.emptyToNull(payload.aboutMe),
+      city: this.emptyToNull(payload.city) || payload.city,
+      state: this.emptyToNull(payload.state) || payload.state,
+      country: this.emptyToNull(payload.country) || 'India',
+      religion: this.emptyToNull(payload.religion) || payload.religion,
+      caste: this.emptyToNull(payload.caste) || payload.caste,
+      subcaste: this.emptyToNull(payload.subcaste),
+      gotra: this.emptyToNull(payload.gotra),
+      motherTongue: this.emptyToNull(payload.motherTongue) || payload.motherTongue,
+      educationLevel: this.optionalEnum(
+        payload.educationLevel,
+        ['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'High School'] as const,
+      ) ?? undefined,
+      degree: this.emptyToNull(payload.degree) ?? undefined,
+      collegeName: this.emptyToNull(payload.collegeName) ?? undefined,
+      employmentStatus: this.optionalEnum(
+        payload.employmentStatus,
+        ['Employed', 'Business Owner', 'Freelancer', 'Not Working'] as const,
+      ) ?? undefined,
+      profession: this.emptyToNull(payload.profession) ?? undefined,
+      companyName: this.emptyToNull(payload.companyName) ?? undefined,
+      companySector: this.normalizeCompanySector(payload.companySector) ?? undefined,
+      annualIncome: this.emptyToNull(payload.annualIncome) ?? undefined,
+      familyValues,
+      familyType,
+      fatherOccupation,
+      motherOccupation,
+      diet,
+      smoking,
+      alcohol,
+      interests: payload.interests ?? [],
+      birthTime: this.emptyToNull(payload.birthTime) ?? undefined,
+      birthPlace: this.emptyToNull(payload.birthPlace) ?? undefined,
+      manglik,
+      rashi: this.emptyToNull(payload.rashi) ?? undefined,
+      nakshatra: this.emptyToNull(payload.nakshatra) ?? undefined,
+      prefReligions: payload.prefReligions?.length ? payload.prefReligions : ['Hindu'],
+      prefCastes: payload.prefCastes ?? [],
+      prefMotherTongues: payload.prefMotherTongues ?? [],
+      prefMaritalStatuses: payload.prefMaritalStatuses?.length
+        ? payload.prefMaritalStatuses
+        : ['Never Married'],
+      prefAcceptableIncomes: payload.prefAcceptableIncomes ?? [],
+      prefLocations: payload.prefLocations ?? [],
+      prefMinEducation: this.emptyToNull(payload.prefMinEducation) ?? undefined,
+      photoS3Keys: payload.photoS3Keys ?? [],
+      photoPrivacy,
+      verificationMethod,
+      selfieS3Key: this.emptyToNull(payload.selfieS3Key) ?? undefined,
+      govtIdType: this.optionalEnum(
+        payload.govtIdType,
+        ['Aadhaar', 'PAN card', 'Passport', 'Driving licence', 'Voter ID'] as const,
+      ) ?? undefined,
+      govtIdS3Key: this.emptyToNull(payload.govtIdS3Key) ?? undefined,
+      horoscopeS3Key: this.emptyToNull(payload.horoscopeS3Key) ?? undefined,
+      horoscopeFileName: this.emptyToNull(payload.horoscopeFileName) ?? undefined,
+    };
+  }
+
   private async buildEducationUpdate(
     payload: Partial<CompleteRegistrationPayload>,
     existingEducationId?: number | null,
@@ -124,12 +288,25 @@ export class ProfilesService {
   }
 
   private mapCompanySector(sector?: string | null) {
-    if (!sector) return undefined;
-    const value = sector.toLowerCase();
+    if (!sector?.trim()) return undefined;
+    const value = sector.trim().toLowerCase();
     if (value.includes('government') || value.includes('defense')) return 'Govt';
     if (value.includes('startup')) return 'Startup';
     if (value === 'business') return 'Business';
     return 'Private';
+  }
+
+  /** Empty string is invalid for Postgres enums — coerce to null. */
+  private normalizeCompanySector(
+    sector?: string | null,
+  ): 'Private' | 'Govt' | 'MNC' | 'Startup' | 'Business' | null {
+    if (sector == null || !String(sector).trim()) return null;
+    const trimmed = String(sector).trim();
+    const allowed = ['Private', 'Govt', 'MNC', 'Startup', 'Business'] as const;
+    if ((allowed as readonly string[]).includes(trimmed)) {
+      return trimmed as (typeof allowed)[number];
+    }
+    return this.mapCompanySector(trimmed) ?? null;
   }
 
   private async buildCareerUpdate(payload: Partial<CompleteRegistrationPayload>) {
@@ -280,14 +457,15 @@ export class ProfilesService {
   }
 
   async completeRegistration(userId: string, payload: CompleteRegistrationPayload) {
-    const educationFields = await this.buildEducationUpdate(payload);
-    const careerFields = await this.buildCareerUpdate(payload);
+    const data = this.sanitizeRegistrationPayload(payload);
+    const educationFields = await this.buildEducationUpdate(data);
+    const careerFields = await this.buildCareerUpdate(data);
 
     return this.db.transaction(async (tx) => {
       // 1. Format DOB as YYYY-MM-DD
-      const month = payload.dobMonth.padStart(2, '0');
-      const day = payload.dobDay.padStart(2, '0');
-      const dobStr = `${payload.dobYear}-${month}-${day}`;
+      const month = data.dobMonth.padStart(2, '0');
+      const day = data.dobDay.padStart(2, '0');
+      const dobStr = `${data.dobYear}-${month}-${day}`;
 
       // 2. Check if profile already exists for user
       const [existingProfile] = await tx
@@ -303,37 +481,38 @@ export class ProfilesService {
         await tx
           .update(profiles)
           .set({
-            profileFor: payload.profileFor,
-            fullName: payload.fullName,
-            gender: payload.gender,
+            profileFor: data.profileFor,
+            fullName: data.fullName,
+            gender: data.gender,
             dob: dobStr,
-            maritalStatus: payload.maritalStatus,
-            hasChildren: payload.hasChildren ?? false,
-            childrenCount: payload.childrenCount ?? 0,
-            childrenLivingWithMe: payload.childrenLivingWithMe ?? null,
-            heightCm: payload.heightCm,
-            aboutMe: payload.aboutMe ?? null,
-            city: payload.city,
-            state: payload.state,
-            country: payload.country || 'India',
-            religion: payload.religion,
-            caste: payload.caste,
-            subcaste: payload.subcaste ?? null,
-            gotra: payload.gotra ?? null,
-            motherTongue: payload.motherTongue,
-            educationId: educationFields.educationId ?? payload.educationId ?? null,
-            specializationId: educationFields.specializationId ?? payload.specializationId ?? null,
-            educationLevel: payload.educationLevel,
-            degree: educationFields.degree ?? payload.degree ?? null,
-            collegeName: payload.collegeName ?? null,
-            employmentStatus: payload.employmentStatus,
-            occupationId: careerFields.occupationId ?? payload.occupationId ?? null,
-            profession: careerFields.profession ?? payload.profession,
-            companyId: careerFields.companyId ?? payload.companyId ?? null,
-            companyName: careerFields.companyName ?? payload.companyName ?? null,
-            companySector: careerFields.companySector ?? payload.companySector ?? null,
-            annualIncome: payload.annualIncome,
-            photoPrivacy: payload.photoPrivacy || 'blurred',
+            maritalStatus: data.maritalStatus,
+            hasChildren: data.hasChildren ?? false,
+            childrenCount: data.childrenCount ?? 0,
+            childrenLivingWithMe: data.childrenLivingWithMe ?? null,
+            heightCm: data.heightCm,
+            aboutMe: data.aboutMe ?? null,
+            city: data.city,
+            state: data.state,
+            country: data.country || 'India',
+            religion: data.religion,
+            caste: data.caste,
+            subcaste: data.subcaste ?? null,
+            gotra: data.gotra ?? null,
+            motherTongue: data.motherTongue,
+            educationId: educationFields.educationId ?? data.educationId ?? null,
+            specializationId: educationFields.specializationId ?? data.specializationId ?? null,
+            educationLevel: data.educationLevel ?? null,
+            degree: educationFields.degree ?? data.degree ?? null,
+            collegeName: data.collegeName ?? null,
+            employmentStatus: data.employmentStatus ?? null,
+            occupationId: careerFields.occupationId ?? data.occupationId ?? null,
+            profession: careerFields.profession ?? data.profession ?? null,
+            companyId: careerFields.companyId ?? data.companyId ?? null,
+            companyName: careerFields.companyName ?? data.companyName ?? null,
+            companySector:
+              careerFields.companySector ?? this.normalizeCompanySector(data.companySector),
+            annualIncome: data.annualIncome ?? null,
+            photoPrivacy: data.photoPrivacy || 'blurred',
             updatedAt: new Date(),
           })
           .where(eq(profiles.id, profileId));
@@ -342,37 +521,38 @@ export class ProfilesService {
           .insert(profiles)
           .values({
             userId,
-            profileFor: payload.profileFor,
-            fullName: payload.fullName,
-            gender: payload.gender,
+            profileFor: data.profileFor,
+            fullName: data.fullName,
+            gender: data.gender,
             dob: dobStr,
-            maritalStatus: payload.maritalStatus,
-            hasChildren: payload.hasChildren ?? false,
-            childrenCount: payload.childrenCount ?? 0,
-            childrenLivingWithMe: payload.childrenLivingWithMe ?? null,
-            heightCm: payload.heightCm,
-            aboutMe: payload.aboutMe ?? null,
-            city: payload.city,
-            state: payload.state,
-            country: payload.country || 'India',
-            religion: payload.religion,
-            caste: payload.caste,
-            subcaste: payload.subcaste ?? null,
-            gotra: payload.gotra ?? null,
-            motherTongue: payload.motherTongue,
-            educationId: educationFields.educationId ?? payload.educationId ?? null,
-            specializationId: educationFields.specializationId ?? payload.specializationId ?? null,
-            educationLevel: payload.educationLevel,
-            degree: educationFields.degree ?? payload.degree ?? null,
-            collegeName: payload.collegeName ?? null,
-            employmentStatus: payload.employmentStatus,
-            occupationId: careerFields.occupationId ?? payload.occupationId ?? null,
-            profession: careerFields.profession ?? payload.profession,
-            companyId: careerFields.companyId ?? payload.companyId ?? null,
-            companyName: careerFields.companyName ?? payload.companyName ?? null,
-            companySector: careerFields.companySector ?? payload.companySector ?? null,
-            annualIncome: payload.annualIncome,
-            photoPrivacy: payload.photoPrivacy || 'blurred',
+            maritalStatus: data.maritalStatus,
+            hasChildren: data.hasChildren ?? false,
+            childrenCount: data.childrenCount ?? 0,
+            childrenLivingWithMe: data.childrenLivingWithMe ?? null,
+            heightCm: data.heightCm,
+            aboutMe: data.aboutMe ?? null,
+            city: data.city,
+            state: data.state,
+            country: data.country || 'India',
+            religion: data.religion,
+            caste: data.caste,
+            subcaste: data.subcaste ?? null,
+            gotra: data.gotra ?? null,
+            motherTongue: data.motherTongue,
+            educationId: educationFields.educationId ?? data.educationId ?? null,
+            specializationId: educationFields.specializationId ?? data.specializationId ?? null,
+            educationLevel: data.educationLevel ?? null,
+            degree: educationFields.degree ?? data.degree ?? null,
+            collegeName: data.collegeName ?? null,
+            employmentStatus: data.employmentStatus ?? null,
+            occupationId: careerFields.occupationId ?? data.occupationId ?? null,
+            profession: careerFields.profession ?? data.profession ?? null,
+            companyId: careerFields.companyId ?? data.companyId ?? null,
+            companyName: careerFields.companyName ?? data.companyName ?? null,
+            companySector:
+              careerFields.companySector ?? this.normalizeCompanySector(data.companySector),
+            annualIncome: data.annualIncome ?? null,
+            photoPrivacy: data.photoPrivacy || 'blurred',
           })
           .returning();
         profileId = newProfile.id;
@@ -383,22 +563,22 @@ export class ProfilesService {
         .insert(familyDetails)
         .values({
           profileId,
-          familyValues: payload.familyValues,
-          familyType: payload.familyType,
-          fatherOccupation: payload.fatherOccupation,
-          motherOccupation: payload.motherOccupation,
-          brothersCount: payload.brothersCount,
-          sistersCount: payload.sistersCount,
+          familyValues: data.familyValues,
+          familyType: data.familyType,
+          fatherOccupation: data.fatherOccupation,
+          motherOccupation: data.motherOccupation,
+          brothersCount: data.brothersCount ?? 0,
+          sistersCount: data.sistersCount ?? 0,
         })
         .onConflictDoUpdate({
           target: familyDetails.profileId,
           set: {
-            familyValues: payload.familyValues,
-            familyType: payload.familyType,
-            fatherOccupation: payload.fatherOccupation,
-            motherOccupation: payload.motherOccupation,
-            brothersCount: payload.brothersCount,
-            sistersCount: payload.sistersCount,
+            familyValues: data.familyValues,
+            familyType: data.familyType,
+            fatherOccupation: data.fatherOccupation,
+            motherOccupation: data.motherOccupation,
+            brothersCount: data.brothersCount ?? 0,
+            sistersCount: data.sistersCount ?? 0,
             updatedAt: new Date(),
           },
         });
@@ -408,18 +588,18 @@ export class ProfilesService {
         .insert(lifestyleInterests)
         .values({
           profileId,
-          diet: payload.diet,
-          smoking: payload.smoking || 'Never',
-          alcohol: payload.alcohol || 'Never',
-          interests: payload.interests || [],
+          diet: data.diet,
+          smoking: data.smoking || 'Never',
+          alcohol: data.alcohol || 'Never',
+          interests: data.interests || [],
         })
         .onConflictDoUpdate({
           target: lifestyleInterests.profileId,
           set: {
-            diet: payload.diet,
-            smoking: payload.smoking || 'Never',
-            alcohol: payload.alcohol || 'Never',
-            interests: payload.interests || [],
+            diet: data.diet,
+            smoking: data.smoking || 'Never',
+            alcohol: data.alcohol || 'Never',
+            interests: data.interests || [],
             updatedAt: new Date(),
           },
         });
@@ -429,26 +609,26 @@ export class ProfilesService {
         .insert(horoscopes)
         .values({
           profileId,
-          birthTime: payload.birthTime ?? null,
-          birthPlace: payload.birthPlace ?? null,
-          manglik: payload.manglik || "Don't Know",
-          rashi: payload.rashi ?? null,
-          nakshatra: payload.nakshatra ?? null,
-          horoscopeS3Key: payload.horoscopeS3Key ?? null,
-          horoscopeFileName: payload.horoscopeFileName ?? null,
-          horoscopeFileSizeBytes: payload.horoscopeFileSizeBytes ?? null,
+          birthTime: data.birthTime ?? null,
+          birthPlace: data.birthPlace ?? null,
+          manglik: data.manglik || "Don't Know",
+          rashi: data.rashi ?? null,
+          nakshatra: data.nakshatra ?? null,
+          horoscopeS3Key: data.horoscopeS3Key ?? null,
+          horoscopeFileName: data.horoscopeFileName ?? null,
+          horoscopeFileSizeBytes: data.horoscopeFileSizeBytes ?? null,
         })
         .onConflictDoUpdate({
           target: horoscopes.profileId,
           set: {
-            birthTime: payload.birthTime ?? null,
-            birthPlace: payload.birthPlace ?? null,
-            manglik: payload.manglik || "Don't Know",
-            rashi: payload.rashi ?? null,
-            nakshatra: payload.nakshatra ?? null,
-            horoscopeS3Key: payload.horoscopeS3Key ?? null,
-            horoscopeFileName: payload.horoscopeFileName ?? null,
-            horoscopeFileSizeBytes: payload.horoscopeFileSizeBytes ?? null,
+            birthTime: data.birthTime ?? null,
+            birthPlace: data.birthPlace ?? null,
+            manglik: data.manglik || "Don't Know",
+            rashi: data.rashi ?? null,
+            nakshatra: data.nakshatra ?? null,
+            horoscopeS3Key: data.horoscopeS3Key ?? null,
+            horoscopeFileName: data.horoscopeFileName ?? null,
+            horoscopeFileSizeBytes: data.horoscopeFileSizeBytes ?? null,
             updatedAt: new Date(),
           },
         });
@@ -458,39 +638,39 @@ export class ProfilesService {
         .insert(partnerPreferences)
         .values({
           profileId,
-          prefAgeMin: payload.prefAgeMin,
-          prefAgeMax: payload.prefAgeMax,
-          prefHeightMinCm: payload.prefHeightMinCm || 140,
-          prefHeightMaxCm: payload.prefHeightMaxCm || 200,
-          prefMaritalStatuses: payload.prefMaritalStatuses || ['Never Married'],
-          prefReligions: payload.prefReligions.length > 0 ? payload.prefReligions : ['Hindu'],
-          prefCastes: payload.prefCastes || [],
-          prefMotherTongues: payload.prefMotherTongues || [],
-          prefMinEducation: payload.prefMinEducation ?? null,
-          prefAcceptableIncomes: payload.prefAcceptableIncomes || [],
-          prefLocations: payload.prefLocations || [],
+          prefAgeMin: data.prefAgeMin,
+          prefAgeMax: data.prefAgeMax,
+          prefHeightMinCm: data.prefHeightMinCm || 140,
+          prefHeightMaxCm: data.prefHeightMaxCm || 200,
+          prefMaritalStatuses: data.prefMaritalStatuses || ['Never Married'],
+          prefReligions: data.prefReligions.length > 0 ? data.prefReligions : ['Hindu'],
+          prefCastes: data.prefCastes || [],
+          prefMotherTongues: data.prefMotherTongues || [],
+          prefMinEducation: data.prefMinEducation ?? null,
+          prefAcceptableIncomes: data.prefAcceptableIncomes || [],
+          prefLocations: data.prefLocations || [],
         })
         .onConflictDoUpdate({
           target: partnerPreferences.profileId,
           set: {
-            prefAgeMin: payload.prefAgeMin,
-            prefAgeMax: payload.prefAgeMax,
-            prefHeightMinCm: payload.prefHeightMinCm || 140,
-            prefHeightMaxCm: payload.prefHeightMaxCm || 200,
-            prefMaritalStatuses: payload.prefMaritalStatuses || ['Never Married'],
-            prefReligions: payload.prefReligions.length > 0 ? payload.prefReligions : ['Hindu'],
-            prefCastes: payload.prefCastes || [],
-            prefMotherTongues: payload.prefMotherTongues || [],
-            prefMinEducation: payload.prefMinEducation ?? null,
-            prefAcceptableIncomes: payload.prefAcceptableIncomes || [],
-            prefLocations: payload.prefLocations || [],
+            prefAgeMin: data.prefAgeMin,
+            prefAgeMax: data.prefAgeMax,
+            prefHeightMinCm: data.prefHeightMinCm || 140,
+            prefHeightMaxCm: data.prefHeightMaxCm || 200,
+            prefMaritalStatuses: data.prefMaritalStatuses || ['Never Married'],
+            prefReligions: data.prefReligions.length > 0 ? data.prefReligions : ['Hindu'],
+            prefCastes: data.prefCastes || [],
+            prefMotherTongues: data.prefMotherTongues || [],
+            prefMinEducation: data.prefMinEducation ?? null,
+            prefAcceptableIncomes: data.prefAcceptableIncomes || [],
+            prefLocations: data.prefLocations || [],
             updatedAt: new Date(),
           },
         });
 
       // 7. Insert Photos — reject keys not minted for this user via presigned upload.
-      if (payload.photoS3Keys && payload.photoS3Keys.length > 0) {
-        const uniqueKeys = [...new Set(payload.photoS3Keys)];
+      if (data.photoS3Keys && data.photoS3Keys.length > 0) {
+        const uniqueKeys = [...new Set(data.photoS3Keys)];
         const badPhoto = uniqueKeys.find((key) => !isOwnedPhotoKey(key, userId, 'profile_photo'));
         if (badPhoto) {
           throw new BadRequestException('photoS3Keys must be profile photos uploaded through your own presigned URL');
@@ -510,10 +690,10 @@ export class ProfilesService {
       }
 
       // 8. Upsert Verification
-      const method = payload.verificationMethod || 'selfie';
-      const selfieS3Key = payload.selfieS3Key && payload.selfieS3Key.trim() !== '' ? payload.selfieS3Key : null;
-      const govtIdType = payload.govtIdType && payload.govtIdType.trim() !== '' ? (payload.govtIdType as any) : null;
-      const govtIdS3Key = payload.govtIdS3Key && payload.govtIdS3Key.trim() !== '' ? payload.govtIdS3Key : null;
+      const method = data.verificationMethod || 'selfie';
+      const selfieS3Key = data.selfieS3Key ?? null;
+      const govtIdType = data.govtIdType ?? null;
+      const govtIdS3Key = data.govtIdS3Key ?? null;
 
       if (selfieS3Key && !isOwnedPhotoKey(selfieS3Key, userId, 'selfie')) {
         throw new BadRequestException('selfieS3Key must be a selfie uploaded through your own presigned URL');
@@ -615,19 +795,39 @@ export class ProfilesService {
       if (payload.country !== undefined) profilesUpdate.country = payload.country;
       if (payload.religion !== undefined) profilesUpdate.religion = payload.religion;
       if (payload.caste !== undefined) profilesUpdate.caste = payload.caste;
-      if (payload.subcaste !== undefined) profilesUpdate.subcaste = payload.subcaste;
-      if (payload.gotra !== undefined) profilesUpdate.gotra = payload.gotra;
+      if (payload.subcaste !== undefined) profilesUpdate.subcaste = this.emptyToNull(payload.subcaste);
+      if (payload.gotra !== undefined) profilesUpdate.gotra = this.emptyToNull(payload.gotra);
       if (payload.motherTongue !== undefined) profilesUpdate.motherTongue = payload.motherTongue;
       Object.assign(profilesUpdate, educationFields);
       Object.assign(profilesUpdate, careerFields);
-      if (payload.educationLevel !== undefined) profilesUpdate.educationLevel = payload.educationLevel;
-      if (payload.degree !== undefined && educationFields.degree === undefined) profilesUpdate.degree = payload.degree;
-      if (payload.collegeName !== undefined) profilesUpdate.collegeName = payload.collegeName;
-      if (payload.employmentStatus !== undefined) profilesUpdate.employmentStatus = payload.employmentStatus;
-      if (payload.profession !== undefined && careerFields.profession === undefined) profilesUpdate.profession = payload.profession;
-      if (payload.companyName !== undefined && careerFields.companyName === undefined) profilesUpdate.companyName = payload.companyName;
-      if (payload.companySector !== undefined && careerFields.companySector === undefined) profilesUpdate.companySector = payload.companySector;
-      if (payload.annualIncome !== undefined) profilesUpdate.annualIncome = payload.annualIncome;
+      if (payload.educationLevel !== undefined) {
+        profilesUpdate.educationLevel = this.optionalEnum(
+          payload.educationLevel,
+          ['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'High School'] as const,
+        );
+      }
+      if (payload.degree !== undefined && educationFields.degree === undefined) {
+        profilesUpdate.degree = this.emptyToNull(payload.degree);
+      }
+      if (payload.collegeName !== undefined) profilesUpdate.collegeName = this.emptyToNull(payload.collegeName);
+      if (payload.employmentStatus !== undefined) {
+        profilesUpdate.employmentStatus = this.optionalEnum(
+          payload.employmentStatus,
+          ['Employed', 'Business Owner', 'Freelancer', 'Not Working'] as const,
+        );
+      }
+      if (payload.profession !== undefined && careerFields.profession === undefined) {
+        profilesUpdate.profession = this.emptyToNull(payload.profession);
+      }
+      if (payload.companyName !== undefined && careerFields.companyName === undefined) {
+        profilesUpdate.companyName = this.emptyToNull(payload.companyName);
+      }
+      if (payload.companySector !== undefined && careerFields.companySector === undefined) {
+        profilesUpdate.companySector = this.normalizeCompanySector(payload.companySector);
+      }
+      if (payload.annualIncome !== undefined) {
+        profilesUpdate.annualIncome = this.emptyToNull(payload.annualIncome);
+      }
       if (payload.photoPrivacy !== undefined) profilesUpdate.photoPrivacy = payload.photoPrivacy;
       // Special handling for DOB
       if (payload.dobYear !== undefined && payload.dobMonth !== undefined && payload.dobDay !== undefined) {

@@ -108,26 +108,15 @@ class ApiClient {
 
   // --- Auth APIs ---
   auth = {
-    sendOtp: (data: SendOtpRequest) => {
-      // Vercel-only: when NEXT_PUBLIC_BFF_DEV_OTP=true, the BFF serves 123456
-      // locally so the app demo works without the EC2 API. The default path
-      // reaches the real BFF proxy via /api/proxy.
-      const useDevStub =
-        typeof process !== 'undefined' &&
-        (process as any).env?.NEXT_PUBLIC_BFF_DEV_OTP === 'true';
-      const path = useDevStub ? '/api/dev/auth/send-otp' : '/auth/send-otp';
-      return this.request<{ message: string; mockOtp?: string }>(path, {
+    sendOtp: (data: SendOtpRequest) =>
+      this.request<{ message: string }>('/auth/send-otp', {
         method: 'POST',
         body: JSON.stringify(data),
-      });
-    },
+      }),
 
     verifyOtp: async (data: VerifyOtpRequest): Promise<AuthResponse> => {
-      const useDevStub =
-        typeof process !== 'undefined' &&
-        (process as any).env?.NEXT_PUBLIC_BFF_DEV_OTP === 'true';
-      const path = useDevStub ? '/api/dev/auth/login' : '/api/auth/login';
-      const res = await this.request<AuthResponse>(path, {
+      // Hit the Next.js auth API route which sets the HTTP-only cookie
+      const res = await this.request<AuthResponse>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(data),
       });

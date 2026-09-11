@@ -1,0 +1,46 @@
+{
+  "exact": {
+    "profiles": 0,
+    "users": 2,
+    "states": 25,
+    "cities": 104,
+    "city_aliases": 154,
+    "education_levels": 47,
+    "specializations": 199,
+    "education_aliases": 117,
+    "occupations": 91,
+    "occupation_aliases": 219,
+    "companies": 150,
+    "company_aliases": 220,
+    "communities": 130,
+    "community_aliases": 285,
+    "gotras": 49,
+    "gotra_aliases": 85,
+    "subcastes": 209,
+    "subcaste_aliases": 209,
+    "plans": 5,
+    "profile_photos": 0,
+    "payments": 0,
+    "subscriptions": 0,
+    "interests": 0,
+    "shortlists": 0,
+    "notifications": 0,
+    "otp_attempts": 16
+  },
+  "smoke": {
+    "citySearch": 1,
+    "occupationSearch": 0,
+    "communitySearch": 1,
+    "educationSearch": 5,
+    "plansActive": [
+      "Gold",
+      "Platinum",
+      "Diamond",
+      "Free",
+      "Silver"
+    ],
+    "createdByCheck": []
+  },
+  "emptyMasterTables": [],
+  "emptyOrSparseMaster": []
+}

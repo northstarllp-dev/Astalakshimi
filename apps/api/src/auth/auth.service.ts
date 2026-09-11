@@ -30,7 +30,7 @@ export class AuthService {
     private readonly smsService: SmsService,
   ) {}
 
-  async sendOtp(input: SendOtpInput): Promise<{ message: string; mockOtp?: string }> {
+  async sendOtp(input: SendOtpInput): Promise<{ message: string }> {
     const formattedPhone = input.phone.replace(/\s+/g, '');
     
     const [existingUser] = await this.db.select().from(users).where(eq(users.phone, formattedPhone)).limit(1);
@@ -46,7 +46,6 @@ export class AuthService {
       }
     }
     
-    const mockEnabled = this.configService.get<boolean>('auth.mockOtpEnabled');
     const ttlSeconds = this.configService.get<number>('auth.otpTtlSeconds') || 300;
 
     // Per-phone send cap (SMS-pumping protection) independent of per-IP throttling
@@ -62,9 +61,7 @@ export class AuthService {
       throw new BadRequestException('Too many OTP requests. Please try again in a few minutes.');
     }
 
-    const otp = mockEnabled
-      ? this.configService.get<string>('auth.defaultMockOtp') || '123456'
-      : crypto.randomInt(100000, 1000000).toString();
+    const otp = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
     const hashedOtp = sha256(otp);
 
@@ -75,14 +72,6 @@ export class AuthService {
       consentAccepted: input.consentAccepted ?? false,
       referredBy: input.referredBy,
     });
-
-    if (mockEnabled) {
-      this.logger.log(`[OTP] Mock OTP generated for ${formattedPhone} (expires in ${ttlSeconds}s)`);
-      return {
-        message: `OTP sent successfully to ${formattedPhone}`,
-        mockOtp: otp,
-      };
-    }
 
     try {
       await this.smsService.sendOtp(formattedPhone, otp);

@@ -72,14 +72,10 @@ function LoginPageInner() {
     setLoading(true)
     const digits = values.phone.replace(/\D/g, "").slice(0, 10)
     try {
-      const res = await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true, type: "login" })
+      await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true, type: "login" })
       setOtpSent(true)
       setSeconds(30)
-      if (res.mockOtp) {
-        otpForm.setValue("otp", res.mockOtp)
-      } else {
-        otpForm.reset({ otp: "" })
-      }
+      otpForm.reset({ otp: "" })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to send OTP. Please check the mobile number."
       if (message.toLowerCase().includes("not registered")) {

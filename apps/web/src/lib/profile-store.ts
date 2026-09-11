@@ -258,7 +258,7 @@ export const emptySignupData = (): SignupData => ({
   otherOccupation: "",
   companyId: null,
   companyName: "",
-  companySector: "",
+  companySector: undefined,
   annualIncome: "",
   familyValues: "Moderate",
   familyType: "Nuclear",

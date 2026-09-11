@@ -36,17 +36,19 @@ If `JWT_SECRET` is weak or missing in prod, the API throws on boot (added during
 
 ### OTP / SMS
 
-| Var                  | Dev           | Prod                                             | Fail-fast? |
-| -------------------- | ------------- | ------------------------------------------------ | ---------- |
-| `MOCK_OTP_ENABLED`   | `true`        | **`false`** or unset                            | Yes — prod refuses to start if `true` |
-| `SMS_PROVIDER`       | unset         | `apitxt`                                         | |
-| `APITXT_AUTH_KEY`    | unset         | *(your apitxt dashboard key — rotate)*          | Required by SmsService when `SMS_PROVIDER=apitxt` |
-| `APITXT_CHANNEL`     | unset         | `sms` (or `whatsapp` for WhatsApp delivery)      | |
-| `APITXT_COUNTRY`     | `91`          | `91`                                             | Default if unset |
-| `APITXT_TEMPLATE_ID` | unset         | *(DLT template id)*                              | Optional |
-| `OTP_TTL_SECONDS`    | `300`         | `300` or `180` for tighter windows               | No |
-| `OTP_MAX_PER_PHONE_PER_WINDOW` | `3`   | `3`                                              | No |
-| `OTP_SEND_WINDOW_SECONDS`     | `600` | `300` for tighter windows                       | No |
+| Var                  | Value                                             | Fail-fast? |
+| -------------------- | ------------------------------------------------ | ---------- |
+| `SMS_PROVIDER`       | `apitxt`                                          | Yes — prod refuses to start if unset |
+| `APITXT_AUTH_KEY`    | *(your apitxt dashboard key — rotate)*            | Required by SmsService when `SMS_PROVIDER=apitxt` |
+| `APITXT_CHANNEL`     | `sms` (or `whatsapp` for WhatsApp delivery)       | Default `sms` |
+| `APITXT_COUNTRY`     | `91`                                              | Default if unset |
+| `APITXT_TEMPLATE_ID` | *(DLT template id)*                               | Optional |
+| `OTP_TTL_SECONDS`    | `300` or `180` for tighter windows                | No |
+| `OTP_MAX_PER_PHONE_PER_WINDOW` | `3`                                     | No |
+| `OTP_SEND_WINDOW_SECONDS`     | `600` (or `300` for tighter windows)    | No |
+
+There is no mock OTP mode — the API always sends a real SMS via the configured provider
+and fails closed if delivery is not configured.
 
 ### RDS / Database
 
@@ -107,11 +109,12 @@ Update `pm2 status` and `pm2 logs api` if needed.
 The API **refuses to boot** in production if any of these is missing/weak:
 
 1. `JWT_SECRET` < 32 chars or starts with `astalakshimi-`
-2. `MOCK_OTP_ENABLED=true`
+2. `SMS_PROVIDER` unset (use `apitxt` with `APITXT_AUTH_KEY`)
 3. `SMS_PROVIDER=apitxt` and `APITXT_AUTH_KEY` is missing  → SmsService throws on first OTP
-4. `SMS_PROVIDER=razorpay` and `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` missing  → PaymentsConfig throws
+4. `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` missing  → PaymentsConfig throws
 
-In **development** all of these fall back to safe dummy values so the server boots without ceremony.
+In **development** JWT falls back to a dev secret, but SMS still fails closed —
+set `SMS_PROVIDER=apitxt` + `APITXT_AUTH_KEY` in `.env` or send-otp returns 500.
 
 ---
 
@@ -127,6 +130,7 @@ full URL with the password replaced by `***`.
 To update runtime secrets cleanly without editing the file by hand, the
 existing `bash scripts/fix-ec2-env.sh` script automates the common changes:
 - forces `NODE_ENV=production`
-- forces `MOCK_OTP_ENABLED=false`
+- removes stale `MOCK_OTP_ENABLED`/`DEFAULT_MOCK_OTP` keys from the old setup
+- verifies `SMS_PROVIDER` + `APITXT_AUTH_KEY` are set (exits if not)
 - generates a new `JWT_SECRET` if the existing one is missing/short/default
 - keeps `AWS_*_BUCKET` and `CORS_ORIGIN` aligned

@@ -12,15 +12,11 @@ export default registerAs('auth', () => {
     );
   }
 
-  const mockOtpEnabled =
-    process.env.MOCK_OTP_ENABLED === 'true'
-      ? true
-      : process.env.NODE_ENV === 'production'
-        ? false
-        : process.env.MOCK_OTP_ENABLED !== 'false';
-
-  if (isProduction && mockOtpEnabled) {
-    throw new Error('Refusing to start: MOCK_OTP_ENABLED must not be enabled in production');
+  const smsProvider = process.env.SMS_PROVIDER || '';
+  if (isProduction && !smsProvider) {
+    throw new Error(
+      'Refusing to start: SMS_PROVIDER must be set in production (use "apitxt" with APITXT_AUTH_KEY)',
+    );
   }
 
   return {
@@ -30,9 +26,7 @@ export default registerAs('auth', () => {
     otpTtlSeconds: parseInt(process.env.OTP_TTL_SECONDS || '300', 10), // 5 minutes
     otpMaxPerPhonePerWindow: parseInt(process.env.OTP_MAX_PER_PHONE_PER_WINDOW || '3', 10),
     otpSendWindowSeconds: parseInt(process.env.OTP_SEND_WINDOW_SECONDS || '600', 10), // 10 minutes
-    mockOtpEnabled,
-    defaultMockOtp: process.env.DEFAULT_MOCK_OTP || '123456',
-    smsProvider: process.env.SMS_PROVIDER || '',
+    smsProvider,
     msg91AuthKey: process.env.MSG91_AUTH_KEY || '',
     msg91SenderId: process.env.MSG91_SENDER_ID || '',
     msg91TemplateId: process.env.MSG91_TEMPLATE_ID || '',

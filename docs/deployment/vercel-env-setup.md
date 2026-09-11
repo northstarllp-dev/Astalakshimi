@@ -42,21 +42,12 @@ not in chat history.
 
 ---
 
-## Preview / staging (no EC2)
+## Preview / staging
 
-If you want Vercel preview deploys to work **without** the EC2 API, set
-`BFF_DEV_OTP=true`. The BFF serves 123456 from `/api/dev/auth/*`. Every other
-endpoint (search, profiles, etc.) still 502s in preview unless you also stand
-up a real backend.
-
-| Key                          | Value | Environments |
-| ---------------------------- | ----- | ------------- |
-| `BFF_DEV_OTP`                | `true` | **Preview** and **Development** only. Leave unset in Production. |
-| `BFF_DEV_OTP_FORCE`          | `true` | Set only if you want preview to lie about being "production" while still mocking. **Only use in test**. |
-
-NEVER set `BFF_DEV_OTP=true` in Production. Cookie-based auth tokens issued
-in dev mode are dev-issued `dev.<uuid>` strings; real OTP-bound sessions need
-a real API.
+Preview deploys talk to the same EC2 API as production (via `NEXT_PUBLIC_API_URL`).
+The login flow requires the EC2 API to be reachable — there is no mock/dev OTP path.
+If EC2 is down, `/api/proxy/*` returns 502 and the front end shows an error, which is
+the correct failure mode.
 
 ---
 
@@ -76,9 +67,8 @@ Don't override these on Vercel — the platform controls them:
 2. Select the **`astalakshimi-web`** project.
 3. **Settings → Environment Variables**.
 4. Click **Add New**.
-5. Paste **Key** and **Value**. Tick environments:
-   - **Production** for everything except the dev-only `BFF_DEV_OTP*`
-   - **Preview** and **Development** for everything, plus `BFF_DEV_OTP=true`
+5. Paste **Key** and **Value**. Tick **Production**, **Preview**, and
+   **Development** for every variable.
 6. **Save**. Trigger a redeploy (Deployments → ... → Redeploy) for env changes
    to take effect.
 

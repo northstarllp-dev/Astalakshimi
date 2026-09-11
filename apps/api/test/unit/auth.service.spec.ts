@@ -1,4 +1,5 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { AuthService } from '../../src/auth/auth.service';
 import { users, profiles, otpAttempts } from '@astalakshimi/database';
 
@@ -7,16 +8,13 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
   let mockDb: any;
   let mockJwtService: any;
   let mockConfigService: any;
+  let mockSms: any;
 
   beforeEach(() => {
     // Config Service Mock
     mockConfigService = {
       get: jest.fn((key: string) => {
         switch (key) {
-          case 'auth.mockOtpEnabled':
-            return true;
-          case 'auth.defaultMockOtp':
-            return '123456';
           case 'auth.otpTtlSeconds':
             return 300;
           default:
@@ -51,15 +49,33 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
       update: jest.fn(),
     };
 
-    const mockSmsService = {
+    mockSms = {
       sendOtp: jest.fn().mockResolvedValue(undefined),
     };
 
-    authService = new AuthService(mockDb, mockJwtService, mockConfigService, mockSmsService as any);
+    authService = new AuthService(mockDb, mockJwtService, mockConfigService, mockSms as any);
   });
 
   describe('sendOtp', () => {
-    it('should generate mock OTP and store in database when mock OTP is enabled', async () => {
+    // select() (users lookup) ends with .limit(1);
+    // select({ count }) (rate-limit query) has no .limit — .where resolves directly.
+    const selectMock = () =>
+      jest.fn((...args: any[]) => {
+        if (args.length > 0) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockResolvedValue([]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([]),
+        };
+      });
+
+    it('should generate a random 6-digit OTP, store its hash, and send it via SMS', async () => {
+      mockDb.select.mockImplementation(selectMock());
       const mockValues = jest.fn().mockResolvedValue(undefined);
       mockDb.insert.mockReturnValue({ values: mockValues });
 
@@ -73,18 +89,22 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
       expect(mockValues).toHaveBeenCalledWith(
         expect.objectContaining({
           phone: '9876543210',
-          otpHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', // sha256 of '123456'
+          otpHash: expect.stringMatching(/^[a-f0-9]{64}$/), // sha256 hex of the random OTP
           consentAccepted: true,
           referredBy: 'REF123',
         })
       );
+      expect(mockSms.sendOtp).toHaveBeenCalledWith(
+        '9876543210',
+        expect.stringMatching(/^\d{6}$/),
+      );
       expect(result).toEqual({
         message: 'OTP sent successfully to 9876543210',
-        mockOtp: '123456',
       });
     });
 
     it('should strip spaces from the phone number before storing', async () => {
+      mockDb.select.mockImplementation(selectMock());
       const mockValues = jest.fn().mockResolvedValue(undefined);
       mockDb.insert.mockReturnValue({ values: mockValues });
 
@@ -98,31 +118,21 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
           phone: '+919876543210',
         })
       );
+      expect(mockSms.sendOtp).toHaveBeenCalledWith('+919876543210', expect.any(String));
     });
 
-    it('should generate a 6-digit random OTP when mock OTP is disabled', async () => {
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'auth.mockOtpEnabled') return false;
-        if (key === 'auth.otpTtlSeconds') return 300;
-        return null;
-      });
-
+    it('should fail closed when SMS delivery fails', async () => {
+      mockDb.select.mockImplementation(selectMock());
       const mockValues = jest.fn().mockResolvedValue(undefined);
       mockDb.insert.mockReturnValue({ values: mockValues });
+      mockSms.sendOtp.mockRejectedValue(new Error('SMS delivery failed'));
 
-      const result = await authService.sendOtp({
-        phone: '9876543210',
-        consentAccepted: true,
-      });
-
-      expect(mockValues).toHaveBeenCalledWith(
-        expect.objectContaining({
+      await expect(
+        authService.sendOtp({
           phone: '9876543210',
-          otpHash: expect.stringMatching(/^[a-f0-9]{64}$/), // sha256 hex string
-        })
-      );
-      expect(result.mockOtp).toBeUndefined();
-      expect(result.message).toContain('OTP sent successfully');
+          consentAccepted: true,
+        }),
+      ).rejects.toThrow('Failed to send OTP. Please try again shortly.');
     });
 
     it('should reject login OTP when the phone is not registered', async () => {
@@ -213,6 +223,7 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
         phone: '9876543210',
         otpHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
         attempts: 5,
+        maxAttempts: 5,
         expiresAt: new Date(Date.now() + 60000),
         verified: false,
       };
@@ -236,6 +247,7 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
         phone: '9876543210',
         otpHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
         attempts: 2,
+        maxAttempts: 5,
         expiresAt: new Date(Date.now() + 60000),
         verified: false,
       };
@@ -248,8 +260,11 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
       };
       mockDb.select.mockReturnValue(mockSelectChain);
 
+      // Atomic increment: update(...).set(...).where(...).returning(...)
       const mockSet = jest.fn().mockReturnThis();
-      const mockWhere = jest.fn().mockResolvedValue(undefined);
+      const mockWhere = jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ attempts: 3 }]),
+      });
       mockDb.update.mockReturnValue({ set: mockSet, where: mockWhere });
 
       await expect(
@@ -257,7 +272,9 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
       ).rejects.toThrow('Invalid OTP. Please check and try again.');
 
       expect(mockDb.update).toHaveBeenCalledWith(otpAttempts);
-      expect(mockSet).toHaveBeenCalledWith({ attempts: 3 });
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({ attempts: expect.anything() })
+      );
     });
 
     it('should successfully verify a new user, create user record, and return auth tokens', async () => {
@@ -462,6 +479,7 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
         phone: '9876543210',
         role: 'member',
         status: 'active',
+        refreshTokenHash: createHash('sha256').update('valid_refresh_token').digest('hex'),
       };
 
       let selectCount = 0;
@@ -482,6 +500,11 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
         }
       });
 
+      // Refresh rotation persists the new token hash
+      const mockSet = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn().mockResolvedValue(undefined);
+      mockDb.update.mockReturnValue({ set: mockSet, where: mockWhere });
+
       const result = await authService.refreshToken('valid_refresh_token');
 
       expect(mockJwtService.verify).toHaveBeenCalledWith('valid_refresh_token');
@@ -489,6 +512,10 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
       expect(result.refreshToken).toBe('mock_refresh_token_user-uuid-1');
       expect(result.isNewUser).toBe(false);
       expect(result.hasProfile).toBe(false);
+      expect(mockDb.update).toHaveBeenCalledWith(users);
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({ refreshTokenHash: expect.any(String) })
+      );
     });
 
     it('should throw UnauthorizedException when token type is not "refresh"', async () => {

@@ -33,7 +33,7 @@ describe('Feature 1: Authentication - AuthController (Integration Tests)', () =>
   describe('POST /auth/send-otp', () => {
     it('should forward valid payload to AuthService.sendOtp', async () => {
       const input = { phone: '9876543210', consentAccepted: true, referredBy: 'CODE1' };
-      const expectedResponse = { message: 'OTP sent successfully to 9876543210', mockOtp: '123456' };
+      const expectedResponse = { message: 'OTP sent successfully to 9876543210' };
 
       authService.sendOtp.mockResolvedValue(expectedResponse);
 

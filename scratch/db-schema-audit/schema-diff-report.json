@@ -1,0 +1,733 @@
+{
+  "generatedAt": "2026-09-11T14:00:19.476Z",
+  "summary": {
+    "liveTableCount": 37,
+    "codeTableCount": 37,
+    "tablesMissingInDb": 0,
+    "tablesMissingInCode": 0,
+    "columnsMissingInDb": 0,
+    "columnsMissingInCode": 0,
+    "apiSchemaImports": 38,
+    "rawSqlCount": 19,
+    "appliedDrizzleMigrations": 8
+  },
+  "missingInDb": [],
+  "missingInCode": [],
+  "columnMismatches": [],
+  "liveTables": [
+    "blocked_profiles",
+    "chat_sessions",
+    "cities",
+    "city_aliases",
+    "communities",
+    "community_aliases",
+    "companies",
+    "company_aliases",
+    "education_aliases",
+    "education_levels",
+    "family_details",
+    "gotra_aliases",
+    "gotras",
+    "horoscopes",
+    "interests",
+    "lifestyle_interests",
+    "messages",
+    "notifications",
+    "occupation_aliases",
+    "occupations",
+    "otp_attempts",
+    "partner_preferences",
+    "payments",
+    "plans",
+    "profile_photos",
+    "profile_views",
+    "profiles",
+    "shortlists",
+    "specializations",
+    "states",
+    "subcaste_aliases",
+    "subcastes",
+    "subscriptions",
+    "unlocked_contacts",
+    "user_settings",
+    "users",
+    "verifications"
+  ],
+  "codeTables": {
+    "blocked_profiles": [
+      "blocked_id",
+      "blocker_id",
+      "created_at",
+      "id"
+    ],
+    "occupations": [
+      "category",
+      "display_order",
+      "id",
+      "name"
+    ],
+    "occupation_aliases": [
+      "alias",
+      "id",
+      "normalized_alias",
+      "occupation_id"
+    ],
+    "companies": [
+      "display_order",
+      "id",
+      "name",
+      "sector"
+    ],
+    "company_aliases": [
+      "alias",
+      "company_id",
+      "id",
+      "normalized_alias"
+    ],
+    "chat_sessions": [
+      "blocked_reason",
+      "created_at",
+      "id",
+      "is_blocked",
+      "profile1_id",
+      "profile2_id",
+      "updated_at"
+    ],
+    "communities": [
+      "id",
+      "name",
+      "religion",
+      "slug"
+    ],
+    "community_aliases": [
+      "alias",
+      "community_id",
+      "id",
+      "normalized_alias"
+    ],
+    "subcastes": [
+      "community_id",
+      "id",
+      "name"
+    ],
+    "subcaste_aliases": [
+      "alias",
+      "id",
+      "normalized_alias",
+      "subcaste_id"
+    ],
+    "gotras": [
+      "id",
+      "name",
+      "religion",
+      "slug"
+    ],
+    "gotra_aliases": [
+      "alias",
+      "gotra_id",
+      "id",
+      "normalized_alias"
+    ],
+    "education_levels": [
+      "display_order",
+      "id",
+      "name"
+    ],
+    "specializations": [
+      "display_order",
+      "education_id",
+      "id",
+      "name"
+    ],
+    "education_aliases": [
+      "alias",
+      "education_id",
+      "id",
+      "normalized_alias"
+    ],
+    "family_details": [
+      "brothers_count",
+      "created_at",
+      "family_type",
+      "family_values",
+      "father_occupation",
+      "id",
+      "mother_occupation",
+      "profile_id",
+      "sisters_count",
+      "updated_at"
+    ],
+    "horoscopes": [
+      "birth_place",
+      "birth_time",
+      "created_at",
+      "horoscope_file_name",
+      "horoscope_file_size_bytes",
+      "horoscope_s3_key",
+      "id",
+      "manglik",
+      "nakshatra",
+      "profile_id",
+      "rashi",
+      "updated_at"
+    ],
+    "interests": [
+      "created_at",
+      "id",
+      "message",
+      "receiver_profile_id",
+      "responded_at",
+      "sender_profile_id",
+      "status",
+      "updated_at"
+    ],
+    "lifestyle_interests": [
+      "alcohol",
+      "created_at",
+      "diet",
+      "id",
+      "interests",
+      "profile_id",
+      "smoking",
+      "updated_at"
+    ],
+    "states": [
+      "country",
+      "id",
+      "name",
+      "slug"
+    ],
+    "cities": [
+      "district",
+      "id",
+      "name",
+      "slug",
+      "state_id"
+    ],
+    "city_aliases": [
+      "alias",
+      "city_id",
+      "id",
+      "normalized_alias"
+    ],
+    "messages": [
+      "created_at",
+      "id",
+      "is_read",
+      "receiver_profile_id",
+      "sender_profile_id",
+      "text",
+      "thread_id"
+    ],
+    "notifications": [
+      "actor_profile_id",
+      "body",
+      "category",
+      "created_at",
+      "href",
+      "id",
+      "is_read",
+      "kind",
+      "paid_only",
+      "title",
+      "user_id"
+    ],
+    "otp_attempts": [
+      "attempts",
+      "consent_accepted",
+      "created_at",
+      "expires_at",
+      "id",
+      "max_attempts",
+      "otp_hash",
+      "phone",
+      "referred_by",
+      "verified"
+    ],
+    "partner_preferences": [
+      "created_at",
+      "id",
+      "pref_acceptable_incomes",
+      "pref_age_max",
+      "pref_age_min",
+      "pref_castes",
+      "pref_height_max_cm",
+      "pref_height_min_cm",
+      "pref_locations",
+      "pref_marital_statuses",
+      "pref_min_education",
+      "pref_mother_tongues",
+      "pref_religions",
+      "profile_id",
+      "updated_at"
+    ],
+    "payments": [
+      "amount_paise",
+      "created_at",
+      "currency",
+      "failure_reason",
+      "id",
+      "plan_id",
+      "provider",
+      "provider_order_id",
+      "provider_payment_id",
+      "provider_signature",
+      "status",
+      "target_profile_id",
+      "updated_at",
+      "user_id",
+      "webhook_event_id"
+    ],
+    "plans": [
+      "badge",
+      "contact_unlocks",
+      "created_at",
+      "display_order",
+      "duration_days",
+      "has_advanced_filters",
+      "has_priority_listing",
+      "id",
+      "interest_quota",
+      "is_active",
+      "name",
+      "period_label",
+      "price_paise",
+      "slug",
+      "tagline",
+      "updated_at"
+    ],
+    "profile_photos": [
+      "blur_data_url",
+      "content_hash",
+      "created_at",
+      "display_order",
+      "id",
+      "is_primary",
+      "profile_id",
+      "s3_key",
+      "status"
+    ],
+    "profile_views": [
+      "id",
+      "target_profile_id",
+      "viewed_at",
+      "viewer_profile_id"
+    ],
+    "profiles": [
+      "about_me",
+      "annual_income",
+      "caste",
+      "children_count",
+      "children_living_with_me",
+      "city",
+      "college_name",
+      "company_id",
+      "company_name",
+      "company_sector",
+      "country",
+      "created_at",
+      "created_by",
+      "degree",
+      "dob",
+      "education_id",
+      "education_level",
+      "employment_status",
+      "full_name",
+      "gender",
+      "gotra",
+      "has_children",
+      "height_cm",
+      "id",
+      "marital_status",
+      "mother_tongue",
+      "occupation_id",
+      "photo_privacy",
+      "profession",
+      "profile_for",
+      "religion",
+      "specialization_id",
+      "state",
+      "subcaste",
+      "updated_at",
+      "user_id"
+    ],
+    "shortlists": [
+      "created_at",
+      "id",
+      "profile_id",
+      "target_profile_id"
+    ],
+    "subscriptions": [
+      "cancelled_at",
+      "created_at",
+      "expires_at",
+      "id",
+      "payment_id",
+      "plan_id",
+      "starts_at",
+      "status",
+      "updated_at",
+      "user_id"
+    ],
+    "unlocked_contacts": [
+      "created_at",
+      "id",
+      "payment_id",
+      "unlocked_profile_id",
+      "unlocker_profile_id"
+    ],
+    "user_settings": [
+      "created_at",
+      "hide_from_cities",
+      "hide_from_users",
+      "hide_phone",
+      "hide_profile",
+      "id",
+      "notify_email",
+      "notify_push",
+      "notify_sms",
+      "photo_blur",
+      "profile_visibility",
+      "show_last_seen",
+      "updated_at",
+      "user_id"
+    ],
+    "users": [
+      "consent_accepted",
+      "consent_timestamp",
+      "created_at",
+      "id",
+      "is_phone_verified",
+      "phone",
+      "referred_by",
+      "refresh_token_hash",
+      "role",
+      "status",
+      "updated_at"
+    ],
+    "verifications": [
+      "created_at",
+      "govt_id_s3_key",
+      "govt_id_type",
+      "id",
+      "method",
+      "profile_id",
+      "rejection_reason",
+      "reviewed_at",
+      "reviewed_by",
+      "selfie_s3_key",
+      "status",
+      "updated_at"
+    ]
+  },
+  "api": {
+    "importedSymbols": [
+      "blockedProfiles",
+      "chatSessions",
+      "cities",
+      "cityAliases",
+      "communities",
+      "communityAliases",
+      "companies",
+      "companyAliases",
+      "createDbClient",
+      "educationAliases",
+      "educationLevels",
+      "familyDetails",
+      "gotraAliases",
+      "gotras",
+      "horoscopes",
+      "interests",
+      "lifestyleInterests",
+      "messages",
+      "notifications",
+      "occupationAliases",
+      "occupations",
+      "otpAttempts",
+      "partnerPreferences",
+      "payments",
+      "plans",
+      "profilePhotos",
+      "profileViews",
+      "profiles",
+      "shortlists",
+      "specializations",
+      "states",
+      "subcasteAliases",
+      "subcastes",
+      "subscriptions",
+      "unlockedContacts",
+      "userSettings",
+      "users",
+      "verifications"
+    ],
+    "filesUsing": {
+      "profiles": [
+        "apps/api/src/activity/activity.service.ts",
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/auth/auth.service.ts",
+        "apps/api/src/blocks/blocks.service.ts",
+        "apps/api/src/chat/chat.gateway.ts",
+        "apps/api/src/chat/chat.service.ts",
+        "apps/api/src/contacts/contacts.service.ts",
+        "apps/api/src/entitlements/entitlements.service.ts",
+        "apps/api/src/interests/interests.service.ts",
+        "apps/api/src/matches/matches.service.ts",
+        "apps/api/src/media/media.service.ts",
+        "apps/api/src/notifications/notifications.service.ts",
+        "apps/api/src/payments/payments.service.ts",
+        "apps/api/src/preferences/preferences.service.ts",
+        "apps/api/src/profiles/profiles.service.ts",
+        "apps/api/src/search/search.service.ts",
+        "apps/api/src/shortlists/shortlists.service.ts"
+      ],
+      "interests": [
+        "apps/api/src/activity/activity.service.ts",
+        "apps/api/src/blocks/blocks.service.ts",
+        "apps/api/src/chat/chat.service.ts",
+        "apps/api/src/chat/message.service.ts",
+        "apps/api/src/interests/interests.service.ts",
+        "apps/api/src/matches/matches.service.ts",
+        "apps/api/src/profiles/profiles.service.ts",
+        "apps/api/src/search/search.service.ts",
+        "apps/api/src/shortlists/shortlists.service.ts"
+      ],
+      "shortlists": [
+        "apps/api/src/activity/activity.service.ts",
+        "apps/api/src/shortlists/shortlists.service.ts"
+      ],
+      "profilePhotos": [
+        "apps/api/src/activity/activity.service.ts",
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/chat/chat.service.ts",
+        "apps/api/src/common/photo-access.ts",
+        "apps/api/src/contacts/contacts.service.ts",
+        "apps/api/src/media/media.service.ts",
+        "apps/api/src/profiles/profiles.service.ts",
+        "apps/api/src/search/search.service.ts"
+      ],
+      "profileViews": [
+        "apps/api/src/activity/activity.service.ts"
+      ],
+      "users": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/auth/auth.service.ts",
+        "apps/api/src/auth/jwt.strategy.ts",
+        "apps/api/src/chat/chat.gateway.ts",
+        "apps/api/src/contacts/contacts.service.ts",
+        "apps/api/src/entitlements/entitlements.service.ts",
+        "apps/api/src/payments/payments.service.ts",
+        "apps/api/src/profiles/profiles.service.ts",
+        "apps/api/src/search/search.service.ts"
+      ],
+      "subscriptions": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/entitlements/entitlements.service.ts",
+        "apps/api/src/payments/payments.service.ts",
+        "apps/api/src/profiles/profiles.service.ts",
+        "apps/api/src/search/search.service.ts"
+      ],
+      "verifications": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/interests/interests.service.ts",
+        "apps/api/src/matches/matches.service.ts",
+        "apps/api/src/media/media.service.ts",
+        "apps/api/src/profiles/profiles.service.ts",
+        "apps/api/src/search/search.service.ts",
+        "apps/api/src/shortlists/shortlists.service.ts"
+      ],
+      "familyDetails": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/profiles/profiles.service.ts"
+      ],
+      "lifestyleInterests": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/profiles/profiles.service.ts"
+      ],
+      "horoscopes": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/media/media.service.ts",
+        "apps/api/src/profiles/profiles.service.ts"
+      ],
+      "partnerPreferences": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/preferences/preferences.service.ts",
+        "apps/api/src/profiles/profiles.service.ts"
+      ],
+      "userSettings": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/blocks/blocks.service.ts",
+        "apps/api/src/interests/interests.service.ts",
+        "apps/api/src/matches/matches.service.ts",
+        "apps/api/src/profiles/profiles.service.ts",
+        "apps/api/src/search/search.service.ts",
+        "apps/api/src/settings/settings.service.ts",
+        "apps/api/src/shortlists/shortlists.service.ts"
+      ],
+      "plans": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/entitlements/entitlements.service.ts",
+        "apps/api/src/payments/payments.service.ts",
+        "apps/api/src/plans/plans.service.ts",
+        "apps/api/src/profiles/profiles.service.ts",
+        "apps/api/src/search/search.service.ts"
+      ],
+      "notifications": [
+        "apps/api/src/admin/admin.service.ts",
+        "apps/api/src/notifications/notifications.service.ts"
+      ],
+      "otpAttempts": [
+        "apps/api/src/auth/auth.service.ts"
+      ],
+      "blockedProfiles": [
+        "apps/api/src/blocks/blocks.service.ts"
+      ],
+      "companies": [
+        "apps/api/src/careers/careers.service.ts"
+      ],
+      "companyAliases": [
+        "apps/api/src/careers/careers.service.ts"
+      ],
+      "occupationAliases": [
+        "apps/api/src/careers/careers.service.ts"
+      ],
+      "occupations": [
+        "apps/api/src/careers/careers.service.ts"
+      ],
+      "messages": [
+        "apps/api/src/chat/chat.service.ts",
+        "apps/api/src/chat/message.service.ts"
+      ],
+      "communities": [
+        "apps/api/src/communities/communities.service.ts"
+      ],
+      "communityAliases": [
+        "apps/api/src/communities/communities.service.ts"
+      ],
+      "subcastes": [
+        "apps/api/src/communities/communities.service.ts"
+      ],
+      "subcasteAliases": [
+        "apps/api/src/communities/communities.service.ts"
+      ],
+      "gotras": [
+        "apps/api/src/communities/communities.service.ts"
+      ],
+      "gotraAliases": [
+        "apps/api/src/communities/communities.service.ts"
+      ],
+      "unlockedContacts": [
+        "apps/api/src/contacts/contacts.service.ts",
+        "apps/api/src/entitlements/entitlements.service.ts",
+        "apps/api/src/payments/payments.service.ts"
+      ],
+      "createDbClient": [
+        "apps/api/src/database/database.module.ts"
+      ],
+      "educationAliases": [
+        "apps/api/src/educations/educations.service.ts"
+      ],
+      "educationLevels": [
+        "apps/api/src/educations/educations.service.ts"
+      ],
+      "specializations": [
+        "apps/api/src/educations/educations.service.ts",
+        "apps/api/src/profiles/profiles.service.ts"
+      ],
+      "chatSessions": [
+        "apps/api/src/entitlements/entitlements.service.ts",
+        "apps/api/src/payments/payments.service.ts"
+      ],
+      "cities": [
+        "apps/api/src/locations/locations.service.ts"
+      ],
+      "cityAliases": [
+        "apps/api/src/locations/locations.service.ts"
+      ],
+      "states": [
+        "apps/api/src/locations/locations.service.ts"
+      ],
+      "payments": [
+        "apps/api/src/payments/payments.service.ts"
+      ]
+    },
+    "rawSqlSnippets": [
+      {
+        "file": "apps/api/src/admin/admin.service.ts",
+        "sql": "\"profiles\".\"created_at\" DESC"
+      },
+      {
+        "file": "apps/api/src/auth/auth.service.ts",
+        "sql": "${otpAttempts.attempts} + 1"
+      },
+      {
+        "file": "apps/api/src/careers/careers.service.ts",
+        "sql": "lower(${occupations.name}) = lower(${trimmed})"
+      },
+      {
+        "file": "apps/api/src/careers/careers.service.ts",
+        "sql": "lower(${companies.name}) = lower(${trimmed})"
+      },
+      {
+        "file": "apps/api/src/chat/chat.service.ts",
+        "sql": "${profiles.id} = CASE WHEN ${interests.senderProfileId} = ${userProfile.id} THEN ${interests.receiverProfileId} ELSE ${interests.senderProfileId} END"
+      },
+      {
+        "file": "apps/api/src/communities/communities.service.ts",
+        "sql": "\r\n      SELECT DISTINCT g.id, g.name, g.religion\r\n      FROM gotras g\r\n      LEFT JOIN gotra_aliases a ON a.gotra_id = g.id\r\n      WHERE (\r\n        g.name ILIKE ${pattern}\r\n        OR a.alias ILIKE ${pattern}\r\n        OR a.normalized_alias ILIKE ${normalizedPattern}\r\n      )\r\n      ${religion ? sql"
+      },
+      {
+        "file": "apps/api/src/communities/communities.service.ts",
+        "sql": "\r\n      SELECT c.id, c.name, c.religion\r\n      FROM community_aliases a\r\n      INNER JOIN communities c ON c.id = a.community_id\r\n      WHERE a.normalized_alias = ${normalized}\r\n      ${religion ? sql"
+      },
+      {
+        "file": "apps/api/src/communities/communities.service.ts",
+        "sql": "lower(${communities.name}) = lower(${trimmed})"
+      },
+      {
+        "file": "apps/api/src/educations/educations.service.ts",
+        "sql": "lower(${educationLevels.name}) = lower(${trimmed})"
+      },
+      {
+        "file": "apps/api/src/interests/interests.service.ts",
+        "sql": "${profiles.id} = CASE WHEN ${interests.senderProfileId} = ${userProfile.id} THEN ${interests.receiverProfileId} ELSE ${interests.senderProfileId} END"
+      },
+      {
+        "file": "apps/api/src/locations/locations.service.ts",
+        "sql": "\r\n      SELECT c.id, c.name, s.name AS state, s.country\r\n      FROM cities c\r\n      INNER JOIN states s ON s.id = c.state_id\r\n      LEFT JOIN city_aliases a ON a.city_id = c.id\r\n      WHERE (\r\n        c.name ILIKE ${pattern}\r\n        OR a.alias ILIKE ${pattern}\r\n        OR a.normalized_alias ILIKE ${normalizedPattern}\r\n      )\r\n      ${state ? sql"
+      },
+      {
+        "file": "apps/api/src/locations/locations.service.ts",
+        "sql": "\r\n      SELECT c.id, c.name, s.name AS state, s.country\r\n      FROM city_aliases a\r\n      INNER JOIN cities c ON c.id = a.city_id\r\n      INNER JOIN states s ON s.id = c.state_id\r\n      WHERE a.normalized_alias = ${normalized}\r\n      LIMIT 1\r\n    "
+      },
+      {
+        "file": "apps/api/src/locations/locations.service.ts",
+        "sql": "lower(${cities.name}) = lower(${trimmed})"
+      },
+      {
+        "file": "apps/api/src/profiles/profiles.service.ts",
+        "sql": "${p.id}::uuid"
+      },
+      {
+        "file": "apps/api/src/profiles/profiles.service.ts",
+        "sql": ", "
+      },
+      {
+        "file": "apps/api/src/profiles/profiles.service.ts",
+        "sql": "WHEN id = ${p.id}::uuid THEN ${p.order}"
+      },
+      {
+        "file": "apps/api/src/profiles/profiles.service.ts",
+        "sql": " "
+      },
+      {
+        "file": "apps/api/src/profiles/profiles.service.ts",
+        "sql": "\r\n        UPDATE profile_photos\r\n        SET display_order = CASE ${caseSql} END,\r\n            is_primary = (CASE ${caseSql} END = 0)\r\n        WHERE profile_id = ${profile.id} AND id IN (${idsSql})\r\n      "
+      },
+      {
+        "file": "apps/api/src/search/search.service.ts",
+        "sql": "EXISTS (SELECT 1 FROM profile_photos WHERE profile_photos.profile_id = profiles.id AND profile_photos.is_primary = true)"
+      }
+    ]
+  }
+}
