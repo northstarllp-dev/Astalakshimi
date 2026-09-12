@@ -22,7 +22,7 @@ import {
 } from '@astalakshimi/database';
 import { eq, asc, and, or, inArray, sql } from 'drizzle-orm';
 import type { CompleteRegistrationPayload, FullProfileView } from '@astalakshimi/types';
-import { getApprovedPhotos, computeBlurDecision, isOwnedPhotoKey } from '../common/photo-access';
+import { getApprovedPhotos, getAllPhotos, computeBlurDecision, isOwnedPhotoKey } from '../common/photo-access';
 import { LruCache } from '../common/cache/lru-cache';
 
 @Injectable()
@@ -1046,7 +1046,7 @@ export class ProfilesService {
         .from(verifications)
         .where(eq(verifications.profileId, profile.id))
         .limit(1),
-      getApprovedPhotos(this.db, profile.id),
+      getAllPhotos(this.db, profile.id),
     ]);
 
     const verification = Array.isArray(verificationRes) ? verificationRes[0] : verificationRes;

@@ -39,6 +39,9 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!session) return null
+  if (session.role === "staff" && pathname !== "/admin/profiles" && !pathname.startsWith("/admin/profiles/")) {
+    return null
+  }
 
   return <>{children}</>
 }

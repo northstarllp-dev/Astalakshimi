@@ -134,13 +134,14 @@ export class S3Provider {
     }
   }
 
-  async getAdminSignedViewUrl(s3Key: string): Promise<string> {
+  async getAdminSignedViewUrl(s3Key: string, isMedia = false): Promise<string> {
+    const bucketName = isMedia ? this.mediaBucket : this.vaultBucket;
     if (!this.isConfigured) {
-      return `https://${this.vaultBucket}.s3.amazonaws.com/${s3Key}?mock-view-token=valid`;
+      return `https://${bucketName}.s3.amazonaws.com/${s3Key}?mock-view-token=valid`;
     }
 
     const command = new GetObjectCommand({
-      Bucket: this.vaultBucket,
+      Bucket: bucketName,
       Key: s3Key,
     });
 

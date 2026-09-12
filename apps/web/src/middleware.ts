@@ -5,11 +5,6 @@ export default async function middleware(req: NextRequest) {
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
 
   if (isAdminRoute) {
-    // There is no production staff login yet (the console is a dev-only demo).
-    // Block the admin surface at the edge rather than trusting the client-side gate.
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.redirect(new URL("/", req.nextUrl))
-    }
     return NextResponse.next()
   }
 

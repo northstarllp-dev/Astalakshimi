@@ -15,7 +15,13 @@ const CLOUDFRONT_BASE = process.env.NEXT_PUBLIC_CLOUDFRONT_URL || "";
 export function buildMediaUrl(path: string): string {
   if (!path) return "/images/logo-lakshmi.png";
   if (/^(https?:|data:|\/)/.test(path)) return path;
+  
   const encoded = path.split("/").map(encodeURIComponent).join("/");
+
+  if (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_MOCK_S3_UPLOADS !== "false") {
+    return `/api/proxy/media/demo-upload/${encoded}`;
+  }
+  
   if (CLOUDFRONT_BASE) {
     return `${CLOUDFRONT_BASE.replace(/\/$/, "")}/${encoded}`;
   }

@@ -2,7 +2,7 @@ import { Controller, Post, Get, Body, UseGuards, BadRequestException } from '@ne
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { sendOtpSchema, verifyOtpSchema, type SendOtpInput, type VerifyOtpInput } from '@astalakshimi/validation';
+import { sendOtpSchema, verifyOtpSchema, adminLoginSchema, type SendOtpInput, type VerifyOtpInput, type AdminLoginInput } from '@astalakshimi/validation';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -28,6 +28,13 @@ export class AuthController {
   }
 
   @Public()
+  @Post('admin-login')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async adminLogin(@Body(new ZodValidationPipe(adminLoginSchema)) input: AdminLoginInput) {
+    return this.authService.adminLogin(input);
+  }
+
+  @Public()
   @Post('refresh')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   async refresh(@Body('refreshToken') token: string) {
@@ -49,3 +56,5 @@ export class AuthController {
     return this.authService.getMe(user.userId);
   }
 }
+
+

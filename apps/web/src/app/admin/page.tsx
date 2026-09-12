@@ -20,7 +20,7 @@ export default function AdminHomePage() {
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="font-serif text-2xl font-semibold tracking-tight sm:text-3xl">
-            {session?.name?.split(" ")[0] ?? "Staff"}
+            Dashboard
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Today&apos;s queue and numbers</p>
         </div>

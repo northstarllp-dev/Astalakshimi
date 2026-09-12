@@ -231,7 +231,6 @@ export function Step6Verify({
         const previewUrl = await readFileAsDataUrl(file)
         let key = `profiles/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
 
-        if (apiClient.getToken()) {
           try {
             const { s3Key, contentHash } = await apiClient.media.uploadMediaFile(file, "profile_photo")
             key = s3Key
@@ -240,9 +239,6 @@ export function Step6Verify({
             console.warn("[Media] Upload fallback to mock key:", uploadErr)
             photoHashesRef.current.push(hash)
           }
-        } else {
-          photoHashesRef.current.push(hash)
-        }
 
         nextPhotos.push(previewUrl)
         nextKeys.push(key)
@@ -268,13 +264,11 @@ export function Step6Verify({
       const previewUrl = await readFileAsDataUrl(file)
       let key = `verifications/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
 
-      if (apiClient.getToken()) {
-        try {
-          const { s3Key } = await apiClient.media.uploadMediaFile(file, "govt_id")
-          key = s3Key
-        } catch (uploadErr) {
-          console.warn("[Media] Upload fallback to mock key:", uploadErr)
-        }
+      try {
+        const { s3Key } = await apiClient.media.uploadMediaFile(file, "govt_id")
+        key = s3Key
+      } catch (uploadErr) {
+        console.warn("[Media] Upload fallback to mock key:", uploadErr)
       }
 
       updateData({
@@ -306,13 +300,11 @@ export function Step6Verify({
     try {
       let key = `horoscopes/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
 
-      if (apiClient.getToken()) {
-        try {
-          const { s3Key } = await apiClient.media.uploadMediaFile(file, "horoscope")
-          key = s3Key
-        } catch (uploadErr) {
-          console.warn("[Media] Upload fallback to mock key:", uploadErr)
-        }
+      try {
+        const { s3Key } = await apiClient.media.uploadMediaFile(file, "horoscope")
+        key = s3Key
+      } catch (uploadErr) {
+        console.warn("[Media] Upload fallback to mock key:", uploadErr)
       }
 
       updateData({

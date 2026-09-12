@@ -70,12 +70,16 @@ class ApiClient {
       headers,
     });
 
-    // Unauthenticated: the session is gone. Clear the client flag and bounce to login.
     if (response.status === 401) {
       this.clearToken();
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname + window.location.search;
-        if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
+        if (currentPath.startsWith('/admin')) {
+          if (!currentPath.startsWith('/admin/login')) {
+            const callbackUrl = encodeURIComponent(currentPath);
+            window.location.href = `/admin/login?callbackUrl=${callbackUrl}`;
+          }
+        } else if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
           const callbackUrl = encodeURIComponent(currentPath);
           window.location.href = `/login?callbackUrl=${callbackUrl}`;
         }
@@ -129,6 +133,15 @@ class ApiClient {
     logout: async () => {
       await fetch('/api/auth/logout', { method: 'POST' });
       this.clearToken();
+    },
+
+    adminLogin: async (data: import('@astalakshimi/validation').AdminLoginInput): Promise<AuthResponse> => {
+      const res = await this.request<AuthResponse>('/api/auth/admin-login', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      this.setToken();
+      return res;
     },
   };
 

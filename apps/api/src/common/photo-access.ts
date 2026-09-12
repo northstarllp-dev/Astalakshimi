@@ -114,6 +114,27 @@ export async function getApprovedPhotos(
 }
 
 /**
+ * Fetches all non-rejected photos in display order for a single profile.
+ * Used by the owner view so they can see their own pending photos.
+ */
+export async function getAllPhotos(
+  db: Database,
+  profileId: string,
+): Promise<Array<{ id: string; s3Key: string; isPrimary: boolean; displayOrder: number; status: string }>> {
+  return db
+    .select({
+      id: profilePhotos.id,
+      s3Key: profilePhotos.s3Key,
+      isPrimary: profilePhotos.isPrimary,
+      displayOrder: profilePhotos.displayOrder,
+      status: profilePhotos.status,
+    })
+    .from(profilePhotos)
+    .where(and(eq(profilePhotos.profileId, profileId), inArray(profilePhotos.status, ['approved', 'pending'])))
+    .orderBy(profilePhotos.displayOrder);
+}
+
+/**
  * Key-ownership validation for photo writes.
  *
  * S3 keys are minted as `profiles/{userId}/...` or `verifications/{userId}/...`

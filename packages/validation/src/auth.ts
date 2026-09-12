@@ -24,5 +24,11 @@ export const verifyOtpSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits').regex(/^\d{6}$/, 'OTP must be numeric'),
 });
 
+export const adminLoginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
 export type SendOtpInput = z.infer<typeof sendOtpSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
+export type AdminLoginInput = z.infer<typeof adminLoginSchema>;

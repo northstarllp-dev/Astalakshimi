@@ -6,6 +6,8 @@ export const userStatusEnum = pgEnum('user_status', ['active', 'suspended', 'dea
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   phone: varchar('phone', { length: 15 }).notNull().unique(), // +91XXXXXXXXXX
+  email: varchar('email', { length: 255 }).unique(),
+  passwordHash: varchar('password_hash', { length: 255 }),
   isPhoneVerified: boolean('is_phone_verified').default(false).notNull(),
   consentAccepted: boolean('consent_accepted').default(false).notNull(),
   consentTimestamp: timestamp('consent_timestamp', { withTimezone: true }),

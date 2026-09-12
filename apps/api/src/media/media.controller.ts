@@ -8,10 +8,16 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  Get,
+  Query,
+  Res,
+  NotFoundException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MediaService } from './media.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
@@ -27,6 +33,7 @@ import {
   type ConfirmHoroscopeInput,
 } from '@astalakshimi/validation';
 import type { UserSession } from '@astalakshimi/types';
+import { demoUploadStore } from './demo-upload.store';
 
 type UploadedMediaFile = {
   buffer: Buffer;
@@ -100,6 +107,17 @@ export class MediaController {
     @Body(new ZodValidationPipe(confirmHoroscopeSchema)) input: ConfirmHoroscopeInput,
   ) {
     return this.mediaService.confirmHoroscope(user.userId, input);
+  }
+
+  @Public()
+  @Get('demo-upload/*')
+  getDemoUpload(@Param('0') path: string, @Res() res: Response) {
+    const file = demoUploadStore.get(path);
+    if (!file) {
+      throw new NotFoundException('Mock upload not found');
+    }
+    res.setHeader('Content-Type', file.contentType);
+    res.send(file.buffer);
   }
 
   @Delete('photos/:id')

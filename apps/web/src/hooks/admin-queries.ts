@@ -58,15 +58,16 @@ export function useAdminLoginMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error("Staff console sign-in is not available in production yet.")
-      }
-      const session = adminLogin(email, password)
-      if (!session) throw new Error("Invalid email or password.")
+      const res = await apiClient.auth.adminLogin({ email, password })
+      const session = {
+        role: res.user.role === 'admin' ? 'admin' : 'staff',
+        email: (res.user as any).email || email,
+        name: res.user.phone || 'Admin User',
+      } as AdminSession
       return session
     },
     onSuccess: (session) => {
-      queryClient.setQueryData(adminQueryKeys.session, session)
+      setAdminSessionCache(session, queryClient)
       invalidateAdmin(queryClient)
     },
   })

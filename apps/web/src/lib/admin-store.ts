@@ -8,9 +8,9 @@ export const ADMIN_REPORTS_KEY = "astalakshimi.admin.reports"
 export const ADMIN_AUDIT_KEY = "astalakshimi.admin.audit"
 
 export const DEMO_ADMIN_EMAIL = "admin@astalakshimi.in"
-export const DEMO_ADMIN_PASSWORD = "AstaAdmin@2026"
+export const DEMO_ADMIN_PASSWORD = "Admin@2026"
 export const DEMO_STAFF_EMAIL = "staff@astalakshimi.in"
-export const DEMO_STAFF_PASSWORD = "Staff@2026"
+export const DEMO_STAFF_PASSWORD = "Admin@2026"
 
 export type AdminRole = "admin" | "moderator" | "staff"
 export type AccountStatus = "active" | "suspended"
@@ -313,20 +313,9 @@ export function clearAdminSession() {
 }
 
 export function adminLogin(email: string, password: string): AdminSession | null {
-  // Demo staff console is client-side only. In production this must be replaced by
-  // real API-backed staff authentication (the API enforces admin/moderator roles).
-  if (process.env.NODE_ENV === "production") return null
-  const staff = STAFF.find((s) => s.email.toLowerCase() === email.toLowerCase() && s.password === password)
-  if (!staff) return null
-  const session: AdminSession = {
-    staffId: staff.id,
-    email: staff.email,
-    name: staff.name,
-    role: staff.role,
-    loggedInAt: new Date().toISOString(),
-  }
-  saveAdminSession(session)
-  return session
+  // Now handled via backend authentication. This is left as a stub to prevent build errors
+  // but is no longer called in useAdminLoginMutation.
+  return null
 }
 
 export function ensureAdminSeedData() {

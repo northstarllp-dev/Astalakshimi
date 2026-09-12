@@ -52,7 +52,7 @@ export class AdminService {
   }
 
   async getPendingVerifications() {
-    return this.db
+    const verificationsList = await this.db
       .select({
         id: verifications.id,
         profileId: verifications.profileId,
@@ -69,6 +69,14 @@ export class AdminService {
       .innerJoin(profiles, eq(verifications.profileId, profiles.id))
       .innerJoin(users, eq(profiles.userId, users.id))
       .where(eq(verifications.status, 'pending'));
+
+    return Promise.all(
+      verificationsList.map(async (v) => ({
+        ...v,
+        selfieS3Key: v.selfieS3Key ? await this.s3Provider.getAdminSignedViewUrl(v.selfieS3Key) : null,
+        govtIdS3Key: v.govtIdS3Key ? await this.s3Provider.getAdminSignedViewUrl(v.govtIdS3Key) : null,
+      }))
+    );
   }
 
   /**
@@ -76,7 +84,7 @@ export class AdminService {
    * from every public read until a moderator approves them.
    */
   async getPendingPhotos() {
-    return this.db
+    const photos = await this.db
       .select({
         id: profilePhotos.id,
         profileId: profilePhotos.profileId,
@@ -91,6 +99,13 @@ export class AdminService {
       .innerJoin(profiles, eq(profilePhotos.profileId, profiles.id))
       .where(eq(profilePhotos.status, 'pending'))
       .orderBy(profilePhotos.createdAt);
+
+    return Promise.all(
+      photos.map(async (p) => ({
+        ...p,
+        s3Key: p.s3Key ? await this.s3Provider.getAdminSignedViewUrl(p.s3Key, true) : p.s3Key,
+      }))
+    );
   }
 
   async updatePhotoStatus(photoId: string, status: 'approved' | 'rejected', rejectionReason?: string) {
@@ -220,13 +235,20 @@ export class AdminService {
     const prefByProfile = new Map(dbPreferences.map((p) => [p.profileId, p]));
     const activeSubByUserId = new Map(activeSubs.map((s) => [s.userId, s]));
 
-    return records.map((r) => {
+    return Promise.all(records.map(async (r) => {
       const p = r.profile;
       const profilePhotosList = (photosByProfile.get(p.id) ?? []).sort(
         (a, b) => a.displayOrder - b.displayOrder,
       );
       const horoscope = horoscopeByProfile.get(p.id);
       const verificationStatus = r.verificationStatus || 'idle';
+
+      const signedPhotos = await Promise.all(profilePhotosList.map(async (ph) => ({
+        id: ph.id,
+        s3Key: ph.s3Key ? await this.s3Provider.getAdminSignedViewUrl(ph.s3Key, true) : ph.s3Key,
+        isPrimary: ph.isPrimary,
+        status: ph.status,
+      })));
 
       return {
         id: p.id,
@@ -254,14 +276,9 @@ export class AdminService {
           verificationStatus,
           submittedAt: r.submittedAt || p.createdAt,
         }),
-        photos: profilePhotosList.map((ph) => ({
-          id: ph.id,
-          s3Key: ph.s3Key,
-          isPrimary: ph.isPrimary,
-          status: ph.status,
-        })),
+        photos: signedPhotos,
       };
-    });
+    }));
   }
 
   async getProfile(profileId: string) {
@@ -294,15 +311,16 @@ export class AdminService {
         .limit(1),
     ]);
 
-    const mappedPhotos = dbPhotos
-      .map((ph) => ({
-        id: ph.id,
-        s3Key: ph.s3Key,
-        isPrimary: ph.isPrimary,
-        displayOrder: ph.displayOrder,
-        status: ph.status,
-      }))
-      .sort((a, b) => a.displayOrder - b.displayOrder);
+    const mappedPhotos = await Promise.all(
+      dbPhotos
+        .map(async (ph) => ({
+          id: ph.id,
+          s3Key: ph.s3Key ? await this.s3Provider.getAdminSignedViewUrl(ph.s3Key, true) : ph.s3Key,
+          isPrimary: ph.isPrimary,
+          displayOrder: ph.displayOrder,
+          status: ph.status,
+        }))
+    ).then(photos => photos.sort((a, b) => a.displayOrder - b.displayOrder));
 
     const h = horoscopeRecords[0];
     const fam = familyRecords[0];
@@ -350,8 +368,8 @@ export class AdminService {
       paymentMethod: activeSub.length > 0 ? (activeSub[0].paymentId || p.createdBy === 'self' ? 'online' : 'offline') : undefined,
       verificationStatus: verificationStatus,
       verificationMethod: v?.method,
-      selfieS3Key: v?.selfieS3Key,
-      govtIdS3Key: v?.govtIdS3Key,
+      selfieS3Key: v?.selfieS3Key ? await this.s3Provider.getAdminSignedViewUrl(v.selfieS3Key) : undefined,
+      govtIdS3Key: v?.govtIdS3Key ? await this.s3Provider.getAdminSignedViewUrl(v.govtIdS3Key) : undefined,
       govtIdType: v?.govtIdType,
       rejectionReason: v?.rejectionReason,
       horoscopeName: h?.horoscopeS3Key ? h.horoscopeFileName || 'Uploaded Horoscope' : null,

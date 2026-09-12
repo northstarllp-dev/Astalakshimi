@@ -16,6 +16,7 @@ import { IMAGES } from "@/lib/images"
 import { loginOtpSchema, loginPhoneSchema, type LoginOtpValues, type LoginPhoneValues } from "@/lib/validation"
 import { ArrowLeft, Clock3, Loader2, ShieldCheck } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
+import { clearSignupDraft } from "@/lib/profile-store"
 
 export default function LoginPage() {
   return (
@@ -96,6 +97,7 @@ function LoginPageInner() {
       if (auth.hasProfile) {
         router.push("/home")
       } else {
+        clearSignupDraft()
         router.push("/register")
       }
     } catch (err: unknown) {

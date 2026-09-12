@@ -210,6 +210,7 @@ export function clearSignupDraft() {
   if (typeof window === "undefined") return
   try {
     localStorage.removeItem(SIGNUP_DRAFT_KEY)
+    sessionStorage.removeItem(PROFILE_STORAGE_KEY)
   } catch {
     // ignore
   }

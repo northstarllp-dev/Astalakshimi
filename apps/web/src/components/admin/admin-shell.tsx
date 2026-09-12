@@ -44,7 +44,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold leading-tight text-foreground">Admin</p>
               <p className="truncate text-[11px] text-muted-foreground">
-                {session?.name ?? "Staff"}
+                Staff Portal
               </p>
             </div>
           </div>

@@ -137,6 +137,9 @@ export function useProfileQuery() {
               verificationStatus: fullProfile.verificationStatus as any,
             };
             base = { ...base, ...mapped };
+          } else {
+            // User does not have a profile, reset to prevent showing cached deleted profiles
+            base = { ...emptySignupData(), phone: authMe.user.phone };
           }
           saveProfile(base);
         } catch (e) {

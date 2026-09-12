@@ -151,6 +151,43 @@ export class AuthService {
     };
   }
 
+  async adminLogin(input: import('@astalakshimi/validation').AdminLoginInput): Promise<AuthResponse> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.email, input.email))
+      .limit(1);
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.role !== 'admin' && user.role !== 'moderator') {
+      throw new UnauthorizedException('Access denied');
+    }
+
+    const hashedInput = sha256(input.password);
+    if (user.passwordHash !== hashedInput) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const hasProfile = await this.userHasProfile(user.id);
+    const { accessToken, refreshToken } = this.issueTokens(user);
+
+    await this.db
+      .update(users)
+      .set({ refreshTokenHash: sha256(refreshToken), updatedAt: new Date() })
+      .where(eq(users.id, user.id));
+
+    return {
+      accessToken,
+      refreshToken,
+      user: user as unknown as User,
+      isNewUser: false,
+      hasProfile,
+    };
+  }
+
   async getMe(userId: string): Promise<{ user: User; hasProfile: boolean }> {
     const [user] = await this.db
       .select()

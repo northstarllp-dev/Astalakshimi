@@ -57,6 +57,13 @@
       "when": 1788828000000,
       "tag": "0007_photo_content_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789213731795,
+      "tag": "0008_gorgeous_boomerang",
+      "breakpoints": true
     }
   ]
 }
