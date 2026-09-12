@@ -157,23 +157,23 @@ export interface CompleteRegistrationPayload {
   country?: string;
   religion: string;
   caste: string;
-  subcaste?: string;
-  gotra?: string;
+  subcaste?: string | null;
+  gotra?: string | null;
   motherTongue: string;
 
   // Step 4: Education & Career
-  educationId?: number;
-  specializationId?: number;
-  educationLevel?: EducationLevel;
-  degree?: string;
-  collegeName?: string;
-  employmentStatus?: EmploymentStatus;
-  profession?: string;
-  occupationId?: number;
-  companyId?: number;
-  companyName?: string;
-  companySector?: CompanySector;
-  annualIncome?: string;
+  educationId?: number | null;
+  specializationId?: number | null;
+  educationLevel?: EducationLevel | null;
+  degree?: string | null;
+  collegeName?: string | null;
+  employmentStatus?: EmploymentStatus | null;
+  profession?: string | null;
+  occupationId?: number | null;
+  companyId?: number | null;
+  companyName?: string | null;
+  companySector?: CompanySector | null;
+  annualIncome?: string | null;
 
   // Step 4: Family Details
   familyValues: FamilyValues;
@@ -185,25 +185,25 @@ export interface CompleteRegistrationPayload {
 
   // Step 5: Lifestyle & Astrology
   diet: Diet;
-  smoking?: HabitFrequency;
-  alcohol?: HabitFrequency;
+  smoking?: HabitFrequency | null;
+  alcohol?: HabitFrequency | null;
   interests?: string[];
-  birthTime?: string;
-  birthPlace?: string;
-  manglik?: ManglikStatus;
-  rashi?: string;
-  nakshatra?: string;
+  birthTime?: string | null;
+  birthPlace?: string | null;
+  manglik?: ManglikStatus | null;
+  rashi?: string | null;
+  nakshatra?: string | null;
 
   // Step 5: Partner Preferences
   prefAgeMin: number;
   prefAgeMax: number;
-  prefHeightMinCm?: number;
-  prefHeightMaxCm?: number;
+  prefHeightMinCm?: number | null;
+  prefHeightMaxCm?: number | null;
   prefMaritalStatuses?: string[];
   prefReligions: string[];
   prefCastes?: string[];
   prefMotherTongues?: string[];
-  prefMinEducation?: string;
+  prefMinEducation?: string | null;
   prefAcceptableIncomes?: string[];
   prefLocations?: string[];
 
@@ -211,10 +211,10 @@ export interface CompleteRegistrationPayload {
   photoS3Keys: string[];
   photoPrivacy?: PhotoPrivacy;
   verificationMethod: 'selfie' | 'govt_id';
-  selfieS3Key?: string;
-  govtIdType?: 'Aadhaar' | 'PAN card' | 'Passport' | 'Driving licence' | 'Voter ID';
-  govtIdS3Key?: string;
-  horoscopeS3Key?: string;
-  horoscopeFileName?: string;
-  horoscopeFileSizeBytes?: number;
+  selfieS3Key?: string | null;
+  govtIdType?: ('Aadhaar' | 'PAN card' | 'Passport' | 'Driving licence' | 'Voter ID') | null;
+  govtIdS3Key?: string | null;
+  horoscopeS3Key?: string | null;
+  horoscopeFileName?: string | null;
+  horoscopeFileSizeBytes?: number | null;
 }

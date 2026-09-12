@@ -334,5 +334,38 @@ describe('Feature 2: Profile - Zod Validation Schemas', () => {
       const result = updateProfileSchema.safeParse(partialUpdate);
       expect(result.success).toBe(true);
     });
+
+    it('should accept null for specializationId, companyId, educationId, and occupationId', () => {
+      const payload = {
+        specializationId: null,
+        companyId: null,
+        educationId: null,
+        occupationId: null,
+      };
+
+      const result = updateProfileSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept positive integers for specializationId and companyId', () => {
+      const payload = {
+        specializationId: 4,
+        companyId: 10,
+        educationId: 2,
+        occupationId: 5,
+      };
+
+      const result = updateProfileSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid non-number types for specializationId and companyId', () => {
+      const payload = {
+        specializationId: 'not-a-number',
+      };
+
+      const result = updateProfileSchema.safeParse(payload);
+      expect(result.success).toBe(false);
+    });
   });
 });

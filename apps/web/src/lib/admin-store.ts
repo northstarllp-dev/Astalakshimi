@@ -1,5 +1,6 @@
 import { IMAGES } from "@/lib/images"
 import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
+import { MEMBERSHIP_PLANS } from "@/lib/plans"
 
 export const ADMIN_SESSION_KEY = "astalakshimi.admin.session"
 export const ADMIN_PROFILES_KEY = "astalakshimi.admin.profiles"
@@ -388,17 +389,41 @@ export function isSlaBreached(submittedAt: string) {
   return ms > VERIFICATION_SLA_HOURS * 60 * 60 * 1000
 }
 
-export function getAdminStats(): AdminStats {
-  const profiles = loadAdminProfiles()
+export function getAdminStats(overrideProfiles?: AdminProfile[]): AdminStats {
+  const profiles = overrideProfiles ?? loadAdminProfiles()
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
   const pending = profiles.filter((p) => p.verificationStatus === "pending")
+
+  const launchStart = new Date("2026-09-17T00:00:00+05:30").getTime()
+  const launchEnd = new Date("2026-12-17T00:00:00+05:30").getTime()
+
+  let calculatedRevenue = 0
+  for (const p of profiles) {
+    if (p.activeSubscription && p.plan) {
+      const planDetails = MEMBERSHIP_PLANS.find(
+        (plan) => plan.name.toLowerCase() === p.plan?.toLowerCase()
+      )
+      if (planDetails) {
+        const purchaseDate = p.planExpiry 
+          ? new Date(p.planExpiry).getTime() - planDetails.durationDays * 24 * 60 * 60 * 1000 
+          : new Date(p.submittedAt).getTime()
+        const isLaunchOffer = purchaseDate >= launchStart && purchaseDate < launchEnd
+
+        if (isLaunchOffer && planDetails.id === "silver") {
+          calculatedRevenue += 0
+        } else {
+          calculatedRevenue += Math.round(planDetails.priceInPaise / 100)
+        }
+      }
+    }
+  }
 
   return {
     totalUsers: profiles.length,
     totalProfiles: profiles.length,
     activeSubscriptions: profiles.filter((p) => p.activeSubscription).length,
     pendingVerifications: pending.length,
-    totalRevenue: 284_700,
+    totalRevenue: calculatedRevenue,
     verifiedThisWeek: profiles.filter(
       (p) => p.verificationStatus === "verified" && p.reviewedAt && new Date(p.reviewedAt).getTime() >= weekAgo
     ).length,

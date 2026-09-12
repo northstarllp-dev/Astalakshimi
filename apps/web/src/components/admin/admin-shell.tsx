@@ -9,8 +9,6 @@ import { InstallAppButton } from "@/components/admin/install-app-button"
 import { useAdminLogoutMutation, useAdminSessionQuery } from "@/hooks/admin-queries"
 import { cn } from "@/lib/utils"
 import {
-  FileWarning,
-  History,
   LayoutDashboard,
   LogOut,
   Users,
@@ -23,18 +21,6 @@ const navItems = [
     label: "Profiles",
     icon: Users,
     match: (p: string) => p.startsWith("/admin/profiles"),
-  },
-  {
-    href: "/admin/reports",
-    label: "Reports",
-    icon: FileWarning,
-    match: (p: string) => p.startsWith("/admin/reports"),
-  },
-  {
-    href: "/admin/audit",
-    label: "Audit",
-    icon: History,
-    match: (p: string) => p.startsWith("/admin/audit"),
   },
 ]
 
@@ -110,7 +96,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       >
         <div className={cn(
           "mx-auto grid max-w-lg px-1 pt-1",
-          session?.role === "staff" ? "grid-cols-1" : "grid-cols-4"
+          session?.role === "staff" ? "grid-cols-1" : "grid-cols-2"
         )}>
           {navItems.filter(item => session?.role !== "staff" || item.href === "/admin/profiles").map((item) => {
             const active = item.match(pathname)

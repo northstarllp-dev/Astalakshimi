@@ -89,7 +89,32 @@ export function useAdminStatsQuery() {
   return useQuery({
     queryKey: adminQueryKeys.stats,
     queryFn: async () => {
-      const mockStats = await getAdminStats()
+      let mappedProfiles: AdminProfile[] | undefined;
+      try {
+        const actualProfiles = await apiClient.admin.getAllProfiles()
+        mappedProfiles = actualProfiles.map((p: any) => ({
+          ...p,
+          id: p.id,
+          fullName: p.fullName || "Unknown",
+          city: p.city || "Unknown",
+          phone: p.phone || "Unknown",
+          gender: p.gender || "Female",
+          verificationStatus: p.verificationStatus || "idle",
+          completeness: p.completeness ?? 0,
+          accountStatus: p.accountStatus || "active",
+          createdBy: p.createdBy || "self",
+          submittedAt: p.submittedAt,
+          reviewedAt: p.reviewedAt,
+          photos: p.photos
+            ? p.photos.map((ph: any) => ({
+                ...ph,
+                url: getMediaUrl(ph.s3Key),
+              }))
+            : [],
+        })) as AdminProfile[];
+      } catch (err) {}
+
+      const mockStats = getAdminStats(mappedProfiles)
       const actualStats = await tryAdminApi(() => apiClient.admin.getStats())
       if (!actualStats) return mockStats
       return {
@@ -122,6 +147,7 @@ export function useAdminProfilesQuery() {
           accountStatus: p.accountStatus || "active",
           createdBy: p.createdBy || "self",
           submittedAt: p.submittedAt,
+          reviewedAt: p.reviewedAt,
           photos: p.photos
             ? p.photos.map((ph: any) => ({
                 ...ph,

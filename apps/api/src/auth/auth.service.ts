@@ -98,6 +98,12 @@ export class AuthService {
       throw new BadRequestException('No pending OTP request found for this mobile number. Please request a new OTP.');
     }
 
+    console.log(`[DEBUG OTP] Phone: ${formattedPhone}`);
+    console.log(`[DEBUG OTP] Current Time: ${new Date().toISOString()} (${new Date().getTime()})`);
+    console.log(`[DEBUG OTP] Expires At: ${pending.expiresAt.toISOString()} (${pending.expiresAt.getTime()})`);
+    console.log(`[DEBUG OTP] Verified: ${pending.verified}`);
+    console.log(`[DEBUG OTP] Is Expired?: ${new Date() > pending.expiresAt}`);
+
     if (new Date() > pending.expiresAt || pending.verified) {
       throw new BadRequestException('OTP has expired or already used. Please request a new OTP.');
     }

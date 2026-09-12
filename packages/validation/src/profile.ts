@@ -5,17 +5,17 @@ export const maritalStatusSchema = z.enum(['Never Married', 'Divorced', 'Widowed
 export const educationLevelSchema = z.enum(['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'High School']);
 export const employmentStatusSchema = z.enum(['Employed', 'Business Owner', 'Freelancer', 'Not Working']);
 export const companySectorSchema = z.enum(['Private', 'Govt', 'MNC', 'Startup', 'Business']);
-/** Accept omitted / empty string from forms; never pass "" to Postgres enums. */
+/** Accept omitted / empty string / null from forms; never pass "" to Postgres enums. */
 export const optionalCompanySectorSchema = z.preprocess(
-  (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+  (v) => (v === null || (typeof v === 'string' && v.trim() === '') ? undefined : v),
   companySectorSchema.optional(),
 );
 export const optionalEducationLevelSchema = z.preprocess(
-  (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+  (v) => (v === null || (typeof v === 'string' && v.trim() === '') ? undefined : v),
   educationLevelSchema.optional(),
 );
 export const optionalEmploymentStatusSchema = z.preprocess(
-  (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+  (v) => (v === null || (typeof v === 'string' && v.trim() === '') ? undefined : v),
   employmentStatusSchema.optional(),
 );
 export const photoPrivacySchema = z.enum(['blurred', 'accepted', 'visible']);
@@ -163,55 +163,77 @@ export const step6VerificationSchema = z
     }
   });
 
-// Complete Profile Update Schema (for editing after registration)
-export const updateProfileSchema = z.object({
-  fullName: z.string().trim().min(3).optional(),
-  maritalStatus: maritalStatusSchema.optional(),
-  hasChildren: z.boolean().optional(),
-  childrenCount: z.number().int().min(0).optional(),
-  childrenLivingWithMe: z.boolean().optional(),
-  heightCm: z.number().int().min(120).max(230).optional(),
-  aboutMe: z.string().max(1000).optional(),
-  city: z.string().min(2).optional(),
-  state: z.string().min(2).optional(),
-  religion: z.string().optional(),
-  caste: z.string().optional(),
-  subcaste: z.string().optional(),
-  gotra: z.string().optional(),
-  motherTongue: z.string().optional(),
-  educationLevel: optionalEducationLevelSchema,
-  degree: z.string().optional(),
-  collegeName: z.string().optional(),
-  employmentStatus: optionalEmploymentStatusSchema,
-  profession: z.string().optional(),
-  companyName: z.string().optional(),
-  companySector: optionalCompanySectorSchema,
-  annualIncome: z.string().optional(),
-  photoPrivacy: photoPrivacySchema.optional(),
-  diet: dietSchema.optional(),
-  smoking: habitFrequencySchema.optional(),
-  alcohol: habitFrequencySchema.optional(),
-  interests: z.array(z.string()).max(7).optional(),
-  familyValues: familyValuesSchema.optional(),
-  familyType: familyTypeSchema.optional(),
-  fatherOccupation: parentOccupationSchema.optional(),
-  motherOccupation: parentOccupationSchema.optional(),
-  brothersCount: z.number().int().min(0).optional(),
-  sistersCount: z.number().int().min(0).optional(),
-  birthTime: z.string().optional(),
-  birthPlace: z.string().optional(),
-  manglik: manglikStatusSchema.optional(),
-  rashi: z.string().optional(),
-  nakshatra: z.string().optional(),
-  educationId: z.number().int().positive().optional(),
-  specializationId: z.number().int().positive().optional(),
-  occupationId: z.number().int().positive().optional(),
-  companyId: z.number().int().positive().optional(),
-});
-
-/** Full registration payload — empty strings for optional enums become undefined. */
+/** Full registration and update payload — empty strings and nulls for optional enums become undefined. */
 const emptyToUndefined = (v: unknown) =>
-  typeof v === 'string' && v.trim() === '' ? undefined : v;
+  v === null || (typeof v === 'string' && v.trim() === '') ? undefined : v;
+
+// Complete Profile Update Schema (for editing after registration)
+export const updateProfileSchema = z
+  .object({
+    profileFor: z.string().optional(),
+    fullName: z.string().trim().min(3).optional(),
+    gender: genderSchema.optional(),
+    dobDay: z.string().regex(/^(0[1-9]|[12]\d|3[01])$/).optional(),
+    dobMonth: z.string().regex(/^(0[1-9]|1[0-2])$/).optional(),
+    dobYear: z.string().regex(/^(19\d\d|20\d\d)$/).optional(),
+    maritalStatus: maritalStatusSchema.optional(),
+    hasChildren: z.boolean().optional().nullable(),
+    childrenCount: z.number().int().min(0).optional().nullable(),
+    childrenLivingWithMe: z.boolean().optional().nullable(),
+    heightCm: z.number().int().min(120).max(230).optional(),
+    aboutMe: z.string().max(1000).optional().nullable(),
+    city: z.string().min(2).optional(),
+    state: z.string().min(2).optional(),
+    country: z.string().optional(),
+    religion: z.string().optional(),
+    caste: z.string().optional(),
+    subcaste: z.string().optional().nullable(),
+    gotra: z.string().optional().nullable(),
+    motherTongue: z.string().optional(),
+    educationLevel: optionalEducationLevelSchema.nullable(),
+    degree: z.string().optional().nullable(),
+    collegeName: z.string().optional().nullable(),
+    employmentStatus: optionalEmploymentStatusSchema.nullable(),
+    profession: z.string().optional().nullable(),
+    companyName: z.string().optional().nullable(),
+    companySector: optionalCompanySectorSchema.nullable(),
+    annualIncome: z.string().optional().nullable(),
+    photoPrivacy: photoPrivacySchema.optional(),
+    diet: z.preprocess(emptyToUndefined, dietSchema.optional().nullable()),
+    smoking: z.preprocess(emptyToUndefined, habitFrequencySchema.optional().nullable()),
+    alcohol: z.preprocess(emptyToUndefined, habitFrequencySchema.optional().nullable()),
+    interests: z.array(z.string()).max(7).optional(),
+    familyValues: z.preprocess(emptyToUndefined, familyValuesSchema.optional().nullable()),
+    familyType: z.preprocess(emptyToUndefined, familyTypeSchema.optional().nullable()),
+    fatherOccupation: z.preprocess(emptyToUndefined, parentOccupationSchema.optional().nullable()),
+    motherOccupation: z.preprocess(emptyToUndefined, parentOccupationSchema.optional().nullable()),
+    brothersCount: z.number().int().min(0).optional().nullable(),
+    sistersCount: z.number().int().min(0).optional().nullable(),
+    birthTime: z.string().optional().nullable(),
+    birthPlace: z.string().optional().nullable(),
+    manglik: z.preprocess(emptyToUndefined, manglikStatusSchema.optional().nullable()),
+    rashi: z.string().optional().nullable(),
+    nakshatra: z.string().optional().nullable(),
+    educationId: z.number().int().positive().optional().nullable(),
+    specializationId: z.number().int().positive().optional().nullable(),
+    occupationId: z.number().int().positive().optional().nullable(),
+    companyId: z.number().int().positive().optional().nullable(),
+    horoscopeS3Key: z.string().optional().nullable(),
+    horoscopeFileName: z.string().optional().nullable(),
+    horoscopeFileSizeBytes: z.number().optional().nullable(),
+    prefAgeMin: z.number().int().min(18).max(80).optional(),
+    prefAgeMax: z.number().int().min(18).max(80).optional(),
+    prefHeightMinCm: z.number().int().optional().nullable(),
+    prefHeightMaxCm: z.number().int().optional().nullable(),
+    prefMaritalStatuses: z.array(z.string()).optional(),
+    prefReligions: z.array(z.string()).optional(),
+    prefCastes: z.array(z.string()).optional(),
+    prefMotherTongues: z.array(z.string()).optional(),
+    prefMinEducation: z.string().optional().nullable(),
+    prefAcceptableIncomes: z.array(z.string()).optional(),
+    prefLocations: z.array(z.string()).optional(),
+  })
+  .passthrough();
 
 export const completeRegistrationSchema = step2IdentitySchema
   .and(step3CommunitySchema)

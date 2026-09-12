@@ -41,7 +41,8 @@ export class ProfilesService {
   ) {}
 
   private invalidateProfileCache(profileId: string) {
-    this.profileViewCache.delete(profileId);
+    this.profileViewCache.delete(`base:${profileId}`);
+    this.profileViewCache.delete(`stats:${profileId}`);
   }
 
   /** Treat blank strings as missing so Postgres enums/varchars never get "". */
@@ -149,14 +150,14 @@ export class ProfilesService {
       fullName: this.emptyToNull(payload.fullName) || payload.fullName,
       gender,
       maritalStatus,
-      aboutMe: this.emptyToNull(payload.aboutMe),
+      aboutMe: this.emptyToNull(payload.aboutMe) ?? undefined,
       city: this.emptyToNull(payload.city) || payload.city,
       state: this.emptyToNull(payload.state) || payload.state,
       country: this.emptyToNull(payload.country) || 'India',
       religion: this.emptyToNull(payload.religion) || payload.religion,
       caste: this.emptyToNull(payload.caste) || payload.caste,
-      subcaste: this.emptyToNull(payload.subcaste),
-      gotra: this.emptyToNull(payload.gotra),
+      subcaste: this.emptyToNull(payload.subcaste) ?? undefined,
+      gotra: this.emptyToNull(payload.gotra) ?? undefined,
       motherTongue: this.emptyToNull(payload.motherTongue) || payload.motherTongue,
       educationLevel: this.optionalEnum(
         payload.educationLevel,
@@ -235,7 +236,7 @@ export class ProfilesService {
       }
 
       update.educationId = payload.educationId;
-      update.degree = levelName;
+      update.degree = payload.degree || levelName;
       if (payload.specializationId === undefined) {
         update.specializationId = null;
       }
@@ -244,6 +245,9 @@ export class ProfilesService {
     if (payload.specializationId !== undefined) {
       if (payload.specializationId === null) {
         update.specializationId = null;
+        if (payload.degree) {
+          update.degree = payload.degree;
+        }
         return update;
       }
 
@@ -318,42 +322,39 @@ export class ProfilesService {
       companySector?: 'Private' | 'Govt' | 'MNC' | 'Startup' | 'Business';
     } = {};
 
-    if (payload.occupationId !== undefined) {
-      if (payload.occupationId === null) {
-        update.occupationId = null;
-        update.profession = null;
-      } else {
-        const occupationName = await this.careersService.getOccupationName(payload.occupationId);
-        if (!occupationName) {
-          throw new BadRequestException('Invalid occupation');
-        }
-        update.occupationId = payload.occupationId;
-        update.profession = occupationName;
+    if (payload.occupationId !== undefined && payload.occupationId !== null) {
+      const occupationName = await this.careersService.getOccupationName(payload.occupationId);
+      if (!occupationName) {
+        throw new BadRequestException('Invalid occupation');
       }
+      update.occupationId = payload.occupationId;
+      update.profession = occupationName;
     } else if (payload.profession) {
       const resolved = await this.careersService.resolveOccupation(payload.profession);
       if (resolved) {
         update.occupationId = resolved.id;
         update.profession = resolved.name;
+      } else {
+        update.occupationId = null;
+        update.profession = payload.profession;
       }
+    } else if (payload.occupationId === null) {
+      update.occupationId = null;
+      update.profession = null;
     }
 
-    if (payload.companyId !== undefined) {
-      if (payload.companyId === null) {
-        update.companyId = null;
-      } else {
-        const companyName = await this.careersService.getCompanyName(payload.companyId);
-        if (!companyName) {
-          throw new BadRequestException('Invalid company');
-        }
-        const resolved = await this.careersService.resolveCompany(companyName);
-        update.companyId = payload.companyId;
-        update.companyName = companyName;
-        const sector = this.mapCompanySector(resolved?.sector);
-        if (sector) update.companySector = sector;
+    if (payload.companyId !== undefined && payload.companyId !== null) {
+      const companyName = await this.careersService.getCompanyName(payload.companyId);
+      if (!companyName) {
+        throw new BadRequestException('Invalid company');
       }
+      const resolved = await this.careersService.resolveCompany(companyName);
+      update.companyId = payload.companyId;
+      update.companyName = companyName;
+      const sector = this.mapCompanySector(resolved?.sector);
+      if (sector) update.companySector = sector;
     } else if (payload.companyName !== undefined) {
-      const trimmed = payload.companyName.trim();
+      const trimmed = payload.companyName ? payload.companyName.trim() : '';
       if (!trimmed) {
         update.companyId = null;
         update.companyName = null;
@@ -369,6 +370,8 @@ export class ProfilesService {
           update.companyName = trimmed;
         }
       }
+    } else if (payload.companyId === null) {
+      update.companyId = null;
     }
 
     if (payload.profession !== undefined && update.profession === undefined && !payload.occupationId) {

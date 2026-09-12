@@ -163,6 +163,7 @@ export class AdminService {
         accountStatus: users.status,
         verificationStatus: verifications.status,
         submittedAt: verifications.updatedAt,
+        reviewedAt: verifications.reviewedAt,
       })
       .from(profiles)
       .innerJoin(users, eq(profiles.userId, users.id))
@@ -237,6 +238,7 @@ export class AdminService {
         accountStatus: r.accountStatus,
         createdBy: p.createdBy,
         submittedAt: r.submittedAt || p.createdAt,
+        reviewedAt: r.reviewedAt,
         activeSubscription: activeSubByUserId.has(p.userId),
         plan: activeSubByUserId.get(p.userId)?.planName || 'Free',
         planExpiry: activeSubByUserId.get(p.userId)?.expiresAt || undefined,
