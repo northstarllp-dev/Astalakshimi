@@ -104,6 +104,7 @@ export interface FullProfileView {
   lifestyle?: LifestyleInterests | null;
   horoscope?: Horoscope | null;
   partnerPreferences?: any | null;
+  verification?: any | null;
   photos: {
     id: string;
     s3Key: string;
