@@ -661,7 +661,7 @@ export default function ProfileEditPage() {
         </div>
         <Field label="Preferred religions" required error={fieldError(errors, "prefReligion")}>
           <MultiSelect
-            values={data.prefReligion}
+            values={data.prefReligion || []}
             onValuesChange={(values) => update({ prefReligion: values })}
             options={RELIGIONS}
             placeholder="Select religions"

@@ -93,16 +93,16 @@ export const profileEditSchema = z
     otherOccupation: z.string().optional(),
     profession: z.string().optional(),
     annualIncome: z.string().optional(),
-    prefReligion: z.array(z.string()).min(1, "Select at least one preferred religion."),
+    prefReligion: z.array(z.string()).optional(),
     aboutMe: z.string().max(300, "Keep this under 300 characters."),
-    prefAgeMin: z.number().int().min(18).max(80),
-    prefAgeMax: z.number().int().min(18).max(80),
+    prefAgeMin: z.number().int().min(18).max(80).optional(),
+    prefAgeMax: z.number().int().min(18).max(80).optional(),
     brothersCount: z.number().int().min(0).max(5),
     sistersCount: z.number().int().min(0).max(5),
   })
   .passthrough()
   .superRefine((value, ctx) => {
-    if (value.prefAgeMin > value.prefAgeMax) {
+    if (value.prefAgeMin !== undefined && value.prefAgeMax !== undefined && value.prefAgeMin > value.prefAgeMax) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Minimum age cannot be above maximum age.",
