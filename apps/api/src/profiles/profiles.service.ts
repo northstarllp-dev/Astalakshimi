@@ -592,8 +592,8 @@ export class ProfilesService {
         .values({
           profileId,
           diet: data.diet,
-          smoking: data.smoking || 'Never',
-          alcohol: data.alcohol || 'Never',
+          smoking: data.smoking ?? null,
+          alcohol: data.alcohol ?? null,
           interests: data.interests || [],
         })
         .onConflictDoUpdate({
@@ -641,12 +641,12 @@ export class ProfilesService {
         .insert(partnerPreferences)
         .values({
           profileId,
-          prefAgeMin: data.prefAgeMin,
-          prefAgeMax: data.prefAgeMax,
-          prefHeightMinCm: data.prefHeightMinCm || 140,
-          prefHeightMaxCm: data.prefHeightMaxCm || 200,
-          prefMaritalStatuses: data.prefMaritalStatuses || ['Never Married'],
-          prefReligions: data.prefReligions.length > 0 ? data.prefReligions : ['Hindu'],
+          prefAgeMin: data.prefAgeMin ?? null,
+          prefAgeMax: data.prefAgeMax ?? null,
+          prefHeightMinCm: data.prefHeightMinCm ?? null,
+          prefHeightMaxCm: data.prefHeightMaxCm ?? null,
+          prefMaritalStatuses: data.prefMaritalStatuses || [],
+          prefReligions: data.prefReligions || [],
           prefCastes: data.prefCastes || [],
           prefMotherTongues: data.prefMotherTongues || [],
           prefMinEducation: data.prefMinEducation ?? null,
@@ -656,12 +656,12 @@ export class ProfilesService {
         .onConflictDoUpdate({
           target: partnerPreferences.profileId,
           set: {
-            prefAgeMin: data.prefAgeMin,
-            prefAgeMax: data.prefAgeMax,
-            prefHeightMinCm: data.prefHeightMinCm || 140,
-            prefHeightMaxCm: data.prefHeightMaxCm || 200,
-            prefMaritalStatuses: data.prefMaritalStatuses || ['Never Married'],
-            prefReligions: data.prefReligions.length > 0 ? data.prefReligions : ['Hindu'],
+            prefAgeMin: data.prefAgeMin ?? null,
+            prefAgeMax: data.prefAgeMax ?? null,
+            prefHeightMinCm: data.prefHeightMinCm ?? null,
+            prefHeightMaxCm: data.prefHeightMaxCm ?? null,
+            prefMaritalStatuses: data.prefMaritalStatuses || [],
+            prefReligions: data.prefReligions || [],
             prefCastes: data.prefCastes || [],
             prefMotherTongues: data.prefMotherTongues || [],
             prefMinEducation: data.prefMinEducation ?? null,
@@ -792,6 +792,10 @@ export class ProfilesService {
       if (payload.childrenCount !== undefined) profilesUpdate.childrenCount = payload.childrenCount;
       if (payload.childrenLivingWithMe !== undefined) profilesUpdate.childrenLivingWithMe = payload.childrenLivingWithMe;
       if (payload.heightCm !== undefined) profilesUpdate.heightCm = payload.heightCm;
+      if (payload.weight !== undefined) profilesUpdate.weight = this.emptyToNull(payload.weight);
+      if (payload.complexion !== undefined) profilesUpdate.complexion = this.emptyToNull(payload.complexion);
+      if (payload.disability !== undefined) profilesUpdate.disability = this.emptyToNull(payload.disability);
+      if (payload.willingToRelocate !== undefined) profilesUpdate.willingToRelocate = this.emptyToNull(payload.willingToRelocate);
       if (payload.aboutMe !== undefined) profilesUpdate.aboutMe = payload.aboutMe;
       if (payload.city !== undefined) profilesUpdate.city = payload.city;
       if (payload.state !== undefined) profilesUpdate.state = payload.state;
@@ -845,6 +849,7 @@ export class ProfilesService {
       const familyDetailsUpdate: any = {};
       if (payload.familyValues !== undefined) familyDetailsUpdate.familyValues = payload.familyValues;
       if (payload.familyType !== undefined) familyDetailsUpdate.familyType = payload.familyType;
+      if (payload.familyStatus !== undefined) familyDetailsUpdate.familyStatus = payload.familyStatus;
       if (payload.fatherOccupation !== undefined) familyDetailsUpdate.fatherOccupation = payload.fatherOccupation;
       if (payload.motherOccupation !== undefined) familyDetailsUpdate.motherOccupation = payload.motherOccupation;
       if (payload.brothersCount !== undefined) familyDetailsUpdate.brothersCount = payload.brothersCount;
@@ -1025,7 +1030,7 @@ export class ProfilesService {
       throw new NotFoundException('Profile not found for this user. Please complete registration.');
     }
 
-    const [family, lifestyle, horoscope, verificationRes, photos] = await Promise.all([
+    const [family, lifestyle, horoscope, verificationRes, prefRes, photos] = await Promise.all([
       this.db
         .select()
         .from(familyDetails)
@@ -1046,16 +1051,27 @@ export class ProfilesService {
         .from(verifications)
         .where(eq(verifications.profileId, profile.id))
         .limit(1),
+      this.db
+        .select()
+        .from(partnerPreferences)
+        .where(eq(partnerPreferences.profileId, profile.id))
+        .limit(1),
       getAllPhotos(this.db, profile.id),
     ]);
 
+    const familyObj = Array.isArray(family) ? family[0] : family;
+    const lifestyleObj = Array.isArray(lifestyle) ? lifestyle[0] : lifestyle;
+    const horoscopeObj = Array.isArray(horoscope) ? horoscope[0] : horoscope;
     const verification = Array.isArray(verificationRes) ? verificationRes[0] : verificationRes;
+    const partnerPreferencesObj = Array.isArray(prefRes) ? prefRes[0] : prefRes;
 
     return {
       profile: await this.enrichProfileDetails(profile as any),
-      family: (family as any) || null,
-      lifestyle: (lifestyle as any) || null,
-      horoscope: (horoscope as any) || null,
+      family: (familyObj as any) || null,
+      lifestyle: (lifestyleObj as any) || null,
+      horoscope: (horoscopeObj as any) || null,
+      partnerPreferences: (partnerPreferencesObj as any) || null,
+      verification: verification || null,
       photos,
       verificationStatus: verification?.status || 'idle',
     };
@@ -1071,6 +1087,7 @@ export class ProfilesService {
     let lifestyle: any = null;
     let horoscopeRow: any = null;
     let verification: any = null;
+    let partnerPrefs: any = null;
     let photos: Array<{ id: string; s3Key: string; isPrimary: boolean; displayOrder: number }> = [];
 
     if (cachedBase) {
@@ -1080,6 +1097,7 @@ export class ProfilesService {
       lifestyle = c.lifestyle;
       horoscopeRow = c.horoscopeRow;
       verification = c.verification;
+      partnerPrefs = c.partnerPreferences;
       photos = c.photos;
     } else {
       [profile] = await this.db
@@ -1092,7 +1110,7 @@ export class ProfilesService {
         throw new NotFoundException('Profile not found');
       }
 
-      [family, lifestyle, horoscopeRow, verification, photos] = await Promise.all([
+      [family, lifestyle, horoscopeRow, verification, partnerPrefs, photos] = await Promise.all([
         this.db
           .select()
           .from(familyDetails)
@@ -1114,6 +1132,11 @@ export class ProfilesService {
           .where(eq(verifications.profileId, profile.id))
           .limit(1),
         this.db
+          .select()
+          .from(partnerPreferences)
+          .where(eq(partnerPreferences.profileId, profile.id))
+          .limit(1),
+        this.db
           .select({
             id: profilePhotos.id,
             s3Key: profilePhotos.s3Key,
@@ -1131,6 +1154,7 @@ export class ProfilesService {
         lifestyle,
         horoscopeRow,
         verification,
+        partnerPreferences: partnerPrefs,
         photos,
         setting: null, // fetched fresh on every read; cheap single-row lookup
       } as unknown as FullProfileView);
@@ -1212,14 +1236,20 @@ export class ProfilesService {
       ownerUserId: profile.userId,
     });
 
+    const familyObj = Array.isArray(family) ? family[0] : family;
+    const lifestyleObj = Array.isArray(lifestyle) ? lifestyle[0] : lifestyle;
+    const horoscopeRowObj = Array.isArray(horoscopeRow) ? horoscopeRow[0] : horoscopeRow;
+    const verificationObj = Array.isArray(verification) ? verification[0] : verification;
+    const partnerPrefsObj = Array.isArray(partnerPrefs) ? partnerPrefs[0] : partnerPrefs;
+
     const canViewHoroscope = isOwnProfile || (isMutualConnect && contactAccess.isMutualBenefit);
 
     const horoscopePayload =
-      horoscopeRow && canViewHoroscope
-        ? (horoscopeRow as any)
-        : horoscopeRow
+      horoscopeRowObj && canViewHoroscope
+        ? (horoscopeRowObj as any)
+        : horoscopeRowObj
           ? {
-              ...(horoscopeRow as any),
+              ...(horoscopeRowObj as any),
               horoscopeS3Key: null,
               horoscopeFileName: null,
               horoscopeFileSizeBytes: null,
@@ -1242,19 +1272,20 @@ export class ProfilesService {
 
     return {
       profile: await this.enrichProfileDetails(profile as any),
-      family: (family as any) || null,
-      lifestyle: (lifestyle as any) || null,
+      family: (familyObj as any) || null,
+      lifestyle: (lifestyleObj as any) || null,
       horoscope: horoscopePayload,
+      partnerPreferences: partnerPrefsObj || null,
       // Withhold keys entirely when blurred: the bucket is public, so sending
       // them would let anyone view the photo regardless of the blur flag.
       photos: withholdKey ? [] : photos,
-      verificationStatus: verification?.status || 'idle',
+      verificationStatus: verificationObj?.status || 'idle',
       blurPhoto,
-      isVerified: verification?.status === 'verified',
-      photoVerified: verification?.status === 'verified',
+      isVerified: verificationObj?.status === 'verified',
+      photoVerified: verificationObj?.status === 'verified',
       isMutualConnect,
       contactPhone: visiblePhone,
-      hasHoroscope: Boolean(horoscopeRow?.horoscopeS3Key),
+      hasHoroscope: Boolean(horoscopeRowObj?.horoscopeS3Key),
       contactAccess,
     };
   }

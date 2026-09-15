@@ -28,13 +28,17 @@ export const profiles = pgTable('profiles', {
   childrenLivingWithMe: boolean('children_living_with_me'), // true = Yes, false = No
 
   // Physical Attributes & Bio
-  heightCm: integer('height_cm').notNull(), // From scrollable wheel / visual slider
+  heightCm: integer('height_cm'), // From scrollable wheel / visual slider
+  weight: varchar('weight', { length: 50 }),
+  complexion: varchar('complexion', { length: 50 }),
+  disability: varchar('disability', { length: 100 }),
   aboutMe: text('about_me'), // Generated via Bio Builder prompts and editable
 
   // Location
   city: varchar('city', { length: 100 }).notNull(),
   state: varchar('state', { length: 100 }).notNull(),
   country: varchar('country', { length: 100 }).default('India').notNull(),
+  willingToRelocate: varchar('willing_to_relocate', { length: 50 }),
 
   // Community & Background
   religion: varchar('religion', { length: 50 }).notNull(),

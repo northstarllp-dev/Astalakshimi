@@ -8,9 +8,9 @@ export const lifestyleInterests = pgTable('lifestyle_interests', {
   id: uuid('id').defaultRandom().primaryKey(),
   profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull().unique(),
 
-  diet: dietEnum('diet').notNull(),
-  smoking: habitFrequencyEnum('smoking').default('Never').notNull(),
-  alcohol: habitFrequencyEnum('alcohol').default('Never').notNull(),
+  diet: dietEnum('diet'),
+  smoking: habitFrequencyEnum('smoking'),
+  alcohol: habitFrequencyEnum('alcohol'),
 
   // Curated tag cloud (e.g., ["✈️ Travel", "📚 Reading", "🍳 Cooking", "🐕 Pets", "🏏 Cricket"])
   interests: jsonb('interests').$type<string[]>().default([]).notNull(),

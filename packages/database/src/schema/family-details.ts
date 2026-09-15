@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, integer, timestamp, pgEnum, varchar } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
 
 export const familyValuesEnum = pgEnum('family_values', ['Traditional', 'Moderate', 'Liberal']);
@@ -15,12 +15,13 @@ export const familyDetails = pgTable('family_details', {
   id: uuid('id').defaultRandom().primaryKey(),
   profileId: uuid('profile_id').references(() => profiles.id, { onDelete: 'cascade' }).notNull().unique(),
 
-  familyValues: familyValuesEnum('family_values').notNull(),
-  familyType: familyTypeEnum('family_type').notNull(),
+  familyValues: familyValuesEnum('family_values'),
+  familyType: familyTypeEnum('family_type'),
+  familyStatus: varchar('family_status', { length: 50 }),
 
   // Parents' Occupations
-  fatherOccupation: parentOccupationEnum('father_occupation').notNull(),
-  motherOccupation: parentOccupationEnum('mother_occupation').notNull(),
+  fatherOccupation: parentOccupationEnum('father_occupation'),
+  motherOccupation: parentOccupationEnum('mother_occupation'),
 
   // Sibling Counters ([-] N [+])
   brothersCount: integer('brothers_count').default(0).notNull(),

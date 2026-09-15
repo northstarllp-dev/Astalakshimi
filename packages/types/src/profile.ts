@@ -26,10 +26,14 @@ export interface Profile {
   childrenCount?: number;
   childrenLivingWithMe?: boolean | null;
   heightCm: number;
+  weight?: string | null;
+  complexion?: string | null;
+  disability?: string | null;
   aboutMe?: string | null;
   city: string;
   state: string;
   country: string;
+  willingToRelocate?: string | null;
   religion: string;
   caste: string;
   subcaste?: string | null;
@@ -58,6 +62,7 @@ export interface FamilyDetails {
   profileId: string;
   familyValues: FamilyValues;
   familyType: FamilyType;
+  familyStatus?: string | null;
   fatherOccupation: ParentOccupation;
   motherOccupation: ParentOccupation;
   brothersCount: number;
@@ -98,6 +103,7 @@ export interface FullProfileView {
   family?: FamilyDetails | null;
   lifestyle?: LifestyleInterests | null;
   horoscope?: Horoscope | null;
+  partnerPreferences?: any | null;
   photos: {
     id: string;
     s3Key: string;
@@ -149,12 +155,16 @@ export interface CompleteRegistrationPayload {
   childrenCount?: number;
   childrenLivingWithMe?: boolean;
   heightCm: number;
+  weight?: string | null;
+  complexion?: string | null;
+  disability?: string | null;
   aboutMe?: string;
 
   // Step 3: Location & Community
   city: string;
   state: string;
   country?: string;
+  willingToRelocate?: string | null;
   religion: string;
   caste: string;
   subcaste?: string | null;
@@ -178,6 +188,7 @@ export interface CompleteRegistrationPayload {
   // Step 4: Family Details
   familyValues: FamilyValues;
   familyType: FamilyType;
+  familyStatus?: string | null;
   fatherOccupation: ParentOccupation;
   motherOccupation: ParentOccupation;
   brothersCount: number;

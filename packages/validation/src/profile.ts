@@ -27,6 +27,10 @@ export const habitFrequencySchema = z.enum(['Never', 'Occasionally', 'Regularly'
 export const manglikStatusSchema = z.enum(['Yes', 'No', "Don't Know", 'Both']);
 export const govtIdTypeSchema = z.enum(['Aadhaar', 'PAN card', 'Passport', 'Driving licence', 'Voter ID']);
 
+/** Full registration and update payload — empty strings and nulls for optional enums become undefined. */
+const emptyToUndefined = (v: unknown) =>
+  v === null || (typeof v === 'string' && v.trim() === '') ? undefined : v;
+
 // Step 2: Identity & Physical
 export const step2IdentitySchema = z
   .object({
@@ -45,7 +49,7 @@ export const step2IdentitySchema = z
     hasChildren: z.boolean().optional(),
     childrenCount: z.number().int().min(0).max(10).optional(),
     childrenLivingWithMe: z.boolean().optional(),
-    heightCm: z.number().int().min(120, 'Height must be at least 120 cm (3\'11")').max(230, 'Height must be under 230 cm (7\'6")'),
+    heightCm: z.number().int().min(120, 'Height must be at least 120 cm (3\'11")').max(230, 'Height must be under 230 cm (7\'6")').optional().nullable(),
     aboutMe: z.string().max(1000, 'Bio cannot exceed 1000 characters').optional(),
   })
   .superRefine((data, ctx) => {
@@ -91,10 +95,11 @@ export const step3CommunitySchema = z.object({
   subcaste: z.string().trim().optional(),
   gotra: z.string().trim().optional(),
   motherTongue: z.string().min(1, 'Mother tongue is required'),
-  familyValues: familyValuesSchema,
-  familyType: familyTypeSchema,
-  fatherOccupation: parentOccupationSchema,
-  motherOccupation: parentOccupationSchema,
+  familyValues: z.preprocess(emptyToUndefined, familyValuesSchema.optional()),
+  familyType: z.preprocess(emptyToUndefined, familyTypeSchema.optional()),
+  familyStatus: z.string().optional().nullable(),
+  fatherOccupation: z.preprocess(emptyToUndefined, parentOccupationSchema.optional()),
+  motherOccupation: z.preprocess(emptyToUndefined, parentOccupationSchema.optional()),
   brothersCount: z.number().int().min(0).max(10).default(0),
   sistersCount: z.number().int().min(0).max(10).default(0),
 });
@@ -113,9 +118,9 @@ export const step4CareerSchema = z.object({
 
 // Step 5: Lifestyle, Habits & Astrology
 export const step5LifestyleAstrologySchema = z.object({
-  diet: dietSchema,
-  smoking: habitFrequencySchema.default('Never'),
-  alcohol: habitFrequencySchema.default('Never'),
+  diet: z.preprocess(emptyToUndefined, dietSchema.optional()),
+  smoking: z.preprocess(emptyToUndefined, habitFrequencySchema.optional()),
+  alcohol: z.preprocess(emptyToUndefined, habitFrequencySchema.optional()),
   interests: z.array(z.string()).max(7, 'Please select up to 7 interests maximum').default([]),
   birthTime: z.string().trim().min(1, 'Birth time is required'),
   birthPlace: z.string().trim().min(1, 'Birth place is required'),
@@ -163,10 +168,6 @@ export const step6VerificationSchema = z
     }
   });
 
-/** Full registration and update payload — empty strings and nulls for optional enums become undefined. */
-const emptyToUndefined = (v: unknown) =>
-  v === null || (typeof v === 'string' && v.trim() === '') ? undefined : v;
-
 // Complete Profile Update Schema (for editing after registration)
 export const updateProfileSchema = z
   .object({
@@ -180,7 +181,10 @@ export const updateProfileSchema = z
     hasChildren: z.boolean().optional().nullable(),
     childrenCount: z.number().int().min(0).optional().nullable(),
     childrenLivingWithMe: z.boolean().optional().nullable(),
-    heightCm: z.number().int().min(120).max(230).optional(),
+    heightCm: z.number().int().min(120).max(230).optional().nullable(),
+    weight: z.string().optional().nullable(),
+    complexion: z.string().optional().nullable(),
+    disability: z.string().optional().nullable(),
     aboutMe: z.string().max(1000).optional().nullable(),
     city: z.string().min(2).optional(),
     state: z.string().min(2).optional(),
@@ -205,6 +209,7 @@ export const updateProfileSchema = z
     interests: z.array(z.string()).max(7).optional(),
     familyValues: z.preprocess(emptyToUndefined, familyValuesSchema.optional().nullable()),
     familyType: z.preprocess(emptyToUndefined, familyTypeSchema.optional().nullable()),
+    familyStatus: z.string().optional().nullable(),
     fatherOccupation: z.preprocess(emptyToUndefined, parentOccupationSchema.optional().nullable()),
     motherOccupation: z.preprocess(emptyToUndefined, parentOccupationSchema.optional().nullable()),
     brothersCount: z.number().int().min(0).optional().nullable(),
@@ -232,6 +237,7 @@ export const updateProfileSchema = z
     prefMinEducation: z.string().optional().nullable(),
     prefAcceptableIncomes: z.array(z.string()).optional(),
     prefLocations: z.array(z.string()).optional(),
+    willingToRelocate: z.string().optional().nullable(),
   })
   .passthrough();
 

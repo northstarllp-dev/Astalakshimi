@@ -20,6 +20,8 @@ export type SignupData = {
   weight: string
   complexion: string
   diet: string
+  smoking: string
+  alcohol: string
   disability: string
   maritalStatus: string
   hasChildren?: boolean
@@ -62,11 +64,11 @@ export type SignupData = {
   state: string
   willingToRelocate: string
   aboutMe: string
-  prefAgeMin: number
-  prefAgeMax: number
+  prefAgeMin?: number
+  prefAgeMax?: number
   prefHeightMinCm?: number
   prefHeightMaxCm?: number
-  prefReligion: string[]
+  prefReligion?: string[]
   prefCastes?: string[]
   prefMotherTongues?: string[]
   prefMinEducation?: string
@@ -227,16 +229,18 @@ export const emptySignupData = (): SignupData => ({
   dobDay: "",
   dobMonth: "",
   dobYear: "",
-  height: "5'5\"",
+  height: "",
   weight: "",
   complexion: "",
-  diet: "Vegetarian",
+  diet: "",
+  smoking: "",
+  alcohol: "",
   disability: "",
-  maritalStatus: "Never Married",
+  maritalStatus: "",
   hasChildren: false,
   childrenCount: 0,
   childrenLivingWithMe: false,
-  religion: "Hindu",
+  religion: "",
   caste: "",
   subcaste: "",
   gotra: "",
@@ -261,26 +265,26 @@ export const emptySignupData = (): SignupData => ({
   companyName: "",
   companySector: undefined,
   annualIncome: "",
-  familyValues: "Moderate",
-  familyType: "Nuclear",
-  familyStatus: "Middle class",
-  fatherOccupation: "Employed",
-  motherOccupation: "Homemaker",
+  familyValues: "",
+  familyType: "",
+  familyStatus: "",
+  fatherOccupation: "",
+  motherOccupation: "",
   brothersCount: 0,
   sistersCount: 0,
   siblings: "",
   city: "",
-  state: "Tamil Nadu",
-  willingToRelocate: "Yes",
+  state: "",
+  willingToRelocate: "",
   aboutMe: "",
-  prefAgeMin: 24,
-  prefAgeMax: 32,
-  prefHeightMinCm: 140,
-  prefHeightMaxCm: 200,
-  prefReligion: ["Hindu"],
+  prefAgeMin: undefined,
+  prefAgeMax: undefined,
+  prefHeightMinCm: undefined,
+  prefHeightMaxCm: undefined,
+  prefReligion: [],
   prefCastes: [],
   prefMotherTongues: [],
-  prefMinEducation: "Bachelors",
+  prefMinEducation: "",
   prefAcceptableIncomes: [],
   prefLocations: [],
   photos: [],

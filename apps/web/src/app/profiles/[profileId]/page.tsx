@@ -122,26 +122,30 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
     company: data.profile.companyName || "Not specified",
     income: data.profile.annualIncome,
     lifestyle: {
-      drinking: data.lifestyle?.alcohol || "Never",
-      smoking: data.lifestyle?.smoking || "Never",
-      diet: data.lifestyle?.diet || "Vegetarian",
+      drinking: data.lifestyle?.alcohol || "Not specified",
+      smoking: data.lifestyle?.smoking || "Not specified",
+      diet: data.lifestyle?.diet || "Not specified",
     },
     family: {
-      type: data.family?.familyType || "Nuclear",
-      values: data.family?.familyValues || "Traditional",
-      father: data.family?.fatherOccupation || "Employed",
-      mother: data.family?.motherOccupation || "Homemaker",
+      type: data.family?.familyType || "Not specified",
+      values: data.family?.familyValues || "Not specified",
+      father: data.family?.fatherOccupation || "Not specified",
+      mother: data.family?.motherOccupation || "Not specified",
       siblings: `${(data.family?.brothersCount || 0) + (data.family?.sistersCount || 0)}`,
     },
     planSlug: data.planSlug || data.profile?.planSlug || data.subscription?.planSlug || null,
     preferences: {
-      ageRange: "25 - 32 yrs",
-      heightRange: "160 - 180 cm",
-      maritalStatus: "Never Married",
-      religion: data.profile.religion,
-      community: data.profile.caste,
-      education: "Bachelors",
-      location: "India"
+      ageRange: data.partnerPreferences?.prefAgeMin && data.partnerPreferences?.prefAgeMax 
+        ? `${data.partnerPreferences.prefAgeMin} - ${data.partnerPreferences.prefAgeMax} yrs` 
+        : "Not specified",
+      heightRange: data.partnerPreferences?.prefHeightMinCm && data.partnerPreferences?.prefHeightMaxCm
+        ? `${formatHeightFromCm(data.partnerPreferences.prefHeightMinCm)} - ${formatHeightFromCm(data.partnerPreferences.prefHeightMaxCm)}`
+        : "Not specified",
+      maritalStatus: data.partnerPreferences?.prefMaritalStatuses?.length ? data.partnerPreferences.prefMaritalStatuses.join(", ") : "Not specified",
+      religion: data.partnerPreferences?.prefReligions?.length ? data.partnerPreferences.prefReligions.join(", ") : "Not specified",
+      community: data.partnerPreferences?.prefCastes?.length ? data.partnerPreferences.prefCastes.join(", ") : "Not specified",
+      education: data.partnerPreferences?.prefMinEducation || "Not specified",
+      location: data.partnerPreferences?.prefLocations?.length ? data.partnerPreferences.prefLocations.join(", ") : "Not specified"
     }
   }
 

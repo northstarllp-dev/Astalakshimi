@@ -34,7 +34,7 @@ function GridItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1 rounded-xl bg-muted/30 p-3">
       <dt className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</dt>
-      <dd className="text-sm font-medium text-foreground">{value || "—"}</dd>
+      <dd className="text-sm font-medium text-foreground">{value || "Not specified"}</dd>
     </div>
   )
 }
@@ -352,7 +352,7 @@ export default function MyProfilePage() {
                       value={
                         [data.education, data.educationStream].filter(Boolean).join(" · ") ||
                         data.otherEducation ||
-                        "—"
+                        ""
                       }
                     />
                     <GridItem label="Occupation" value={data.otherOccupation || data.occupation} />
@@ -441,8 +441,8 @@ export default function MyProfilePage() {
                     </Link>
                   </div>
                   <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <GridItem label="Age Range" value={`${data.prefAgeMin} – ${data.prefAgeMax} yrs`} />
-                    <GridItem label="Religions" value={data.prefReligion.join(", ")} />
+                    <GridItem label="Age Range" value={data.prefAgeMin && data.prefAgeMax ? `${data.prefAgeMin} – ${data.prefAgeMax} yrs` : ""} />
+                    <GridItem label="Religions" value={data.prefReligion?.length ? data.prefReligion.join(", ") : ""} />
                   </dl>
                 </div>
               </div>

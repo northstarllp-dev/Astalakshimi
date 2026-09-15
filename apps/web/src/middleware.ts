@@ -22,10 +22,15 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  if (pathname === "/login" || pathname === "/") {
+  if (pathname === "/") {
     if (isLoggedIn) {
       return NextResponse.redirect(new URL("/home", req.nextUrl))
+    } else {
+      return NextResponse.redirect(new URL("/login", req.nextUrl))
     }
+  }
+
+  if (pathname === "/login") {
     return NextResponse.next()
   }
 
