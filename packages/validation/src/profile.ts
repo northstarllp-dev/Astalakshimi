@@ -169,7 +169,8 @@ export const step2IdentitySchema = z
     maritalStatus: maritalStatusSchema,
     hasChildren: z.boolean().optional(),
     childrenCount: z.number().int().min(0).max(10).optional(),
-    childrenLivingWithMe: z.boolean().optional(),
+    // null when Never Married / no children (see resolveChildrenFields)
+    childrenLivingWithMe: z.boolean().nullable().optional(),
     heightCm: z.number().int().min(120, 'Height must be at least 120 cm (3\'11")').max(230, 'Height must be under 230 cm (7\'6")').optional().nullable(),
     aboutMe: z.string().max(1000, 'Bio cannot exceed 1000 characters').optional(),
   })

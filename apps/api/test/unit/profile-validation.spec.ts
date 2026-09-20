@@ -193,6 +193,23 @@ describe('Feature 2: Profile - Zod Validation Schemas', () => {
       ).toBe(true);
     });
 
+    it('accepts Never Married with childrenLivingWithMe null', () => {
+      expect(
+        step2IdentitySchema.safeParse({
+          profileFor: 'Myself',
+          fullName: 'Test User',
+          gender: 'Female',
+          dobDay: '15',
+          dobMonth: '06',
+          dobYear: '1995',
+          maritalStatus: 'Never Married',
+          hasChildren: false,
+          childrenCount: 0,
+          childrenLivingWithMe: null,
+        }).success,
+      ).toBe(true);
+    });
+
     it('rejects Divorced + hasChildren without childrenLivingWithMe', () => {
       expect(
         step2IdentitySchema.safeParse({

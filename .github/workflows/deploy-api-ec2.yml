@@ -67,8 +67,11 @@ jobs:
             # Pull first, then run the script from that commit. Otherwise Actions
             # keeps executing a stale deploy script (e.g. missing reference build).
             PREV_COMMIT="$(git rev-parse HEAD)"
-            git fetch origin "$DEPLOY_BRANCH"
-            git reset --hard "origin/$DEPLOY_BRANCH"
+            git remote prune origin >/dev/null 2>&1 || true
+            rm -f .git/refs/remotes/origin/"$DEPLOY_BRANCH".lock 2>/dev/null || true
+            git fetch origin "$DEPLOY_BRANCH" --prune
+            # Always land on the deploy branch (server may be left on `dev`).
+            git checkout -B "$DEPLOY_BRANCH" "origin/$DEPLOY_BRANCH"
             export SKIP_GIT_PULL=true
             export DEPLOY_PREV_COMMIT="$PREV_COMMIT"
             bash scripts/deploy-api-ec2.sh
