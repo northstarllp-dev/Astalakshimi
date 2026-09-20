@@ -64,6 +64,13 @@ jobs:
             cd /home/ubuntu/Astalakshimi
             export DEPLOY_BRANCH="${{ github.event.inputs.branch || 'main' }}"
             export RUN_MIGRATIONS="${{ github.event.inputs.run_migrations || 'false' }}"
+            # Pull first, then run the script from that commit. Otherwise Actions
+            # keeps executing a stale deploy script (e.g. missing reference build).
+            PREV_COMMIT="$(git rev-parse HEAD)"
+            git fetch origin "$DEPLOY_BRANCH"
+            git reset --hard "origin/$DEPLOY_BRANCH"
+            export SKIP_GIT_PULL=true
+            export DEPLOY_PREV_COMMIT="$PREV_COMMIT"
             bash scripts/deploy-api-ec2.sh
 
       - name: Verify public health endpoint
