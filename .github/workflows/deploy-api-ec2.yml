@@ -35,6 +35,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Require EC2 deploy secrets
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        run: |
+          missing=0
+          if [ -z "$EC2_HOST" ]; then echo "::error::Secret EC2_HOST is missing or empty"; missing=1; fi
+          if [ -z "$EC2_USER" ]; then echo "::error::Secret EC2_USER is missing or empty"; missing=1; fi
+          if [ -z "$EC2_SSH_PRIVATE_KEY" ]; then echo "::error::Secret EC2_SSH_PRIVATE_KEY is missing or empty"; missing=1; fi
+          if [ "$missing" -ne 0 ]; then
+            echo "Add them under Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          echo "EC2 deploy secrets are present"
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
