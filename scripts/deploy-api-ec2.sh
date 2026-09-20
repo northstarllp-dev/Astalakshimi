@@ -6,6 +6,8 @@
 #   DEPLOY_BRANCH=main          Git branch to deploy (default: main)
 #   RUN_MIGRATIONS=true         Run drizzle migrations after build
 #   SKIP_GIT_PULL=true          Skip fetch/reset (rebuild current checkout only)
+#   DEPLOY_PREV_COMMIT=<sha>    Commit to roll back to on health failure
+#   DEPLOY_IS_ROLLBACK=true     Internal: this invocation is a rollback rebuild
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,7 +15,7 @@ cd "$REPO_ROOT"
 
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:4000/api/health}"
-HEALTH_RETRIES="${HEALTH_RETRIES:-20}"
+HEALTH_RETRIES="${HEALTH_RETRIES:-24}"
 HEALTH_INTERVAL_SEC="${HEALTH_INTERVAL_SEC:-3}"
 
 log() { echo "[deploy] $*"; }
@@ -45,7 +47,10 @@ build_api() {
   log "building shared packages and api"
   pnpm --filter @astalakshimi/types build
   pnpm --filter @astalakshimi/validation build
-  pnpm --filter @astalakshimi/reference build
+  # Present on newer main; skip when rolling back to older commits.
+  if [ -f packages/reference/package.json ]; then
+    pnpm --filter @astalakshimi/reference build
+  fi
   pnpm --filter @astalakshimi/database build
   pnpm --filter @astalakshimi/api build
 
@@ -65,14 +70,19 @@ restart_api() {
   pm2 save
 }
 
-PREV_COMMIT="$(git rev-parse HEAD)"
-log "current commit: $PREV_COMMIT"
+PREV_COMMIT="${DEPLOY_PREV_COMMIT:-$(git rev-parse HEAD)}"
+log "current commit: $(git rev-parse HEAD) (rollback target: $PREV_COMMIT)"
 
+# Re-exec after pull so we always run the deploy script from the target commit
+# (avoids building with a stale in-memory script that omits new packages).
 if [ "${SKIP_GIT_PULL:-false}" != "true" ]; then
   log "fetching origin/$DEPLOY_BRANCH"
   git fetch origin "$DEPLOY_BRANCH"
   git reset --hard "origin/$DEPLOY_BRANCH"
   log "deploying commit: $(git log -1 --oneline)"
+  export SKIP_GIT_PULL=true
+  export DEPLOY_PREV_COMMIT="$PREV_COMMIT"
+  exec bash "$REPO_ROOT/scripts/deploy-api-ec2.sh"
 fi
 
 if ! build_api; then
@@ -83,21 +93,24 @@ fi
 restart_api
 
 if health_check; then
+  if [ "${DEPLOY_IS_ROLLBACK:-false}" = "true" ]; then
+    log "rollback succeeded; previous version restored"
+    exit 1
+  fi
   log "deploy succeeded"
   pm2 list | head -10
   exit 0
 fi
 
-log "health check failed — rolling back to $PREV_COMMIT"
-git reset --hard "$PREV_COMMIT"
-build_api
-restart_api
-
-if health_check; then
-  log "rollback succeeded; previous version restored"
+if [ "${DEPLOY_IS_ROLLBACK:-false}" = "true" ]; then
+  log "rollback also failed — manual intervention required"
+  pm2 logs api --nostream --lines 30 --err || true
   exit 1
 fi
 
-log "rollback also failed — manual intervention required"
-pm2 logs api --nostream --lines 30 --err || true
-exit 1
+log "health check failed — rolling back to $PREV_COMMIT"
+git reset --hard "$PREV_COMMIT"
+export SKIP_GIT_PULL=true
+export DEPLOY_PREV_COMMIT="$PREV_COMMIT"
+export DEPLOY_IS_ROLLBACK=true
+exec bash "$REPO_ROOT/scripts/deploy-api-ec2.sh"
