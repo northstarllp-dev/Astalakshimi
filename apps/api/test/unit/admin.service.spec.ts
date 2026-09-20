@@ -49,9 +49,9 @@ describe('Feature 14: Admin - AdminService (Unit Tests)', () => {
   };
 
   describe('getStats', () => {
-    it('should return aggregated platform stats', async () => {
+    it('should return aggregated platform stats (users = members only)', async () => {
       mockDb.select = mockQueryBuilder([
-        [{ count: 150 }], // users
+        [{ count: 150 }], // members
         [{ count: 140 }], // profiles
         [{ count: 25 }],  // subscriptions
         [{ count: 5 }],   // verifications

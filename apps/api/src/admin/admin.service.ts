@@ -34,7 +34,11 @@ export class AdminService {
   ) {}
 
   async getStats() {
-    const totalUsers = await this.db.select({ count: sql<number>`count(*)` }).from(users);
+    // Dashboard "Users" is member count only — exclude staff (admin/moderator).
+    const totalUsers = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(eq(users.role, 'member'));
     const totalProfiles = await this.db.select({ count: sql<number>`count(*)` }).from(profiles);
     const activeSubscriptions = await this.db
       .select({ count: sql<number>`count(*)` })
