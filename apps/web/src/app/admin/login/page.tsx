@@ -50,7 +50,13 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void form.handleSubmit(onSubmit)(event)
+          }}
+        >
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
               Work email
@@ -89,7 +95,12 @@ export default function AdminLoginPage() {
             </p>
           )}
 
-          <Button type="submit" className="h-12 w-full rounded-lg" disabled={login.isPending}>
+          <Button
+            type="button"
+            className="h-12 w-full rounded-lg"
+            disabled={login.isPending}
+            onClick={form.handleSubmit(onSubmit)}
+          >
             {login.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…

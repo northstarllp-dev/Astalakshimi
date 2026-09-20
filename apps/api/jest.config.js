@@ -12,6 +12,8 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@astalakshimi/database$': '<rootDir>/../../packages/database/dist/index',
     '^@astalakshimi/database/(.*)$': '<rootDir>/../../packages/database/dist/$1',
+    '^@astalakshimi/reference$': '<rootDir>/../../packages/reference/dist/index',
+    '^@astalakshimi/reference/(.*)$': '<rootDir>/../../packages/reference/dist/$1',
     '^@astalakshimi/types$': '<rootDir>/../../packages/types/dist/index',
     '^@astalakshimi/types/(.*)$': '<rootDir>/../../packages/types/dist/$1',
     '^@astalakshimi/validation$': '<rootDir>/../../packages/validation/dist/index',

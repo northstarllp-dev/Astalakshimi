@@ -42,10 +42,16 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
       createNotification: jest.fn().mockResolvedValue({}),
     };
 
+    const mockBlocksService = {
+      isBlocked: jest.fn().mockResolvedValue(false),
+      getBlockedProfiles: jest.fn().mockResolvedValue([]),
+    } as any;
+
     interestsService = new InterestsService(
       mockDb,
       mockEntitlementsService,
-      mockNotificationsService
+      mockNotificationsService,
+      mockBlocksService,
     );
   });
 

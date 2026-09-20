@@ -1,0 +1,150 @@
+[
+  {
+    "slug": "tamil",
+    "label": "Tamil"
+  },
+  {
+    "slug": "telugu",
+    "label": "Telugu"
+  },
+  {
+    "slug": "hindi",
+    "label": "Hindi"
+  },
+  {
+    "slug": "malayalam",
+    "label": "Malayalam"
+  },
+  {
+    "slug": "kannada",
+    "label": "Kannada"
+  },
+  {
+    "slug": "marathi",
+    "label": "Marathi"
+  },
+  {
+    "slug": "bengali",
+    "label": "Bengali"
+  },
+  {
+    "slug": "gujarati",
+    "label": "Gujarati"
+  },
+  {
+    "slug": "punjabi",
+    "label": "Punjabi"
+  },
+  {
+    "slug": "urdu",
+    "label": "Urdu"
+  },
+  {
+    "slug": "odia",
+    "label": "Odia"
+  },
+  {
+    "slug": "assamese",
+    "label": "Assamese"
+  },
+  {
+    "slug": "konkani",
+    "label": "Konkani"
+  },
+  {
+    "slug": "sindhi",
+    "label": "Sindhi"
+  },
+  {
+    "slug": "tulu",
+    "label": "Tulu"
+  },
+  {
+    "slug": "bhojpuri",
+    "label": "Bhojpuri"
+  },
+  {
+    "slug": "marwari",
+    "label": "Marwari"
+  },
+  {
+    "slug": "rajasthani",
+    "label": "Rajasthani"
+  },
+  {
+    "slug": "haryanvi",
+    "label": "Haryanvi"
+  },
+  {
+    "slug": "maithili",
+    "label": "Maithili"
+  },
+  {
+    "slug": "dogri",
+    "label": "Dogri"
+  },
+  {
+    "slug": "kashmiri",
+    "label": "Kashmiri"
+  },
+  {
+    "slug": "nepali",
+    "label": "Nepali"
+  },
+  {
+    "slug": "sourashtra",
+    "label": "Sourashtra"
+  },
+  {
+    "slug": "chhattisgarhi",
+    "label": "Chhattisgarhi"
+  },
+  {
+    "slug": "garhwali",
+    "label": "Garhwali"
+  },
+  {
+    "slug": "kumaoni",
+    "label": "Kumaoni"
+  },
+  {
+    "slug": "magahi",
+    "label": "Magahi"
+  },
+  {
+    "slug": "manipuri",
+    "label": "Manipuri"
+  },
+  {
+    "slug": "mizo",
+    "label": "Mizo"
+  },
+  {
+    "slug": "khasi",
+    "label": "Khasi"
+  },
+  {
+    "slug": "santhali",
+    "label": "Santhali"
+  },
+  {
+    "slug": "kodava",
+    "label": "Kodava"
+  },
+  {
+    "slug": "kutchi",
+    "label": "Kutchi"
+  },
+  {
+    "slug": "himachali",
+    "label": "Himachali"
+  },
+  {
+    "slug": "english",
+    "label": "English"
+  },
+  {
+    "slug": "other",
+    "label": "Other"
+  }
+]

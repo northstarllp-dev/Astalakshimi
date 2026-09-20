@@ -34,7 +34,7 @@ describe('Feature 6: Search & Filtering - SearchController (Integration Tests)',
 
   describe('GET /search', () => {
     it('should pass user ID and query parameters to search service', async () => {
-      const mockQuery = { ageMin: '25', ageMax: '30', city: 'Chennai' };
+      const mockQuery = { ageMin: 25, ageMax: 30, city: 'Chennai', limit: 20, page: 1 };
       const expectedResponse = {
         totalCount: 2,
         profiles: [
@@ -45,7 +45,7 @@ describe('Feature 6: Search & Filtering - SearchController (Integration Tests)',
 
       searchService.searchProfiles.mockResolvedValue(expectedResponse as any);
 
-      const result = await controller.searchProfiles(mockUserSession, mockQuery);
+      const result = await controller.searchProfiles(mockUserSession, mockQuery as any);
 
       expect(searchService.searchProfiles).toHaveBeenCalledWith(
         mockUserSession.userId,
@@ -55,7 +55,7 @@ describe('Feature 6: Search & Filtering - SearchController (Integration Tests)',
     });
 
     it('should handle advanced queries with JSON strings', async () => {
-      const mockQuery = { advanced: JSON.stringify({ heights: ['170', '180'] }) };
+      const mockQuery = { advanced: JSON.stringify({ heights: ['170', '180'] }), limit: 20, page: 1 };
       const expectedResponse = {
         totalCount: 1,
         profiles: [{ id: 'prof-1' }],
@@ -63,7 +63,7 @@ describe('Feature 6: Search & Filtering - SearchController (Integration Tests)',
 
       searchService.searchProfiles.mockResolvedValue(expectedResponse as any);
 
-      const result = await controller.searchProfiles(mockUserSession, mockQuery);
+      const result = await controller.searchProfiles(mockUserSession, mockQuery as any);
 
       expect(searchService.searchProfiles).toHaveBeenCalledWith(
         mockUserSession.userId,

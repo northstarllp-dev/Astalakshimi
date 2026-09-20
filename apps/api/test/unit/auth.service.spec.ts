@@ -529,5 +529,100 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
         authService.refreshToken('bad_token')
       ).rejects.toThrow('Invalid refresh token');
     });
+
+    it('should detect refresh-token reuse, clear the stored hash, and reject', async () => {
+      const staleUser = {
+        id: 'user-uuid-1',
+        phone: '9876543210',
+        role: 'member',
+        status: 'active',
+        // Stored hash belongs to an older rotated token, not the presented one
+        refreshTokenHash: createHash('sha256').update('some-older-token').digest('hex'),
+      };
+
+      mockJwtService.verify.mockReturnValueOnce({ sub: 'user-uuid-1', type: 'refresh' });
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([staleUser]),
+      });
+
+      const mockSet = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn().mockResolvedValue(undefined);
+      mockDb.update.mockReturnValue({ set: mockSet, where: mockWhere });
+
+      await expect(
+        authService.refreshToken('valid_refresh_token'),
+      ).rejects.toThrow('Session expired or revoked');
+
+      // Reuse clears the hash so the whole token family is revoked
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({ refreshTokenHash: null }),
+      );
+    });
+  });
+
+  describe('adminLogin', () => {
+    const adminLoginSelect = (rows: any[]) => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue(rows),
+      });
+    };
+
+    it('should reject a member account even with a matching password hash', async () => {
+      const member = {
+        id: 'member-1',
+        phone: '9876543210',
+        role: 'member',
+        status: 'active',
+        passwordHash: createHash('sha256').update('secret123').digest('hex'),
+      };
+      adminLoginSelect([member]);
+
+      await expect(
+        authService.adminLogin({ email: 'member@example.com', password: 'secret123' }),
+      ).rejects.toThrow('Access denied');
+    });
+
+    it('should reject unknown staff emails without revealing which check failed', async () => {
+      adminLoginSelect([]);
+
+      await expect(
+        authService.adminLogin({ email: 'nobody@example.com', password: 'secret123' }),
+      ).rejects.toThrow('Invalid credentials');
+    });
+
+    it('should reject a wrong password for a real admin', async () => {
+      const admin = {
+        id: 'admin-1',
+        email: 'admin@example.com',
+        role: 'admin',
+        status: 'active',
+        passwordHash: createHash('sha256').update('correct-horse').digest('hex'),
+      };
+      adminLoginSelect([admin]);
+
+      await expect(
+        authService.adminLogin({ email: 'admin@example.com', password: 'wrong-pass' }),
+      ).rejects.toThrow('Invalid credentials');
+    });
+  });
+
+  describe('logout', () => {
+    it('should clear the stored refresh-token hash', async () => {
+      const mockSet = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn().mockResolvedValue(undefined);
+      mockDb.update.mockReturnValue({ set: mockSet, where: mockWhere });
+
+      const result = await authService.logout('user-uuid-1');
+
+      expect(result).toEqual({ success: true });
+      expect(mockDb.update).toHaveBeenCalledWith(users);
+      expect(mockSet).toHaveBeenCalledWith(
+        expect.objectContaining({ refreshTokenHash: null }),
+      );
+    });
   });
 });

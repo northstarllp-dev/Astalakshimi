@@ -4,11 +4,9 @@ import { ProfilesController } from './profiles.controller';
 import { DatabaseModule } from '../database/database.module';
 import { BlocksModule } from '../blocks/blocks.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
-import { EducationsModule } from '../educations/educations.module';
-import { CareersModule } from '../careers/careers.module';
 
 @Module({
-  imports: [DatabaseModule, BlocksModule, EntitlementsModule, EducationsModule, CareersModule],
+  imports: [DatabaseModule, BlocksModule, EntitlementsModule],
   controllers: [ProfilesController],
   providers: [ProfilesService],
   exports: [ProfilesService],

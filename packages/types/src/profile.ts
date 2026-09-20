@@ -1,9 +1,16 @@
+import type { PartnerPreference } from './preference.js';
+import type { MatchScoreInfo } from './match.js';
+
 export type Gender = 'Male' | 'Female' | 'Other';
+export type ProfileFor = 'Myself' | 'Son' | 'Daughter' | 'Brother' | 'Sister' | 'Relative';
+/** System-owned: set by member signup (`self`) or admin create (`staff`). Never member-writable. */
+export type CreatedBy = 'self' | 'staff';
 export type MaritalStatus = 'Never Married' | 'Divorced' | 'Widowed' | 'Awaiting Divorce';
 export type EducationLevel = 'Bachelors' | 'Masters' | 'Doctorate' | 'Diploma' | 'High School';
 export type EmploymentStatus = 'Employed' | 'Business Owner' | 'Freelancer' | 'Not Working';
 export type CompanySector = 'Private' | 'Govt' | 'MNC' | 'Startup' | 'Business';
 export type PhotoPrivacy = 'blurred' | 'accepted' | 'visible';
+export type Complexion = 'Very fair' | 'Fair' | 'Wheatish' | 'Wheatish brown' | 'Dark';
 
 export type FamilyValues = 'Traditional' | 'Moderate' | 'Liberal';
 export type FamilyType = 'Nuclear' | 'Joint' | 'Extended';
@@ -17,7 +24,9 @@ export type ManglikStatus = 'Yes' | 'No' | "Don't Know" | 'Both';
 export interface Profile {
   id: string;
   userId: string;
-  profileFor: string;
+  /** Present on DB rows; member UI must not edit. Admin surfaces this. */
+  createdBy?: CreatedBy;
+  profileFor: ProfileFor | string;
   fullName: string;
   gender: Gender;
   dob: string; // YYYY-MM-DD
@@ -26,29 +35,26 @@ export interface Profile {
   childrenCount?: number;
   childrenLivingWithMe?: boolean | null;
   heightCm: number;
-  weight?: string | null;
-  complexion?: string | null;
-  disability?: string | null;
   aboutMe?: string | null;
+  weightKg?: number | null;
+  complexion?: Complexion | string | null;
+  disability?: string | null;
   city: string;
   state: string;
   country: string;
+  citySlug?: string | null;
   willingToRelocate?: string | null;
   religion: string;
   caste: string;
+  communitySlug?: string | null;
   subcaste?: string | null;
   gotra?: string | null;
   motherTongue: string;
-  educationId?: number | null;
-  specializationId?: number | null;
-  specializationName?: string | null;
   educationLevel?: EducationLevel | null;
   degree?: string | null;
   collegeName?: string | null;
   employmentStatus?: EmploymentStatus | null;
   profession?: string | null;
-  occupationId?: number | null;
-  companyId?: number | null;
   companyName?: string | null;
   companySector?: CompanySector | null;
   annualIncome?: string | null;
@@ -60,11 +66,11 @@ export interface Profile {
 export interface FamilyDetails {
   id: string;
   profileId: string;
-  familyValues: FamilyValues;
-  familyType: FamilyType;
+  familyValues?: FamilyValues | null;
+  familyType?: FamilyType | null;
   familyStatus?: string | null;
-  fatherOccupation: ParentOccupation;
-  motherOccupation: ParentOccupation;
+  fatherOccupation?: ParentOccupation | null;
+  motherOccupation?: ParentOccupation | null;
   brothersCount: number;
   sistersCount: number;
   createdAt: string;
@@ -74,9 +80,9 @@ export interface FamilyDetails {
 export interface LifestyleInterests {
   id: string;
   profileId: string;
-  diet: Diet;
-  smoking: HabitFrequency;
-  alcohol: HabitFrequency;
+  diet: Diet | null;
+  smoking: HabitFrequency | null;
+  alcohol: HabitFrequency | null;
   interests: string[];
   createdAt: string;
   updatedAt: string;
@@ -98,12 +104,13 @@ export interface Horoscope {
 }
 
 // Complete profile composite for match views & dashboard
-export interface FullProfileView {
+export interface FullProfileView extends MatchScoreInfo {
   profile: Profile;
   family?: FamilyDetails | null;
   lifestyle?: LifestyleInterests | null;
   horoscope?: Horoscope | null;
-  partnerPreferences?: any | null;
+  /** Present on GET /profiles/me so edit forms can round-trip partner prefs. */
+  preferences?: PartnerPreference | null;
   verification?: any | null;
   photos: {
     id: string;
@@ -111,6 +118,7 @@ export interface FullProfileView {
     url?: string;
     isPrimary: boolean;
     displayOrder: number;
+    status?: 'pending' | 'approved' | 'rejected';
   }[];
   verificationStatus: 'idle' | 'pending' | 'verified' | 'rejected';
   blurPhoto?: boolean;
@@ -145,7 +153,7 @@ export interface CompleteRegistrationPayload {
   referredBy?: string;
 
   // Step 2: Identity & Physical
-  profileFor: string;
+  profileFor: ProfileFor | string;
   fullName: string;
   gender: Gender;
   dobDay: string;
@@ -154,46 +162,44 @@ export interface CompleteRegistrationPayload {
   maritalStatus: MaritalStatus;
   hasChildren?: boolean;
   childrenCount?: number;
-  childrenLivingWithMe?: boolean;
+  childrenLivingWithMe?: boolean | null;
   heightCm: number;
-  weight?: string | null;
-  complexion?: string | null;
-  disability?: string | null;
   aboutMe?: string;
+  weightKg?: number | null;
+  complexion?: Complexion | string | null;
+  disability?: string | null;
 
   // Step 3: Location & Community
   city: string;
   state: string;
   country?: string;
+  citySlug?: string | null;
   willingToRelocate?: string | null;
   religion: string;
   caste: string;
+  communitySlug?: string | null;
   subcaste?: string | null;
   gotra?: string | null;
   motherTongue: string;
 
   // Step 4: Education & Career
-  educationId?: number | null;
-  specializationId?: number | null;
   educationLevel?: EducationLevel | null;
   degree?: string | null;
   collegeName?: string | null;
   employmentStatus?: EmploymentStatus | null;
   profession?: string | null;
-  occupationId?: number | null;
-  companyId?: number | null;
   companyName?: string | null;
   companySector?: CompanySector | null;
   annualIncome?: string | null;
 
-  // Step 4: Family Details
-  familyValues: FamilyValues;
-  familyType: FamilyType;
+  // Step 4: Family Details (post-community; optional until collected)
+  familyValues?: FamilyValues | null;
+  familyType?: FamilyType | null;
   familyStatus?: string | null;
-  fatherOccupation: ParentOccupation;
-  motherOccupation: ParentOccupation;
-  brothersCount: number;
-  sistersCount: number;
+  fatherOccupation?: ParentOccupation | null;
+  motherOccupation?: ParentOccupation | null;
+  brothersCount?: number;
+  sistersCount?: number;
 
   // Step 5: Lifestyle & Astrology
   diet: Diet;
@@ -221,6 +227,8 @@ export interface CompleteRegistrationPayload {
 
   // Step 6: Photos & Verification
   photoS3Keys: string[];
+  /** Optional sha256 hashes aligned with photoS3Keys for dedupe persistence. */
+  photoContentHashes?: string[];
   photoPrivacy?: PhotoPrivacy;
   verificationMethod: 'selfie' | 'govt_id';
   selfieS3Key?: string | null;

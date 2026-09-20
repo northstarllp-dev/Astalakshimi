@@ -1,6 +1,12 @@
 export type VerificationMethod = "selfie" | "govt_id" | ""
 export type VerificationStatus = "idle" | "pending" | "verified" | "rejected"
 
+import {
+  getReligionLabels,
+  getMotherTongueLabels,
+  getRelocateLabels,
+} from "@astalakshimi/reference"
+
 export const DEMO_REJECTION_REASON = "Selfie does not match profile photos."
 
 export type SignupData = {
@@ -22,33 +28,26 @@ export type SignupData = {
   diet: string
   smoking: string
   alcohol: string
+  interests: string[]
   disability: string
   maritalStatus: string
   hasChildren?: boolean
   childrenCount?: number
-  childrenLivingWithMe?: boolean
+  childrenLivingWithMe?: boolean | null
   religion: string
   caste: string
+  communitySlug?: string
   subcaste: string
   gotra: string
   star: string
   rashi: string
   manglik: string
   motherTongue: string
-  educationId?: number | null
-  specializationId?: number | null
-  education: string
-  educationLevel?: string
-  educationStream: string
-  otherEducation: string
-  degree?: string
-  collegeName?: string
-  occupationId?: number | null
-  occupation: string
-  employmentStatus?: string
-  profession?: string
-  otherOccupation: string
-  companyId?: number | null
+  educationLevel: string
+  degree: string
+  collegeName: string
+  employmentStatus: string
+  profession: string
   companyName: string
   companySector?: string
   annualIncome: string
@@ -62,6 +61,7 @@ export type SignupData = {
   siblings: string
   city: string
   state: string
+  citySlug?: string
   willingToRelocate: string
   aboutMe: string
   prefAgeMin?: number
@@ -69,6 +69,7 @@ export type SignupData = {
   prefHeightMinCm?: number
   prefHeightMaxCm?: number
   prefReligion?: string[]
+  prefMaritalStatuses?: string[]
   prefCastes?: string[]
   prefMotherTongues?: string[]
   prefMinEducation?: string
@@ -76,6 +77,8 @@ export type SignupData = {
   prefLocations?: string[]
   photos: string[]
   photoS3Keys: string[]
+  /** sha256 hashes parallel to photoS3Keys (registration / upload dedupe). */
+  photoContentHashes?: string[]
   photoObjects?: any[]
   photoPrivacy: string
   verificationMethod: VerificationMethod
@@ -146,7 +149,8 @@ export function inferSignupResumeStep(data: SignupData): number {
     /^\d{2}$/.test(data.dobMonth || "") &&
     /^\d{4}$/.test(data.dobYear || "") &&
     Boolean(data.maritalStatus) &&
-    Boolean(data.city?.trim())
+    Boolean(data.city?.trim()) &&
+    Boolean(data.height?.trim())
   if (!step2Ok) return 2
 
   const step3Ok =
@@ -235,33 +239,26 @@ export const emptySignupData = (): SignupData => ({
   diet: "",
   smoking: "",
   alcohol: "",
+  interests: [],
   disability: "",
   maritalStatus: "",
   hasChildren: false,
   childrenCount: 0,
-  childrenLivingWithMe: false,
+  childrenLivingWithMe: null,
   religion: "",
   caste: "",
+  communitySlug: "",
   subcaste: "",
   gotra: "",
   star: "",
   rashi: "",
   manglik: "",
   motherTongue: "",
-  educationId: null,
-  specializationId: null,
-  education: "",
   educationLevel: "",
-  educationStream: "",
-  otherEducation: "",
   degree: "",
   collegeName: "",
-  occupationId: null,
-  occupation: "",
   employmentStatus: "",
   profession: "",
-  otherOccupation: "",
-  companyId: null,
   companyName: "",
   companySector: undefined,
   annualIncome: "",
@@ -275,6 +272,7 @@ export const emptySignupData = (): SignupData => ({
   siblings: "",
   city: "",
   state: "",
+  citySlug: "",
   willingToRelocate: "",
   aboutMe: "",
   prefAgeMin: undefined,
@@ -282,6 +280,7 @@ export const emptySignupData = (): SignupData => ({
   prefHeightMinCm: undefined,
   prefHeightMaxCm: undefined,
   prefReligion: [],
+  prefMaritalStatuses: [],
   prefCastes: [],
   prefMotherTongues: [],
   prefMinEducation: "",
@@ -289,6 +288,7 @@ export const emptySignupData = (): SignupData => ({
   prefLocations: [],
   photos: [],
   photoS3Keys: [],
+  photoContentHashes: [],
   photoPrivacy: "blurred",
   verificationMethod: "",
   selfiePhoto: "",
@@ -378,26 +378,65 @@ export const VERIFICATION_SLA_HOURS = 12
 
 export const SIBLING_COUNTS = [0, 1, 2, 3, 4, 5] as const
 
+export const PROFILE_FOR_OPTIONS = [
+  "Myself",
+  "Son",
+  "Daughter",
+  "Brother",
+  "Sister",
+  "Relative",
+] as const
+
+/** Register step 1 shows a curated subset; edit page uses PROFILE_FOR_OPTIONS. */
+export const REGISTER_PROFILE_FOR_OPTIONS = ["Myself", "Son", "Daughter"] as const
 export const COMPLEXIONS = ["Very fair", "Fair", "Wheatish", "Wheatish brown", "Dark"]
-export const DIETS = ["Vegetarian", "Non-vegetarian", "Occasional Non-vegetarian", "Eggetarian", "Vegan", "Jain"]
+export const DIETS = ["Vegetarian", "Non-vegetarian", "Eggetarian", "Jain", "Vegan"]
+/** Habit frequency shared by smoking & alcohol (matches the habit_frequency Postgres enum). */
+export const HABIT_FREQUENCY = ["Never", "Occasionally", "Regularly", "Planning to quit"] as const
+/** Curated lifestyle tag cloud; member picks up to 7. Stored verbatim in lifestyle_interests.interests (jsonb). */
+export const INTERESTS = [
+  "✈ Travel",
+  "📚 Reading",
+  "🎬 Movies",
+  "🎵 Music",
+  "🏏 Sports",
+  "🍳 Cooking",
+  "🧘 Yoga",
+  "🐕 Pets",
+  "🌱 Gardening",
+  "🎮 Gaming",
+  "📷 Photography",
+  "🍷 Foodie",
+  "🎤 Singing",
+  "💃 Dance",
+  "✍ Writing",
+  "🏋 Fitness",
+] as const
 export const MARITAL_STATUSES = ["Never Married", "Divorced", "Widowed", "Awaiting Divorce"]
-export const RELIGIONS = [
-  "Hindu", "Muslim", "Christian", "Sikh", "Jain", "Buddhist",
-  "Parsi", "Jewish", "Spiritual", "No Religion", "Inter-Religion", "Other",
-]
-export const MOTHER_TONGUES = [
-  "Tamil", "Telugu", "Hindi", "Malayalam", "Kannada",
-  "Marathi", "Bengali", "Gujarati", "Punjabi", "Urdu",
-  "Odia", "Assamese", "Konkani", "Sindhi", "Tulu",
-  "Bhojpuri", "Marwari", "Rajasthani", "Haryanvi", "Maithili",
-  "Dogri", "Kashmiri", "Nepali", "Sourashtra", "Chhattisgarhi",
-  "Garhwali", "Kumaoni", "Magahi", "Manipuri", "Mizo",
-  "Khasi", "Santhali", "Kodava", "Kutchi", "Himachali",
-  "English", "Other",
-]
-export const FAMILY_TYPES = ["Nuclear", "Joint"]
-export const FAMILY_STATUS = ["Lower middle class", "Middle class", "Upper middle class", "Affluent", "Wealthy", "Rich"]
-export const RELOCATE_OPTIONS = ["Yes", "No", "Open to discussion"]
+
+export const RELIGIONS = getReligionLabels()
+export const MOTHER_TONGUES = getMotherTongueLabels()
+export const FAMILY_TYPES = ["Nuclear", "Joint", "Extended"] as const
+export const FAMILY_VALUES = ["Traditional", "Moderate", "Liberal"] as const
+export const EDUCATION_LEVELS = ["Bachelors", "Masters", "Doctorate", "Diploma", "High School"] as const
+export const EMPLOYMENT_STATUSES = ["Employed", "Business Owner", "Freelancer", "Not Working"] as const
+export const COMPANY_SECTORS = ["Private", "Govt", "MNC", "Startup", "Business"] as const
+export const FAMILY_STATUS = [
+  "Lower middle class",
+  "Middle class",
+  "Upper middle class",
+  "Affluent",
+  "Wealthy",
+  "Rich",
+] as const
+export const PARENT_OCCUPATIONS = [
+  "Employed",
+  "Business",
+  "Retired",
+  "Homemaker",
+  "Passed Away",
+] as const
+export const RELOCATE_OPTIONS = getRelocateLabels()
 export const MANGLIK_OPTIONS = ["Yes", "No", "Don't know"]
 export const PHOTO_PRIVACY = [
   { value: "blurred", label: "Always blurred" },

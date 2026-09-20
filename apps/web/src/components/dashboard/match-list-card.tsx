@@ -450,9 +450,11 @@ export function MatchListCard({
             {/* Top Photo Badges */}
             <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-2.5">
               <div className="flex flex-col items-start gap-1">
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/95 px-2.5 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-xs">
-                  <Star className="h-3 w-3 fill-current" /> {match.matchPercent || 92}% match
-                </span>
+                {typeof match.matchPercent === "number" && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/95 px-2.5 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-xs">
+                    <Star className="h-3 w-3 fill-current" /> {match.matchPercent}% match
+                  </span>
+                )}
                 {match.photoVerified && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-xs border border-white/10">
                     <BadgeCheck className="h-3 w-3 text-secondary" /> Verified

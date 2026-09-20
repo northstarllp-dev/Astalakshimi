@@ -31,7 +31,8 @@ export default function SettingsPage() {
 
   const update = (partial: Partial<UserSettings>) => {
     if (!settings) return
-    saveMutation.mutate({ ...settings, ...partial })
+    // Send only the changed fields — never the full row (id/userId/timestamps).
+    saveMutation.mutate(partial)
   }
 
   if (!settings) {
@@ -98,7 +99,7 @@ export default function SettingsPage() {
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="always">Always blurred</SelectItem>
-              <SelectItem value="accepted">Unblur after mutual interest</SelectItem>
+              <SelectItem value="when_not_connected">Unblur after mutual interest</SelectItem>
               <SelectItem value="never">Always visible</SelectItem>
             </SelectContent>
           </Select>

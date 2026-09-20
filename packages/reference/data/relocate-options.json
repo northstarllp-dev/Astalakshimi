@@ -1,0 +1,14 @@
+[
+  {
+    "slug": "yes",
+    "label": "Yes"
+  },
+  {
+    "slug": "no",
+    "label": "No"
+  },
+  {
+    "slug": "open-to-discussion",
+    "label": "Open to discussion"
+  }
+]

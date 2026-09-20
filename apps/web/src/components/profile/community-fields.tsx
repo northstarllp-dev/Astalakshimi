@@ -2,19 +2,26 @@
 
 import * as React from "react"
 import { SearchableSelect } from "@/components/profile/searchable-select"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
-  getCommunitiesForReligion,
-  getSubcastesForCommunity,
-  getGotrasForReligion,
+  findCommunityByLabel,
+  getCommunityLabelsForReligion,
 } from "@/lib/community-data"
 import { cn } from "@/lib/utils"
 
 type CommunityFieldsProps = {
   religion: string
   caste: string
+  communitySlug?: string
   subcaste?: string
   gotra?: string
-  onChange: (value: { caste?: string; subcaste?: string; gotra?: string }) => void
+  onChange: (value: {
+    caste?: string
+    communitySlug?: string
+    subcaste?: string
+    gotra?: string
+  }) => void
   casteRequired?: boolean
   casteMissing?: boolean
   casteError?: string
@@ -25,6 +32,7 @@ type CommunityFieldsProps = {
 export function CommunityFields({
   religion,
   caste,
+  communitySlug = "",
   subcaste = "",
   gotra = "",
   onChange,
@@ -35,70 +43,67 @@ export function CommunityFields({
   const showGotra = religion === "Hindu" || religion === "Jain"
 
   const communityOptions = React.useMemo(() => {
-    const list = getCommunitiesForReligion(religion)
+    const list = getCommunityLabelsForReligion(religion)
     if (caste && !list.includes(caste)) {
+      // Legacy / out-of-catalog value: show for display but user must re-pick from catalog to save cleanly.
       return [caste, ...list]
     }
     return list
   }, [religion, caste])
 
-  const subcasteOptions = React.useMemo(() => {
-    const list = getSubcastesForCommunity(caste, religion)
-    if (subcaste && !list.includes(subcaste)) {
-      return [subcaste, ...list]
-    }
-    return list
-  }, [caste, religion, subcaste])
-
-  const gotraOptions = React.useMemo(() => {
-    const list = getGotrasForReligion(religion)
-    if (gotra && !list.includes(gotra)) {
-      return [gotra, ...list]
-    }
-    return list
-  }, [religion, gotra])
-
   return (
     <div className="space-y-4">
       <SearchableSelect
         value={caste}
-        onValueChange={(next) =>
+        onValueChange={(next) => {
+          const match = findCommunityByLabel(next, religion)
           onChange({
             caste: next,
+            communitySlug: match?.slug ?? "",
             subcaste: next === caste ? subcaste : "",
           })
-        }
+        }}
         options={communityOptions}
         placeholder={religion ? "Select caste / community…" : "Select religion first"}
-        searchPlaceholder="Search or type caste…"
+        searchPlaceholder="Search caste…"
         emptyText="No matching community found."
         disabled={disabled || !religion}
         className={cn(casteMissing && casteClassName)}
-        allowCustom={true}
+        allowCustom={false}
       />
 
-      <SearchableSelect
-        value={subcaste}
-        onValueChange={(next) => onChange({ subcaste: next })}
-        options={subcasteOptions}
-        placeholder={caste ? "Select subcaste (optional)…" : "Select caste first"}
-        searchPlaceholder="Search or type subcaste…"
-        emptyText="No matching subcaste found."
-        disabled={disabled || !caste}
-        allowCustom={true}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="community-subcaste" className="text-sm text-muted-foreground">
+          Subcaste (optional)
+        </Label>
+        <Input
+          id="community-subcaste"
+          value={subcaste}
+          onChange={(e) => onChange({ subcaste: e.target.value })}
+          placeholder="Type subcaste if applicable"
+          maxLength={100}
+          disabled={disabled}
+        />
+      </div>
 
       {showGotra ? (
-        <SearchableSelect
-          value={gotra}
-          onValueChange={(next) => onChange({ gotra: next })}
-          options={gotraOptions}
-          placeholder="Select gotra (optional)…"
-          searchPlaceholder="Search or type gotra…"
-          emptyText="No matching gotra found."
-          disabled={disabled}
-          allowCustom={true}
-        />
+        <div className="space-y-2">
+          <Label htmlFor="community-gotra" className="text-sm text-muted-foreground">
+            Gotra (optional)
+          </Label>
+          <Input
+            id="community-gotra"
+            value={gotra}
+            onChange={(e) => onChange({ gotra: e.target.value })}
+            placeholder="Type gotra if applicable"
+            maxLength={100}
+            disabled={disabled}
+          />
+        </div>
+      ) : null}
+
+      {communitySlug ? (
+        <input type="hidden" name="communitySlug" value={communitySlug} readOnly />
       ) : null}
     </div>
   )

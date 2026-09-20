@@ -51,10 +51,26 @@ describe('RolesGuard (Unit Tests)', () => {
     expect(() => guard.canActivate(context)).toThrow('Access denied');
   });
 
-  it('should allow access if user has the required role', () => {
+  it('should allow access if user has the required role', async () => {
     reflector.getAllAndOverride.mockReturnValue(['admin']);
     const context = createMockContext({ role: 'admin' });
-    
-    expect(guard.canActivate(context)).toBe(true);
+
+    expect(await guard.canActivate(context)).toBe(true);
+  });
+
+  it('should allow access when the user holds any one of several required roles', () => {
+    reflector.getAllAndOverride.mockReturnValue(['admin', 'moderator']);
+    const moderatorContext = createMockContext({ role: 'moderator' });
+    const memberContext = createMockContext({ role: 'member' });
+
+    expect(guard.canActivate(moderatorContext)).toBe(true);
+    expect(() => guard.canActivate(memberContext)).toThrow(ForbiddenException);
+  });
+
+  it('should throw ForbiddenException when the user object has no role', () => {
+    reflector.getAllAndOverride.mockReturnValue(['admin']);
+    const context = createMockContext({ userId: 'u-1' });
+
+    expect(() => guard.canActivate(context)).toThrow('Access denied');
   });
 });

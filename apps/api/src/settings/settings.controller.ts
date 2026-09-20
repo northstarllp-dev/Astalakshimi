@@ -8,7 +8,12 @@ import type { UserSession } from '@astalakshimi/types';
 
 const updateSettingsSchema = z
   .object({
-    photoBlur: z.enum(['always', 'when_not_connected', 'never']).optional(),
+    photoBlur: z
+      .preprocess((v) => {
+        if (v === 'accepted') return 'when_not_connected';
+        return v;
+      }, z.enum(['always', 'when_not_connected', 'never']))
+      .optional(),
     profileVisibility: z.string().max(40).optional(),
     hidePhone: z.boolean().optional(),
     hideProfile: z.boolean().optional(),
@@ -19,8 +24,8 @@ const updateSettingsSchema = z
     hideFromUsers: z.array(z.string().uuid()).max(500).optional(),
     hideFromCities: z.array(z.string().uuid()).max(500).optional(),
   })
-  .passthrough()
-  .strict();
+  // Strip unknown keys (id/userId/timestamps from the client) instead of 400ing.
+  .strip();
 
 @UseGuards(JwtAuthGuard)
 @Controller('users/me/settings')

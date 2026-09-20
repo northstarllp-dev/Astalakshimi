@@ -65,6 +65,11 @@ export function HomeMatchRow({
             Verified
           </span>
         ) : null}
+        {typeof match.matchPercent === "number" ? (
+          <span className="absolute right-1.5 top-1.5 inline-flex items-center rounded-full bg-emerald-500/95 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-xs sm:text-[10px]">
+            {match.matchPercent}%
+          </span>
+        ) : null}
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col justify-between gap-1.5 sm:gap-2">

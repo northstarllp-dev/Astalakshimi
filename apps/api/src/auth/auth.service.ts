@@ -278,7 +278,8 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private async userHasProfile(userId: string): Promise<boolean> {
+  /** Public so ProfileGuard can enforce enrollment without duplicating the query. */
+  async userHasProfile(userId: string): Promise<boolean> {
     const [existingProfile] = await this.db
       .select({ id: profiles.id })
       .from(profiles)

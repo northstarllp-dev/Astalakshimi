@@ -159,6 +159,8 @@ export class MediaService {
           govtIdS3Key: input.govtIdS3Key || null,
           status: 'pending',
           rejectionReason: null,
+          reviewedBy: null,
+          reviewedAt: null,
           updatedAt: new Date(),
         },
       })

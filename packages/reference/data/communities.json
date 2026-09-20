@@ -1,0 +1,1193 @@
+{
+  "version": 1,
+  "communities": [
+    {
+      "slug": "hindu-brahmin",
+      "religion": "Hindu",
+      "label": "Brahmin",
+      "aliases": [
+        "brahman",
+        "brahmin",
+        "tamil brahmin"
+      ]
+    },
+    {
+      "slug": "hindu-agarwal",
+      "religion": "Hindu",
+      "label": "Agarwal",
+      "aliases": [
+        "agarwal",
+        "aggarwal",
+        "agrawal",
+        "garg"
+      ]
+    },
+    {
+      "slug": "hindu-arora",
+      "religion": "Hindu",
+      "label": "Arora",
+      "aliases": [
+        "arora"
+      ]
+    },
+    {
+      "slug": "hindu-baidya",
+      "religion": "Hindu",
+      "label": "Baidya",
+      "aliases": [
+        "baidya",
+        "vaidya"
+      ]
+    },
+    {
+      "slug": "hindu-baniya",
+      "religion": "Hindu",
+      "label": "Baniya",
+      "aliases": [
+        "baniya",
+        "vaishya",
+        "bania",
+        "vaish"
+      ]
+    },
+    {
+      "slug": "hindu-banjara",
+      "religion": "Hindu",
+      "label": "Banjara",
+      "aliases": [
+        "banjara",
+        "lambadi",
+        "lambani"
+      ]
+    },
+    {
+      "slug": "hindu-bhandari",
+      "religion": "Hindu",
+      "label": "Bhandari",
+      "aliases": [
+        "bhandari"
+      ]
+    },
+    {
+      "slug": "hindu-bhatia",
+      "religion": "Hindu",
+      "label": "Bhatia",
+      "aliases": [
+        "bhatia"
+      ]
+    },
+    {
+      "slug": "hindu-billava",
+      "religion": "Hindu",
+      "label": "Billava",
+      "aliases": [
+        "billava",
+        "billawas"
+      ]
+    },
+    {
+      "slug": "hindu-bunt",
+      "religion": "Hindu",
+      "label": "Bunt",
+      "aliases": [
+        "bunt",
+        "bunts"
+      ]
+    },
+    {
+      "slug": "hindu-chettiar",
+      "religion": "Hindu",
+      "label": "Chettiar",
+      "aliases": [
+        "chettiyar",
+        "chetty",
+        "nagarathar",
+        "chettiar"
+      ]
+    },
+    {
+      "slug": "hindu-ckp",
+      "religion": "Hindu",
+      "label": "CKP",
+      "aliases": [
+        "ckp",
+        "chandraseniya kayastha prabhu"
+      ]
+    },
+    {
+      "slug": "hindu-devanga",
+      "religion": "Hindu",
+      "label": "Devanga",
+      "aliases": [
+        "devanga"
+      ]
+    },
+    {
+      "slug": "hindu-dhobi",
+      "religion": "Hindu",
+      "label": "Dhobi",
+      "aliases": [
+        "dhobi",
+        "rajak"
+      ]
+    },
+    {
+      "slug": "hindu-ezhava",
+      "religion": "Hindu",
+      "label": "Ezhava",
+      "aliases": [
+        "ezhava",
+        "thiyya",
+        "izhuva"
+      ]
+    },
+    {
+      "slug": "hindu-garhwali",
+      "religion": "Hindu",
+      "label": "Garhwali",
+      "aliases": [
+        "garhwali",
+        "pahari"
+      ]
+    },
+    {
+      "slug": "hindu-gounder",
+      "religion": "Hindu",
+      "label": "Gounder",
+      "aliases": [
+        "gounder",
+        "goundar",
+        "kongu vellala gounder"
+      ]
+    },
+    {
+      "slug": "hindu-gowda",
+      "religion": "Hindu",
+      "label": "Gowda",
+      "aliases": [
+        "gowda",
+        "gauda",
+        "vokkaliga"
+      ]
+    },
+    {
+      "slug": "hindu-gujjar",
+      "religion": "Hindu",
+      "label": "Gujjar",
+      "aliases": [
+        "gujjar",
+        "gurjar"
+      ]
+    },
+    {
+      "slug": "hindu-gupta",
+      "religion": "Hindu",
+      "label": "Gupta",
+      "aliases": [
+        "gupta"
+      ]
+    },
+    {
+      "slug": "hindu-jat",
+      "religion": "Hindu",
+      "label": "Jat",
+      "aliases": [
+        "jat",
+        "jatt"
+      ]
+    },
+    {
+      "slug": "hindu-kalwar",
+      "religion": "Hindu",
+      "label": "Kalwar",
+      "aliases": [
+        "kalwar",
+        "kalal"
+      ]
+    },
+    {
+      "slug": "hindu-kamboj",
+      "religion": "Hindu",
+      "label": "Kamboj",
+      "aliases": [
+        "kamboj",
+        "kamboh"
+      ]
+    },
+    {
+      "slug": "hindu-kamma",
+      "religion": "Hindu",
+      "label": "Kamma",
+      "aliases": [
+        "kamma",
+        "chowdary"
+      ]
+    },
+    {
+      "slug": "hindu-kapu",
+      "religion": "Hindu",
+      "label": "Kapu",
+      "aliases": [
+        "kapu",
+        "telaga"
+      ]
+    },
+    {
+      "slug": "hindu-kayastha",
+      "religion": "Hindu",
+      "label": "Kayastha",
+      "aliases": [
+        "kayastha",
+        "kayasth"
+      ]
+    },
+    {
+      "slug": "hindu-khandayat",
+      "religion": "Hindu",
+      "label": "Khandayat",
+      "aliases": [
+        "khandayat",
+        "khandait"
+      ]
+    },
+    {
+      "slug": "hindu-khatri",
+      "religion": "Hindu",
+      "label": "Khatri",
+      "aliases": [
+        "khatri"
+      ]
+    },
+    {
+      "slug": "hindu-koiri",
+      "religion": "Hindu",
+      "label": "Koiri",
+      "aliases": [
+        "koiri",
+        "koeri",
+        "kushwaha"
+      ]
+    },
+    {
+      "slug": "hindu-koli",
+      "religion": "Hindu",
+      "label": "Koli",
+      "aliases": [
+        "koli"
+      ]
+    },
+    {
+      "slug": "hindu-kshatriya",
+      "religion": "Hindu",
+      "label": "Kshatriya",
+      "aliases": [
+        "kshatriya"
+      ]
+    },
+    {
+      "slug": "hindu-kumhar",
+      "religion": "Hindu",
+      "label": "Kumhar",
+      "aliases": [
+        "kumhar",
+        "kumbhar",
+        "prajapati"
+      ]
+    },
+    {
+      "slug": "hindu-kunbi",
+      "religion": "Hindu",
+      "label": "Kunbi",
+      "aliases": [
+        "kunbi",
+        "kunabi"
+      ]
+    },
+    {
+      "slug": "hindu-kurmi",
+      "religion": "Hindu",
+      "label": "Kurmi",
+      "aliases": [
+        "kurmi",
+        "kurmi kshatriya"
+      ]
+    },
+    {
+      "slug": "hindu-kuruba",
+      "religion": "Hindu",
+      "label": "Kuruba",
+      "aliases": [
+        "kuruba",
+        "kuruma",
+        "kurumba"
+      ]
+    },
+    {
+      "slug": "hindu-leva-patel",
+      "religion": "Hindu",
+      "label": "Leva Patel",
+      "aliases": [
+        "leva patel",
+        "leuva patel",
+        "leuva"
+      ]
+    },
+    {
+      "slug": "hindu-lingayat",
+      "religion": "Hindu",
+      "label": "Lingayat",
+      "aliases": [
+        "lingayat",
+        "veerashaiva"
+      ]
+    },
+    {
+      "slug": "hindu-lohana",
+      "religion": "Hindu",
+      "label": "Lohana",
+      "aliases": [
+        "lohana"
+      ]
+    },
+    {
+      "slug": "hindu-mahajan",
+      "religion": "Hindu",
+      "label": "Mahajan",
+      "aliases": [
+        "mahajan"
+      ]
+    },
+    {
+      "slug": "hindu-mahar",
+      "religion": "Hindu",
+      "label": "Mahar",
+      "aliases": [
+        "mahar"
+      ]
+    },
+    {
+      "slug": "hindu-maheshwari",
+      "religion": "Hindu",
+      "label": "Maheshwari",
+      "aliases": [
+        "maheshwari"
+      ]
+    },
+    {
+      "slug": "hindu-mali",
+      "religion": "Hindu",
+      "label": "Mali",
+      "aliases": [
+        "mali",
+        "maalee",
+        "phulmali"
+      ]
+    },
+    {
+      "slug": "hindu-maratha",
+      "religion": "Hindu",
+      "label": "Maratha",
+      "aliases": [
+        "maratha",
+        "marathi"
+      ]
+    },
+    {
+      "slug": "hindu-meena",
+      "religion": "Hindu",
+      "label": "Meena",
+      "aliases": [
+        "meena",
+        "mina"
+      ]
+    },
+    {
+      "slug": "hindu-mudaliar",
+      "religion": "Hindu",
+      "label": "Mudaliar",
+      "aliases": [
+        "mudaliar",
+        "mudaliyar"
+      ]
+    },
+    {
+      "slug": "hindu-nadar",
+      "religion": "Hindu",
+      "label": "Nadar",
+      "aliases": [
+        "nadar",
+        "shanar"
+      ]
+    },
+    {
+      "slug": "hindu-naicker",
+      "religion": "Hindu",
+      "label": "Naicker",
+      "aliases": [
+        "naicker",
+        "naick",
+        "nayak"
+      ]
+    },
+    {
+      "slug": "hindu-naidu",
+      "religion": "Hindu",
+      "label": "Naidu",
+      "aliases": [
+        "naidu",
+        "balija naidu"
+      ]
+    },
+    {
+      "slug": "hindu-nair",
+      "religion": "Hindu",
+      "label": "Nair",
+      "aliases": [
+        "nair",
+        "nairs",
+        "menon"
+      ]
+    },
+    {
+      "slug": "hindu-nai",
+      "religion": "Hindu",
+      "label": "Nai",
+      "aliases": [
+        "nai",
+        "nayi",
+        "nayee",
+        "hajam"
+      ]
+    },
+    {
+      "slug": "hindu-okkaliga",
+      "religion": "Hindu",
+      "label": "Okkaliga",
+      "aliases": [
+        "okkaliga",
+        "vokkaligar"
+      ]
+    },
+    {
+      "slug": "hindu-padmashali",
+      "religion": "Hindu",
+      "label": "Padmashali",
+      "aliases": [
+        "padmashali",
+        "padmasali"
+      ]
+    },
+    {
+      "slug": "hindu-patel",
+      "religion": "Hindu",
+      "label": "Patel",
+      "aliases": [
+        "patel",
+        "patidar"
+      ]
+    },
+    {
+      "slug": "hindu-pillai",
+      "religion": "Hindu",
+      "label": "Pillai",
+      "aliases": [
+        "pillai",
+        "pillais"
+      ]
+    },
+    {
+      "slug": "hindu-rajput",
+      "religion": "Hindu",
+      "label": "Rajput",
+      "aliases": [
+        "rajput",
+        "rajpoot"
+      ]
+    },
+    {
+      "slug": "hindu-reddy",
+      "religion": "Hindu",
+      "label": "Reddy",
+      "aliases": [
+        "reddy",
+        "reddys",
+        "kapu reddy"
+      ]
+    },
+    {
+      "slug": "hindu-saini",
+      "religion": "Hindu",
+      "label": "Saini",
+      "aliases": [
+        "saini",
+        "mali saini",
+        "shoorsaini"
+      ]
+    },
+    {
+      "slug": "hindu-scheduled-caste",
+      "religion": "Hindu",
+      "label": "Scheduled Caste",
+      "aliases": [
+        "sc",
+        "dalit",
+        "ad dravida"
+      ]
+    },
+    {
+      "slug": "hindu-scheduled-tribe",
+      "religion": "Hindu",
+      "label": "Scheduled Tribe",
+      "aliases": [
+        "st",
+        "adivasi",
+        "tribal"
+      ]
+    },
+    {
+      "slug": "hindu-shimpi",
+      "religion": "Hindu",
+      "label": "Shimpi",
+      "aliases": [
+        "shimpi",
+        "namdev shimpi"
+      ]
+    },
+    {
+      "slug": "hindu-sonar",
+      "religion": "Hindu",
+      "label": "Sonar",
+      "aliases": [
+        "sonar",
+        "sunar",
+        "soni"
+      ]
+    },
+    {
+      "slug": "hindu-teli",
+      "religion": "Hindu",
+      "label": "Teli",
+      "aliases": [
+        "teli",
+        "gandla"
+      ]
+    },
+    {
+      "slug": "hindu-thakur",
+      "religion": "Hindu",
+      "label": "Thakur",
+      "aliases": [
+        "thakur"
+      ]
+    },
+    {
+      "slug": "hindu-thevar",
+      "religion": "Hindu",
+      "label": "Thevar",
+      "aliases": [
+        "thevar",
+        "mukkulathor"
+      ]
+    },
+    {
+      "slug": "hindu-vanniyar",
+      "religion": "Hindu",
+      "label": "Vanniyar",
+      "aliases": [
+        "vanniyar",
+        "vanniya kula kshatriya"
+      ]
+    },
+    {
+      "slug": "hindu-velama",
+      "religion": "Hindu",
+      "label": "Velama",
+      "aliases": [
+        "velama",
+        "padmanayaka"
+      ]
+    },
+    {
+      "slug": "hindu-vellalar",
+      "religion": "Hindu",
+      "label": "Vellalar",
+      "aliases": [
+        "vellalar",
+        "vellala"
+      ]
+    },
+    {
+      "slug": "hindu-vishwakarma",
+      "religion": "Hindu",
+      "label": "Vishwakarma",
+      "aliases": [
+        "vishwakarma",
+        "viswakarma"
+      ]
+    },
+    {
+      "slug": "hindu-vysya",
+      "religion": "Hindu",
+      "label": "Vysya",
+      "aliases": [
+        "vysya",
+        "arya vysya",
+        "komati"
+      ]
+    },
+    {
+      "slug": "hindu-yadav",
+      "religion": "Hindu",
+      "label": "Yadav",
+      "aliases": [
+        "yadav",
+        "ahir"
+      ]
+    },
+    {
+      "slug": "hindu-obc",
+      "religion": "Hindu",
+      "label": "OBC",
+      "aliases": [
+        "obc",
+        "other backward class"
+      ]
+    },
+    {
+      "slug": "hindu-other-hindu",
+      "religion": "Hindu",
+      "label": "Other Hindu",
+      "aliases": [
+        "hindu other",
+        "other"
+      ]
+    },
+    {
+      "slug": "muslim-sunni",
+      "religion": "Muslim",
+      "label": "Sunni",
+      "aliases": [
+        "sunni muslim",
+        "sunni"
+      ]
+    },
+    {
+      "slug": "muslim-shia",
+      "religion": "Muslim",
+      "label": "Shia",
+      "aliases": [
+        "shia muslim",
+        "shia"
+      ]
+    },
+    {
+      "slug": "muslim-ansari",
+      "religion": "Muslim",
+      "label": "Ansari",
+      "aliases": [
+        "ansari",
+        "momin ansari"
+      ]
+    },
+    {
+      "slug": "muslim-bohra",
+      "religion": "Muslim",
+      "label": "Bohra",
+      "aliases": [
+        "bohra",
+        "dawoodi bohra"
+      ]
+    },
+    {
+      "slug": "muslim-khoja",
+      "religion": "Muslim",
+      "label": "Khoja",
+      "aliases": [
+        "khoja",
+        "khoia"
+      ]
+    },
+    {
+      "slug": "muslim-lebbai",
+      "religion": "Muslim",
+      "label": "Lebbai",
+      "aliases": [
+        "lebbai",
+        "labbai"
+      ]
+    },
+    {
+      "slug": "muslim-malik",
+      "religion": "Muslim",
+      "label": "Malik",
+      "aliases": [
+        "malik",
+        "mirasi"
+      ]
+    },
+    {
+      "slug": "muslim-mapilla",
+      "religion": "Muslim",
+      "label": "Mapilla",
+      "aliases": [
+        "mapilla",
+        "mappila",
+        "moplah"
+      ]
+    },
+    {
+      "slug": "muslim-memon",
+      "religion": "Muslim",
+      "label": "Memon",
+      "aliases": [
+        "memon",
+        "memons"
+      ]
+    },
+    {
+      "slug": "muslim-pathan",
+      "religion": "Muslim",
+      "label": "Pathan",
+      "aliases": [
+        "pathan",
+        "pashtun"
+      ]
+    },
+    {
+      "slug": "muslim-qureshi",
+      "religion": "Muslim",
+      "label": "Qureshi",
+      "aliases": [
+        "qureshi",
+        "quraishi"
+      ]
+    },
+    {
+      "slug": "muslim-rajput-muslim",
+      "religion": "Muslim",
+      "label": "Rajput Muslim",
+      "aliases": [
+        "rajput muslim",
+        "muslim rajput"
+      ]
+    },
+    {
+      "slug": "muslim-rowther",
+      "religion": "Muslim",
+      "label": "Rowther",
+      "aliases": [
+        "rowther",
+        "rawther"
+      ]
+    },
+    {
+      "slug": "muslim-shaikh",
+      "religion": "Muslim",
+      "label": "Shaikh",
+      "aliases": [
+        "shaikh",
+        "sheikh",
+        "siddiqui"
+      ]
+    },
+    {
+      "slug": "muslim-syed",
+      "religion": "Muslim",
+      "label": "Syed",
+      "aliases": [
+        "syed",
+        "sayyid"
+      ]
+    },
+    {
+      "slug": "muslim-mughal",
+      "religion": "Muslim",
+      "label": "Mughal",
+      "aliases": [
+        "mughal",
+        "moghul"
+      ]
+    },
+    {
+      "slug": "muslim-other-muslim",
+      "religion": "Muslim",
+      "label": "Other Muslim",
+      "aliases": [
+        "muslim other",
+        "other muslim"
+      ]
+    },
+    {
+      "slug": "christian-roman-catholic",
+      "religion": "Christian",
+      "label": "Roman Catholic",
+      "aliases": [
+        "catholic",
+        "rc",
+        "latin catholic"
+      ]
+    },
+    {
+      "slug": "christian-csi",
+      "religion": "Christian",
+      "label": "CSI",
+      "aliases": [
+        "csi",
+        "church of south india"
+      ]
+    },
+    {
+      "slug": "christian-cni",
+      "religion": "Christian",
+      "label": "CNI",
+      "aliases": [
+        "cni",
+        "church of north india"
+      ]
+    },
+    {
+      "slug": "christian-pentecostal",
+      "religion": "Christian",
+      "label": "Pentecostal",
+      "aliases": [
+        "pentecost",
+        "pentacostal"
+      ]
+    },
+    {
+      "slug": "christian-marthoma",
+      "religion": "Christian",
+      "label": "Marthoma",
+      "aliases": [
+        "marthoma",
+        "marthoma syrian"
+      ]
+    },
+    {
+      "slug": "christian-jacobite",
+      "religion": "Christian",
+      "label": "Jacobite",
+      "aliases": [
+        "jacobite",
+        "syrian jacobite"
+      ]
+    },
+    {
+      "slug": "christian-protestant",
+      "religion": "Christian",
+      "label": "Protestant",
+      "aliases": [
+        "protestant",
+        "anglican"
+      ]
+    },
+    {
+      "slug": "christian-orthodox-syrian",
+      "religion": "Christian",
+      "label": "Orthodox Syrian",
+      "aliases": [
+        "orthodox syrian",
+        "malankara orthodox"
+      ]
+    },
+    {
+      "slug": "christian-born-again",
+      "religion": "Christian",
+      "label": "Born Again",
+      "aliases": [
+        "born again",
+        "evangelical",
+        "born again christian"
+      ]
+    },
+    {
+      "slug": "christian-knanaya",
+      "religion": "Christian",
+      "label": "Knanaya",
+      "aliases": [
+        "knanaya",
+        "knanite"
+      ]
+    },
+    {
+      "slug": "christian-methodist",
+      "religion": "Christian",
+      "label": "Methodist",
+      "aliases": [
+        "methodist"
+      ]
+    },
+    {
+      "slug": "christian-seventh-day-adventist",
+      "religion": "Christian",
+      "label": "Seventh Day Adventist",
+      "aliases": [
+        "sda",
+        "seventh day adventist",
+        "adventist"
+      ]
+    },
+    {
+      "slug": "christian-salvation-army",
+      "religion": "Christian",
+      "label": "Salvation Army",
+      "aliases": [
+        "salvation army"
+      ]
+    },
+    {
+      "slug": "christian-other-christian",
+      "religion": "Christian",
+      "label": "Other Christian",
+      "aliases": [
+        "christian other",
+        "other christian"
+      ]
+    },
+    {
+      "slug": "sikh-jat-sikh",
+      "religion": "Sikh",
+      "label": "Jat Sikh",
+      "aliases": [
+        "jat sikh",
+        "sikh jat"
+      ]
+    },
+    {
+      "slug": "sikh-khatri",
+      "religion": "Sikh",
+      "label": "Khatri",
+      "aliases": [
+        "khatri sikh",
+        "khatri"
+      ]
+    },
+    {
+      "slug": "sikh-ramgarhia",
+      "religion": "Sikh",
+      "label": "Ramgarhia",
+      "aliases": [
+        "ramgarhia",
+        "tarkhan"
+      ]
+    },
+    {
+      "slug": "sikh-ahluwalia",
+      "religion": "Sikh",
+      "label": "Ahluwalia",
+      "aliases": [
+        "ahluwalia",
+        "ahluwalias"
+      ]
+    },
+    {
+      "slug": "sikh-arora-sikh",
+      "religion": "Sikh",
+      "label": "Arora Sikh",
+      "aliases": [
+        "arora sikh",
+        "sikh arora"
+      ]
+    },
+    {
+      "slug": "sikh-bhapa-sikh",
+      "religion": "Sikh",
+      "label": "Bhapa Sikh",
+      "aliases": [
+        "bhapa sikh",
+        "bhapa"
+      ]
+    },
+    {
+      "slug": "sikh-lubana",
+      "religion": "Sikh",
+      "label": "Lubana",
+      "aliases": [
+        "lubana",
+        "labana"
+      ]
+    },
+    {
+      "slug": "sikh-majhabi",
+      "religion": "Sikh",
+      "label": "Majhabi",
+      "aliases": [
+        "majhabi",
+        "mazhabi",
+        "mazbi sikh"
+      ]
+    },
+    {
+      "slug": "sikh-saini-sikh",
+      "religion": "Sikh",
+      "label": "Saini Sikh",
+      "aliases": [
+        "saini sikh",
+        "sikh saini"
+      ]
+    },
+    {
+      "slug": "jain-digambar",
+      "religion": "Jain",
+      "label": "Digambar",
+      "aliases": [
+        "digambar jain",
+        "digambar"
+      ]
+    },
+    {
+      "slug": "jain-shwetambar",
+      "religion": "Jain",
+      "label": "Shwetambar",
+      "aliases": [
+        "shwetambar jain",
+        "svetambar"
+      ]
+    },
+    {
+      "slug": "jain-agarwal-jain",
+      "religion": "Jain",
+      "label": "Agarwal Jain",
+      "aliases": [
+        "agarwal jain",
+        "jain agarwal"
+      ]
+    },
+    {
+      "slug": "jain-khandelwal",
+      "religion": "Jain",
+      "label": "Khandelwal",
+      "aliases": [
+        "khandelwal jain",
+        "khandelwal"
+      ]
+    },
+    {
+      "slug": "jain-oswal",
+      "religion": "Jain",
+      "label": "Oswal",
+      "aliases": [
+        "oswal jain",
+        "oswal"
+      ]
+    },
+    {
+      "slug": "jain-porwal",
+      "religion": "Jain",
+      "label": "Porwal",
+      "aliases": [
+        "porwal jain",
+        "porwal"
+      ]
+    },
+    {
+      "slug": "jain-parwar",
+      "religion": "Jain",
+      "label": "Parwar",
+      "aliases": [
+        "parwar jain",
+        "parwar"
+      ]
+    },
+    {
+      "slug": "buddhist-navayana",
+      "religion": "Buddhist",
+      "label": "Navayana",
+      "aliases": [
+        "navayana buddhist",
+        "neo buddhist"
+      ]
+    },
+    {
+      "slug": "buddhist-mahayana",
+      "religion": "Buddhist",
+      "label": "Mahayana",
+      "aliases": [
+        "mahayana",
+        "mahayana buddhist"
+      ]
+    },
+    {
+      "slug": "buddhist-theravada",
+      "religion": "Buddhist",
+      "label": "Theravada",
+      "aliases": [
+        "theravada",
+        "hinayana"
+      ]
+    },
+    {
+      "slug": "buddhist-other-buddhist",
+      "religion": "Buddhist",
+      "label": "Other Buddhist",
+      "aliases": [
+        "buddhist other"
+      ]
+    },
+    {
+      "slug": "parsi-parsi",
+      "religion": "Parsi",
+      "label": "Parsi",
+      "aliases": [
+        "parsi",
+        "zoroastrian"
+      ]
+    },
+    {
+      "slug": "parsi-irani",
+      "religion": "Parsi",
+      "label": "Irani",
+      "aliases": [
+        "irani",
+        "irani zoroastrian"
+      ]
+    },
+    {
+      "slug": "jewish-jewish",
+      "religion": "Jewish",
+      "label": "Jewish",
+      "aliases": [
+        "jewish",
+        "jew"
+      ]
+    },
+    {
+      "slug": "spiritual-spiritual",
+      "religion": "Spiritual",
+      "label": "Spiritual",
+      "aliases": [
+        "spiritual",
+        "spiritualist"
+      ]
+    },
+    {
+      "slug": "other-inter-caste",
+      "religion": "Other",
+      "label": "Inter-caste",
+      "aliases": [
+        "intercaste",
+        "inter caste",
+        "no caste"
+      ]
+    },
+    {
+      "slug": "other-caste-no-bar",
+      "religion": "Other",
+      "label": "Caste no bar",
+      "aliases": [
+        "caste no bar",
+        "dont wish to specify"
+      ]
+    },
+    {
+      "slug": "other-no-religion",
+      "religion": "Other",
+      "label": "No Religion",
+      "aliases": [
+        "no religion",
+        "atheist",
+        "agnostic"
+      ]
+    }
+  ]
+}

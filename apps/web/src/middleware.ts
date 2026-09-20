@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server"
 
+const AUTH_COOKIE = "astalakshimi.auth_token"
+const HAS_PROFILE_COOKIE = "astalakshimi.has_profile"
+
+/** Routes allowed while authenticated but before a profile exists. */
+const ONBOARDING_ALLOWLIST = new Set(["/register"])
+
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
@@ -8,49 +14,45 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  const token = req.cookies.get("astalakshimi.auth_token")?.value
-  const isLoggedIn = !!token
+  const token = req.cookies.get(AUTH_COOKIE)?.value
+  const isLoggedIn = Boolean(token)
+  const hasProfile = req.cookies.get(HAS_PROFILE_COOKIE)?.value === "1"
 
-  // List of public routes that don't require authentication
-  const publicRoutes = ["/login", "/register", "/"]
-  const isPublicRoute = publicRoutes.includes(pathname)
-
-  // API auth routes must always be accessible
   const isApiAuthRoute = pathname.startsWith("/api/auth")
-
   if (isApiAuthRoute) {
     return NextResponse.next()
   }
 
-  if (pathname === "/") {
-    if (isLoggedIn) {
+  // Mid-onboarding: OTP done, profile not created yet — stay on /register only.
+  if (isLoggedIn && !hasProfile) {
+    if (ONBOARDING_ALLOWLIST.has(pathname)) {
+      return NextResponse.next()
+    }
+    return NextResponse.redirect(new URL("/register", req.nextUrl))
+  }
+
+  // Fully enrolled users: keep them out of auth marketing entry points,
+  // then allow the rest of the app (must return — do not fall into the logged-out branch).
+  if (isLoggedIn && hasProfile) {
+    if (pathname === "/login" || pathname === "/" || pathname === "/register") {
       return NextResponse.redirect(new URL("/home", req.nextUrl))
-    } else {
-      return NextResponse.redirect(new URL("/login", req.nextUrl))
     }
-  }
-
-  if (pathname === "/login") {
     return NextResponse.next()
   }
 
-  if (pathname === "/register") {
+  // Logged out — public entry points only; everything else → login.
+  if (pathname === "/login" || pathname === "/" || pathname === "/register") {
     return NextResponse.next()
   }
 
-  if (!isLoggedIn) {
-    let callbackUrl = pathname
-    if (req.nextUrl.search) {
-      callbackUrl += req.nextUrl.search
-    }
-    const encodedCallbackUrl = encodeURIComponent(callbackUrl)
-    return NextResponse.redirect(new URL(`/login?callbackUrl=${encodedCallbackUrl}`, req.nextUrl))
+  let callbackUrl = pathname
+  if (req.nextUrl.search) {
+    callbackUrl += req.nextUrl.search
   }
-
-  return NextResponse.next()
+  const encodedCallbackUrl = encodeURIComponent(callbackUrl)
+  return NextResponse.redirect(new URL(`/login?callbackUrl=${encodedCallbackUrl}`, req.nextUrl))
 }
 
-// Skip auth for Next internals, API, and static public assets (images, icons, manifest)
 export const config = {
   matcher: [
     "/((?!api|_next/static|_next/image|favicon.ico|icon.png|manifest.webmanifest|images/|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|woff2?)$).*)",

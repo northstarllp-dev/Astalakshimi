@@ -6,6 +6,8 @@ import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { UserSession } from '@astalakshimi/types';
 import { z } from 'zod';
 import {
   adminCreateProfileSchema,
@@ -59,10 +61,16 @@ export class AdminController {
   @Patch('verifications/:profileId')
   updateVerificationStatus(
     @Param('profileId', UuidValidationPipe) profileId: string,
+    @CurrentUser() user: UserSession,
     @Body(new ZodValidationPipe(updateVerificationStatusSchema))
     body: z.infer<typeof updateVerificationStatusSchema>,
   ) {
-    return this.adminService.updateVerificationStatus(profileId, body.status, body.rejectionReason);
+    return this.adminService.updateVerificationStatus(
+      profileId,
+      body.status,
+      user.userId,
+      body.rejectionReason,
+    );
   }
 
   @Get('profiles')

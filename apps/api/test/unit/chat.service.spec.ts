@@ -32,7 +32,25 @@ describe('Feature 5: Chat - ChatService (Unit Tests)', () => {
       createNotification: jest.fn().mockResolvedValue({}),
     };
 
-    chatService = new ChatService(mockDb, mockNotificationsService);
+    const mockContactGuard = {
+      checkMessage: jest.fn().mockResolvedValue({ status: 'ALLOWED' }),
+      guardMessage: jest.fn().mockResolvedValue({ ok: true }),
+    } as any;
+    const mockEntitlementsService = {
+      getUserPlan: jest.fn().mockResolvedValue({ slug: 'free' }),
+      isChatBlocked: jest.fn().mockResolvedValue(false),
+    } as any;
+    const mockBlocksService = {
+      isBlocked: jest.fn().mockResolvedValue(false),
+    } as any;
+
+    chatService = new ChatService(
+      mockDb,
+      mockNotificationsService,
+      mockContactGuard,
+      mockEntitlementsService,
+      mockBlocksService,
+    );
   });
 
   describe('sendMessage', () => {
@@ -155,10 +173,10 @@ describe('Feature 5: Chat - ChatService (Unit Tests)', () => {
         }),
       });
 
-      const result = await chatService.sendMessage('sender-user-id', 'partner-prof-id', {
+      const result = (await chatService.sendMessage('sender-user-id', 'partner-prof-id', {
         text: 'Hello Ananya!',
         receiverProfileId: 'partner-prof-id',
-      });
+      })) as any;
 
       expect(result.id).toBe('msg-uuid-1');
       expect(result.text).toBe('Hello Ananya!');
@@ -280,21 +298,23 @@ describe('Feature 5: Chat - ChatService (Unit Tests)', () => {
             orderBy: jest.fn().mockResolvedValue(acceptedInterests),
           };
         } else if (selectCount === 3) {
-          // photos
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockResolvedValue([{ profileId: partnerProfile.id, s3Key: 'photo1.jpg' }]),
-          };
-        } else if (selectCount === 4) {
-          // last message
+          // all messages (batched) — latest first; two unread from partner
           return {
             from: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
-            orderBy: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ text: 'Latest message text', createdAt: new Date() }]),
+            orderBy: jest.fn().mockResolvedValue([
+              { senderProfileId: partnerProfile.id, receiverProfileId: senderProfile.id, text: 'Latest message text', createdAt: new Date(), isRead: false },
+              { senderProfileId: partnerProfile.id, receiverProfileId: senderProfile.id, text: 'Earlier unread', createdAt: new Date(Date.now() - 60000), isRead: false },
+            ]),
+          };
+        } else if (selectCount === 4) {
+          // photos (getApprovedPrimaryPhotos)
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockResolvedValue([{ profileId: partnerProfile.id, s3Key: 'photo1.jpg', id: 'ph-1' }]),
           };
         } else {
-          // unread count
+          // fallback (e.g. unread count if called separately)
           return {
             from: jest.fn().mockReturnThis(),
             where: jest.fn().mockResolvedValue([{ count: 2 }]),

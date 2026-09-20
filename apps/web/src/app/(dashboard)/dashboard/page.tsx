@@ -21,6 +21,7 @@ import {
   queryKeys,
 } from "@/hooks/queries"
 import { discoverQuickSchema } from "@/lib/validation"
+import { apiClient } from "@/lib/api-client"
 import { VERIFICATION_SLA_HOURS, INCOME_BANDS, DIETS, STARS } from "@/lib/profile-store"
 import {
   BROWSE_TABS,
@@ -44,7 +45,7 @@ import {
 } from "lucide-react"
 import { CityAutocomplete } from "@/components/profile/city-autocomplete"
 import { SearchableSelect } from "@/components/profile/searchable-select"
-import { COMMUNITY_MASTER_DATA } from "@/lib/community-data"
+import { getCommunities } from "@/lib/community-data"
 
 const HEIGHT_BANDS = ["Up to 5'4\"", "5'5\" – 5'8\"", "5'9\" & above"]
 const EDUCATION_GROUPS = ["B.Tech", "B.E", "MBA", "M.Sc", "Ph.D", "M.Phil", "Post Doctorate", "Others"]
@@ -156,6 +157,7 @@ function DiscoverPage() {
   const totalCount = searchResult?.totalCount || 0
 
   const setQuick = (patch: Partial<DiscoverQuery>) => {
+    setPrefsApplied(false)
     setQuery((q) => {
       const next = { ...q, ...patch }
       const parsed = discoverQuickSchema.safeParse({
@@ -171,6 +173,7 @@ function DiscoverPage() {
   }
 
   const setAdvanced = (patch: Partial<AdvancedFilters>) => {
+    setPrefsApplied(false)
     setQuery((q) => ({ ...q, advanced: { ...q.advanced, ...patch } }))
     setPage(1)
   }
@@ -184,14 +187,33 @@ function DiscoverPage() {
     setPaywall(feature)
   }
 
-  const applyPreferences = () => {
-    setQuery((q) => ({ ...q, ...{}, advanced: EMPTY_ADVANCED }))
+  const [prefsApplied, setPrefsApplied] = React.useState(false)
+  const applyPreferences = async () => {
+    // Stored partner prefs → free Discover filters only (age / city / community).
+    // Paid advanced filters are never auto-filled from prefs.
+    try {
+      const prefs = await apiClient.preferences.getMyPreferences()
+      const locations = Array.isArray(prefs?.prefLocations) ? prefs.prefLocations : []
+      const castes = Array.isArray(prefs?.prefCastes) ? prefs.prefCastes : []
+      setQuery((q) => ({
+        ...q,
+        ageMin: prefs?.prefAgeMin ?? q.ageMin,
+        ageMax: prefs?.prefAgeMax ?? q.ageMax,
+        city: locations[0] ?? q.city,
+        community: castes[0] ?? q.community,
+        advanced: EMPTY_ADVANCED,
+      }))
+      setPrefsApplied(true)
+    } catch {
+      // No prefs saved yet — keep the current query untouched.
+      setPrefsApplied(false)
+    }
     setPage(1)
   }
 
   const communityOptions = React.useMemo(() => {
     const list = Array.from(
-      new Set(COMMUNITY_MASTER_DATA.communities.map((c) => c.name))
+      new Set(getCommunities().map((c) => c.label))
     ).sort((a, b) => a.localeCompare(b))
     return [
       { value: "", label: "Any community" },
@@ -273,8 +295,9 @@ function DiscoverPage() {
             size="sm"
             onClick={applyPreferences}
             className="h-10 rounded-full px-3.5 text-sm"
+            title="Apply your saved partner preferences to these filters"
           >
-            <Heart className="mr-1.5 h-4 w-4 text-primary" /> My preferences
+            <Heart className="mr-1.5 h-4 w-4 text-primary" /> {prefsApplied ? "Preferences applied" : "My preferences"}
           </Button>
 
           {saved.length > 0 && paid && (

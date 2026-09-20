@@ -1,8 +1,9 @@
 type UserSettings = any;
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { loadProfile, saveProfile, emptySignupData, DEMO_REJECTION_REASON, type SignupData } from "@/lib/profile-store"
+import { loadProfile, saveProfile, emptySignupData, DEMO_REJECTION_REASON, formatSiblings, type SignupData } from "@/lib/profile-store"
 import { apiClient } from "@/lib/api-client"
-import { formatHeightFromCm, heightToCm } from "@/lib/input-units"
+import { formatHeightFromCm, parseHeightToCm, weightToKg, formatWeightFromKg } from "@/lib/input-units"
+import { resolveChildrenFields } from "@/lib/identity-fields"
 export const queryKeys = {
   profile: ["profile"] as const,
   matches: ["matches"] as const,
@@ -39,45 +40,6 @@ export function useProfileQuery() {
           
           if (authMe.hasProfile) {
             const fullProfile = await apiClient.profiles.getMyProfile();
-            let educationId = fullProfile.profile.educationId ?? null;
-            let education = fullProfile.profile.degree || "";
-            let educationStream = fullProfile.profile.specializationName ?? "";
-            let otherEducation = "";
-
-            if (education.includes(" · ") && !fullProfile.profile.specializationName) {
-              const [level, ...streamParts] = education.split(" · ");
-              education = level;
-              educationStream = streamParts.join(" · ");
-            }
-
-            if (!educationId && education) {
-              const resolved = await apiClient.educations.resolve(education).catch(() => null);
-              if (resolved) {
-                educationId = resolved.id;
-                education = resolved.name;
-              } else {
-                otherEducation = education;
-              }
-            }
-            let occupationId = fullProfile.profile.occupationId ?? null;
-            let occupation = fullProfile.profile.profession || "";
-            if (!occupationId && occupation) {
-              const resolvedOccupation = await apiClient.careers.resolveOccupation(occupation).catch(() => null);
-              if (resolvedOccupation) {
-                occupationId = resolvedOccupation.id;
-                occupation = resolvedOccupation.name;
-              }
-            }
-
-            let companyId = fullProfile.profile.companyId ?? null;
-            let companyName = fullProfile.profile.companyName ?? "";
-            if (!companyId && companyName) {
-              const resolvedCompany = await apiClient.careers.resolveCompany(companyName).catch(() => null);
-              if (resolvedCompany) {
-                companyId = resolvedCompany.id;
-                companyName = resolvedCompany.name;
-              }
-            }
 
             const mapped = {
               profileFor: fullProfile.profile.profileFor,
@@ -86,38 +48,32 @@ export function useProfileQuery() {
               dobYear: fullProfile.profile.dob.split('-')[0],
               dobMonth: fullProfile.profile.dob.split('-')[1],
               dobDay: fullProfile.profile.dob.split('-')[2],
-              height: fullProfile.profile.heightCm ? formatHeightFromCm(fullProfile.profile.heightCm) : '',
-              weight: fullProfile.profile.weight ?? '',
-              complexion: fullProfile.profile.complexion ?? '',
-              disability: fullProfile.profile.disability ?? '',
+              height: formatHeightFromCm(fullProfile.profile.heightCm),
+              weight: formatWeightFromKg(fullProfile.profile.weightKg),
+              complexion: fullProfile.profile.complexion ?? "",
+              disability: fullProfile.profile.disability ?? "",
               maritalStatus: fullProfile.profile.maritalStatus,
               hasChildren: fullProfile.profile.hasChildren ?? false,
               childrenCount: fullProfile.profile.childrenCount ?? 0,
-              childrenLivingWithMe: fullProfile.profile.childrenLivingWithMe ?? false,
+              childrenLivingWithMe: fullProfile.profile.childrenLivingWithMe ?? null,
               religion: fullProfile.profile.religion,
               caste: fullProfile.profile.caste,
+              communitySlug: fullProfile.profile.communitySlug ?? '',
               subcaste: fullProfile.profile.subcaste ?? '',
               gotra: fullProfile.profile.gotra ?? '',
               motherTongue: fullProfile.profile.motherTongue,
-              educationId,
-              specializationId: fullProfile.profile.specializationId ?? null,
               educationLevel: fullProfile.profile.educationLevel ?? '',
-              education,
-              degree: fullProfile.profile.degree ?? education,
-              educationStream,
-              otherEducation,
+              degree: fullProfile.profile.degree ?? '',
               collegeName: fullProfile.profile.collegeName ?? '',
               employmentStatus: fullProfile.profile.employmentStatus ?? '',
-              occupationId,
-              occupation,
-              profession: occupation,
-              companyId,
-              companyName,
+              profession: fullProfile.profile.profession ?? '',
+              companyName: fullProfile.profile.companyName ?? '',
               companySector: fullProfile.profile.companySector ?? '',
               annualIncome: fullProfile.profile.annualIncome ?? '',
               photoPrivacy: fullProfile.profile.photoPrivacy,
               city: fullProfile.profile.city,
               state: fullProfile.profile.state,
+              citySlug: fullProfile.profile.citySlug ?? '',
               willingToRelocate: fullProfile.profile.willingToRelocate ?? '',
               aboutMe: fullProfile.profile.aboutMe ?? '',
               familyValues: fullProfile.family?.familyValues ?? '',
@@ -127,9 +83,14 @@ export function useProfileQuery() {
               motherOccupation: fullProfile.family?.motherOccupation ?? '',
               brothersCount: fullProfile.family?.brothersCount ?? 0,
               sistersCount: fullProfile.family?.sistersCount ?? 0,
+              siblings: formatSiblings(
+                fullProfile.family?.brothersCount ?? 0,
+                fullProfile.family?.sistersCount ?? 0,
+              ),
               diet: fullProfile.lifestyle?.diet ?? '',
               smoking: fullProfile.lifestyle?.smoking ?? '',
               alcohol: fullProfile.lifestyle?.alcohol ?? '',
+              interests: fullProfile.lifestyle?.interests ?? [],
               birthTime: fullProfile.horoscope?.birthTime ?? '',
               birthPlace: fullProfile.horoscope?.birthPlace ?? '',
               manglik: fullProfile.horoscope?.manglik ?? "Don't Know",
@@ -142,16 +103,17 @@ export function useProfileQuery() {
               photoS3Keys: fullProfile.photos.map((p: any) => p.s3Key),
               photoObjects: fullProfile.photos,
               verificationStatus: fullProfile.verificationStatus as any,
-              prefAgeMin: fullProfile.partnerPreferences?.prefAgeMin ?? undefined,
-              prefAgeMax: fullProfile.partnerPreferences?.prefAgeMax ?? undefined,
-              prefHeightMinCm: fullProfile.partnerPreferences?.prefHeightMinCm ?? undefined,
-              prefHeightMaxCm: fullProfile.partnerPreferences?.prefHeightMaxCm ?? undefined,
-              prefReligion: fullProfile.partnerPreferences?.prefReligions ?? [],
-              prefCastes: fullProfile.partnerPreferences?.prefCastes ?? [],
-              prefMotherTongues: fullProfile.partnerPreferences?.prefMotherTongues ?? [],
-              prefMinEducation: fullProfile.partnerPreferences?.prefMinEducation ?? '',
-              prefAcceptableIncomes: fullProfile.partnerPreferences?.prefAcceptableIncomes ?? [],
-              prefLocations: fullProfile.partnerPreferences?.prefLocations ?? [],
+              prefAgeMin: fullProfile.preferences?.prefAgeMin ?? undefined,
+              prefAgeMax: fullProfile.preferences?.prefAgeMax ?? undefined,
+              prefHeightMinCm: fullProfile.preferences?.prefHeightMinCm ?? undefined,
+              prefHeightMaxCm: fullProfile.preferences?.prefHeightMaxCm ?? undefined,
+              prefReligion: fullProfile.preferences?.prefReligions ?? [],
+              prefMaritalStatuses: (fullProfile.preferences as any)?.prefMaritalStatuses ?? [],
+              prefCastes: fullProfile.preferences?.prefCastes ?? [],
+              prefMotherTongues: fullProfile.preferences?.prefMotherTongues ?? [],
+              prefMinEducation: fullProfile.preferences?.prefMinEducation ?? '',
+              prefAcceptableIncomes: fullProfile.preferences?.prefAcceptableIncomes ?? [],
+              prefLocations: fullProfile.preferences?.prefLocations ?? [],
             };
             base = { ...base, ...mapped };
           } else {
@@ -184,44 +146,44 @@ export function useSaveProfileMutation() {
       // 2. Prepare payload for NestJS complete registration endpoint
       const payload = {
         phone: data.phone,
-        otp: data.otp || "123456",
+        otp: data.otp,
         consentAccepted: data.consentAccepted ?? true,
         referredBy: blank(data.referredBy),
-        profileFor: blank(data.profileFor) || "Myself",
+        profileFor: blank(data.profileFor),
         fullName: data.fullName,
-        gender: (blank(data.gender) as any) || "Female",
-        dobDay: blank(data.dobDay) || "01",
-        dobMonth: blank(data.dobMonth) || "01",
-        dobYear: blank(data.dobYear) || "1998",
-        maritalStatus: (blank(data.maritalStatus) as any) || "Never Married",
-        hasChildren: data.hasChildren,
-        childrenCount: data.childrenCount,
-        childrenLivingWithMe: data.childrenLivingWithMe,
-        heightCm: data.height ? heightToCm(data.height) : undefined,
-        weight: blank(data.weight),
-        complexion: blank(data.complexion),
-        disability: blank(data.disability),
+        gender: blank(data.gender) as any,
+        dobDay: blank(data.dobDay),
+        dobMonth: blank(data.dobMonth),
+        dobYear: blank(data.dobYear),
+        maritalStatus: blank(data.maritalStatus) as any,
+        ...resolveChildrenFields({
+          maritalStatus: data.maritalStatus,
+          hasChildren: data.hasChildren,
+          childrenCount: data.childrenCount,
+          childrenLivingWithMe: data.childrenLivingWithMe,
+        }),
+        heightCm: parseHeightToCm(data.height),
         aboutMe: blank(data.aboutMe),
         city: blank(data.city) || "Chennai",
         state: blank(data.state) || "Tamil Nadu",
         country: "India",
+        citySlug: blank(data.citySlug),
         willingToRelocate: blank(data.willingToRelocate),
         religion: blank(data.religion) || "Hindu",
         caste: blank(data.caste) || "Brahmin",
+        communitySlug: blank(data.communitySlug),
         subcaste: blank(data.subcaste),
         gotra: blank(data.gotra),
         motherTongue: blank(data.motherTongue) || "Tamil",
-        educationLevel: (blank(data.educationLevel) as any) || "Bachelors",
-        educationId: data.educationId ?? undefined,
-        specializationId: data.specializationId ?? undefined,
-        degree: blank(data.degree) || blank(data.education),
+        // Career is post-signup (edit / Discover unlock). Do not invent
+        // Bachelors/Employed — leave null so the DB stays honest until filled.
+        educationLevel: (blank(data.educationLevel) as any) || undefined,
+        degree: blank(data.degree),
         collegeName: blank(data.collegeName),
-        employmentStatus: (blank(data.employmentStatus) as any) || "Employed",
-        occupationId: data.occupationId ?? undefined,
-        profession: blank(data.profession) || blank(data.occupation),
-        companyId: data.companyId ?? undefined,
+        employmentStatus: (blank(data.employmentStatus) as any) || undefined,
+        profession: blank(data.profession),
         companyName: blank(data.companyName),
-        companySector: blank(data.companySector) as any,
+        companySector: (blank(data.companySector) as any) || undefined,
         annualIncome: blank(data.annualIncome),
         familyValues: blank(data.familyValues) as any,
         familyType: blank(data.familyType) as any,
@@ -230,10 +192,9 @@ export function useSaveProfileMutation() {
         motherOccupation: blank(data.motherOccupation) as any,
         brothersCount: data.brothersCount || 0,
         sistersCount: data.sistersCount || 0,
+        // Diet required at registration; smoking/alcohol/interests are
+        // collected later via /profile/edit (not sent at signup).
         diet: blank(data.diet) as any,
-        smoking: blank((data as any).smoking) as any,
-        alcohol: blank((data as any).alcohol) as any,
-        interests: (data as any).interests || [],
         birthTime: blank(data.birthTime),
         birthPlace: blank(data.birthPlace),
         manglik: (blank(data.manglik) as any) || "Don't Know",
@@ -244,12 +205,14 @@ export function useSaveProfileMutation() {
         prefHeightMinCm: data.prefHeightMinCm || 140,
         prefHeightMaxCm: data.prefHeightMaxCm || 200,
         prefReligions: data.prefReligion?.length ? data.prefReligion : ["Hindu"],
+        prefMaritalStatuses: data.prefMaritalStatuses?.length ? data.prefMaritalStatuses : ["Never Married"],
         prefCastes: data.prefCastes || [],
         prefMotherTongues: data.prefMotherTongues || [],
         prefMinEducation: blank(data.prefMinEducation),
         prefAcceptableIncomes: data.prefAcceptableIncomes || [],
         prefLocations: data.prefLocations || [],
         photoS3Keys: data.photoS3Keys || [],
+        photoContentHashes: data.photoContentHashes || [],
         photoPrivacy: (blank(data.photoPrivacy) as any) || "blurred",
         verificationMethod: (blank(data.verificationMethod) as any) || "selfie",
         selfieS3Key:
@@ -272,7 +235,7 @@ export function useSaveProfileMutation() {
         }
         const auth = await apiClient.auth.verifyOtp({
           phone: data.phone,
-          otp: data.otp || '123456',
+          otp: data.otp,
         })
         apiClient.setToken()
       }
@@ -280,6 +243,8 @@ export function useSaveProfileMutation() {
       // 4. Submit complete registration transaction to RDS
       if (apiClient.getToken()) {
         await apiClient.profiles.completeRegistration(payload as any)
+        // Unlock dashboard routes in middleware now that a profile exists.
+        await apiClient.auth.syncEnrollment()
       }
 
       return data
@@ -295,54 +260,157 @@ function normalizeManglik(value: string | undefined) {
   return value === "Don't know" ? "Don't Know" : value
 }
 
+const UPDATE_PAYLOAD_KEYS = new Set([
+  "profileFor",
+  "fullName",
+  "gender",
+  "dobDay",
+  "dobMonth",
+  "dobYear",
+  "maritalStatus",
+  "hasChildren",
+  "childrenCount",
+  "childrenLivingWithMe",
+  "heightCm",
+  "aboutMe",
+  "weightKg",
+  "complexion",
+  "disability",
+  "city",
+  "state",
+  "country",
+  "citySlug",
+  "willingToRelocate",
+  "religion",
+  "caste",
+  "communitySlug",
+  "subcaste",
+  "gotra",
+  "motherTongue",
+  "educationLevel",
+  "degree",
+  "collegeName",
+  "employmentStatus",
+  "profession",
+  "companyName",
+  "companySector",
+  "annualIncome",
+  "photoPrivacy",
+  "diet",
+  "smoking",
+  "alcohol",
+  "interests",
+  "familyValues",
+  "familyType",
+  "familyStatus",
+  "fatherOccupation",
+  "motherOccupation",
+  "brothersCount",
+  "sistersCount",
+  "birthTime",
+  "birthPlace",
+  "manglik",
+  "rashi",
+  "nakshatra",
+  "horoscopeS3Key",
+  "horoscopeFileName",
+  "horoscopeFileSizeBytes",
+  "prefAgeMin",
+  "prefAgeMax",
+  "prefHeightMinCm",
+  "prefHeightMaxCm",
+  "prefMaritalStatuses",
+  "prefReligions",
+  "prefCastes",
+  "prefMotherTongues",
+  "prefMinEducation",
+  "prefAcceptableIncomes",
+  "prefLocations",
+])
+
+function blankToUndef(v: unknown) {
+  if (v == null) return undefined
+  if (typeof v === "string" && v.trim() === "") return undefined
+  return v
+}
+
 function buildProfileUpdatePayload(data: Partial<SignupData>) {
   const payload: Record<string, unknown> = {}
-  const skip = new Set([
-    "photos",
-    "photoS3Keys",
-    "photoObjects",
-    "star",
-    "horoscopeName",
-    "horoscopeSize",
-    "height",
-    "education",
-    "otherEducation",
-    "degree",
-    "educationStream",
-    "occupation",
-    "otherOccupation",
-    "companyName",
-    "prefReligion",
-    "manglik",
-  ])
 
   for (const [key, value] of Object.entries(data)) {
-    if (!skip.has(key)) payload[key] = value
+    if (!UPDATE_PAYLOAD_KEYS.has(key)) continue
+    payload[key] = blankToUndef(value)
   }
 
-  if (data.height) payload.heightCm = heightToCm(data.height)
-  if (data.star !== undefined) payload.nakshatra = data.star
-  if (data.horoscopeName !== undefined) payload.horoscopeFileName = data.horoscopeName
-  if (data.horoscopeSize !== undefined) payload.horoscopeFileSizeBytes = data.horoscopeSize
-  if (data.horoscopeS3Key !== undefined) payload.horoscopeS3Key = data.horoscopeS3Key
+  if (data.height) {
+    const heightCm = parseHeightToCm(data.height)
+    if (heightCm) payload.heightCm = heightCm
+  }
+  if (data.weight !== undefined) payload.weightKg = weightToKg(data.weight)
+  if (data.complexion !== undefined) payload.complexion = blankToUndef(data.complexion) ?? null
+  if (data.disability !== undefined) payload.disability = blankToUndef(data.disability) ?? null
+  if (data.subcaste !== undefined) payload.subcaste = blankToUndef(data.subcaste) ?? null
+  if (data.gotra !== undefined) payload.gotra = blankToUndef(data.gotra) ?? null
+  if (
+    data.maritalStatus !== undefined ||
+    data.hasChildren !== undefined ||
+    data.childrenCount !== undefined ||
+    data.childrenLivingWithMe !== undefined
+  ) {
+    const children = resolveChildrenFields({
+      maritalStatus: data.maritalStatus,
+      hasChildren: data.hasChildren,
+      childrenCount: data.childrenCount,
+      childrenLivingWithMe: data.childrenLivingWithMe,
+    })
+    payload.hasChildren = children.hasChildren
+    payload.childrenCount = children.childrenCount
+    payload.childrenLivingWithMe = children.childrenLivingWithMe
+  }
+  // Horoscope: UI `star` → API `nakshatra`; blank → null so PATCH can clear.
+  if (data.birthTime !== undefined) payload.birthTime = blankToUndef(data.birthTime) ?? null
+  if (data.birthPlace !== undefined) payload.birthPlace = blankToUndef(data.birthPlace) ?? null
+  if (data.rashi !== undefined) payload.rashi = blankToUndef(data.rashi) ?? null
+  if (data.star !== undefined) payload.nakshatra = blankToUndef(data.star) ?? null
+  if (data.horoscopeName !== undefined) payload.horoscopeFileName = blankToUndef(data.horoscopeName) ?? null
+  if (data.horoscopeSize !== undefined) payload.horoscopeFileSizeBytes = data.horoscopeSize || null
+  if (data.horoscopeS3Key !== undefined) payload.horoscopeS3Key = blankToUndef(data.horoscopeS3Key) ?? null
   if (data.manglik !== undefined) payload.manglik = normalizeManglik(data.manglik)
-  if (data.educationId !== undefined) payload.educationId = data.educationId
-  if (data.specializationId !== undefined) payload.specializationId = data.specializationId
-  if (!data.educationId && (data.education !== undefined || data.otherEducation !== undefined || data.degree !== undefined)) {
-    payload.degree = data.otherEducation || data.education || data.degree
-  }
-  if (data.educationId && !data.specializationId && data.educationStream?.trim()) {
-    payload.degree = data.education
-      ? `${data.education} · ${data.educationStream.trim()}`
-      : data.educationStream.trim()
-  }
-  if (data.occupationId !== undefined) payload.occupationId = data.occupationId
-  if (data.companyId !== undefined) payload.companyId = data.companyId
-  if (!data.occupationId && (data.occupation !== undefined || data.otherOccupation !== undefined || data.profession !== undefined)) {
-    payload.profession = data.otherOccupation || data.occupation || data.profession
-  }
-  if (!data.companyId && data.companyName !== undefined) payload.companyName = data.companyName
+  // Lifestyle enums: blank → null so PATCH clears them to NULL (nullable columns).
+  if (data.diet !== undefined) payload.diet = blankToUndef(data.diet) ?? null
+  if (data.smoking !== undefined) payload.smoking = blankToUndef(data.smoking) ?? null
+  if (data.alcohol !== undefined) payload.alcohol = blankToUndef(data.alcohol) ?? null
+  // Free-text career fields: blank → null so PATCH can clear them in Postgres.
+  if (data.degree !== undefined) payload.degree = blankToUndef(data.degree) ?? null
+  if (data.collegeName !== undefined) payload.collegeName = blankToUndef(data.collegeName) ?? null
+  if (data.profession !== undefined) payload.profession = blankToUndef(data.profession) ?? null
+  if (data.companyName !== undefined) payload.companyName = blankToUndef(data.companyName) ?? null
+  if (data.annualIncome !== undefined) payload.annualIncome = blankToUndef(data.annualIncome) ?? null
+  // Enum career fields: blank → null so "Others" / cleared selects actually clear the DB.
+  if (data.educationLevel !== undefined) payload.educationLevel = blankToUndef(data.educationLevel) ?? null
+  if (data.employmentStatus !== undefined) payload.employmentStatus = blankToUndef(data.employmentStatus) ?? null
+  if (data.companySector !== undefined) payload.companySector = blankToUndef(data.companySector) ?? null
+  // Family fields: blank enum/text → null so PATCH can clear them.
+  if (data.familyStatus !== undefined) payload.familyStatus = blankToUndef(data.familyStatus) ?? null
+  if (data.familyValues !== undefined) payload.familyValues = blankToUndef(data.familyValues) ?? null
+  if (data.familyType !== undefined) payload.familyType = blankToUndef(data.familyType) ?? null
+  if (data.fatherOccupation !== undefined) payload.fatherOccupation = blankToUndef(data.fatherOccupation) ?? null
+  if (data.motherOccupation !== undefined) payload.motherOccupation = blankToUndef(data.motherOccupation) ?? null
   if (data.prefReligion !== undefined) payload.prefReligions = data.prefReligion
+  if (data.prefAgeMin !== undefined) payload.prefAgeMin = data.prefAgeMin
+  if (data.prefAgeMax !== undefined) payload.prefAgeMax = data.prefAgeMax
+  if (data.prefHeightMinCm !== undefined) payload.prefHeightMinCm = data.prefHeightMinCm
+  if (data.prefHeightMaxCm !== undefined) payload.prefHeightMaxCm = data.prefHeightMaxCm
+  if (data.prefCastes !== undefined) payload.prefCastes = data.prefCastes
+  if (data.prefMotherTongues !== undefined) payload.prefMotherTongues = data.prefMotherTongues
+  if (data.prefMinEducation !== undefined) payload.prefMinEducation = blankToUndef(data.prefMinEducation)
+  if (data.prefAcceptableIncomes !== undefined) payload.prefAcceptableIncomes = data.prefAcceptableIncomes
+  if (data.prefLocations !== undefined) payload.prefLocations = data.prefLocations
+
+  // Drop keys that became undefined after blank normalization (except explicit null FKs).
+  for (const key of Object.keys(payload)) {
+    if (payload[key] === undefined) delete payload[key]
+  }
 
   return payload
 }
@@ -359,44 +427,32 @@ function mapFullProfileToSignupData(
     dobYear: fullProfile.profile.dob.split("-")[0],
     dobMonth: fullProfile.profile.dob.split("-")[1],
     dobDay: fullProfile.profile.dob.split("-")[2],
-    height: fullProfile.profile.heightCm ? formatHeightFromCm(fullProfile.profile.heightCm) : "",
-    weight: fullProfile.profile.weight ?? "",
+    height: formatHeightFromCm(fullProfile.profile.heightCm),
+    weight: formatWeightFromKg(fullProfile.profile.weightKg),
     complexion: fullProfile.profile.complexion ?? "",
     disability: fullProfile.profile.disability ?? "",
     maritalStatus: fullProfile.profile.maritalStatus,
     hasChildren: fullProfile.profile.hasChildren ?? false,
     childrenCount: fullProfile.profile.childrenCount ?? 0,
-    childrenLivingWithMe: fullProfile.profile.childrenLivingWithMe ?? false,
+    childrenLivingWithMe: fullProfile.profile.childrenLivingWithMe ?? null,
     religion: fullProfile.profile.religion,
     caste: fullProfile.profile.caste,
+    communitySlug: fullProfile.profile.communitySlug ?? "",
     subcaste: fullProfile.profile.subcaste ?? "",
     gotra: fullProfile.profile.gotra ?? "",
     motherTongue: fullProfile.profile.motherTongue,
-    educationId: fullProfile.profile.educationId ?? null,
-    specializationId: fullProfile.profile.specializationId ?? null,
     educationLevel: fullProfile.profile.educationLevel ?? "",
-    education: fullProfile.profile.degree?.split(" · ")[0] || fullProfile.profile.degree || "",
     degree: fullProfile.profile.degree ?? "",
-    educationStream:
-      fullProfile.profile.specializationName ??
-      (fullProfile.profile.degree?.includes(" · ")
-        ? fullProfile.profile.degree.split(" · ").slice(1).join(" · ")
-        : ""),
-    otherEducation: fullProfile.profile.educationId
-      ? ""
-      : fullProfile.profile.degree || "",
     collegeName: fullProfile.profile.collegeName ?? "",
     employmentStatus: fullProfile.profile.employmentStatus ?? "",
-    occupationId: fullProfile.profile.occupationId ?? null,
-    occupation: fullProfile.profile.profession || "",
     profession: fullProfile.profile.profession ?? "",
-    companyId: fullProfile.profile.companyId ?? null,
     companyName: fullProfile.profile.companyName ?? "",
-    companySector: fullProfile.profile.companySector ?? "Private",
+    companySector: fullProfile.profile.companySector ?? "",
     annualIncome: fullProfile.profile.annualIncome ?? "",
     photoPrivacy: fullProfile.profile.photoPrivacy,
     city: fullProfile.profile.city,
     state: fullProfile.profile.state,
+    citySlug: fullProfile.profile.citySlug ?? "",
     willingToRelocate: fullProfile.profile.willingToRelocate ?? "",
     aboutMe: fullProfile.profile.aboutMe ?? "",
     familyValues: fullProfile.family?.familyValues ?? "",
@@ -406,9 +462,14 @@ function mapFullProfileToSignupData(
     motherOccupation: fullProfile.family?.motherOccupation ?? "",
     brothersCount: fullProfile.family?.brothersCount ?? 0,
     sistersCount: fullProfile.family?.sistersCount ?? 0,
+    siblings: formatSiblings(
+      fullProfile.family?.brothersCount ?? 0,
+      fullProfile.family?.sistersCount ?? 0,
+    ),
     diet: fullProfile.lifestyle?.diet ?? "",
     smoking: fullProfile.lifestyle?.smoking ?? "",
     alcohol: fullProfile.lifestyle?.alcohol ?? "",
+    interests: fullProfile.lifestyle?.interests ?? [],
     birthTime: fullProfile.horoscope?.birthTime ?? "",
     birthPlace: fullProfile.horoscope?.birthPlace ?? "",
     manglik: fullProfile.horoscope?.manglik ?? "Don't Know",
@@ -417,6 +478,17 @@ function mapFullProfileToSignupData(
     horoscopeName: fullProfile.horoscope?.horoscopeFileName ?? "",
     horoscopeS3Key: fullProfile.horoscope?.horoscopeS3Key ?? "",
     horoscopeSize: fullProfile.horoscope?.horoscopeFileSizeBytes ?? 0,
+    prefAgeMin: fullProfile.preferences?.prefAgeMin ?? base.prefAgeMin,
+    prefAgeMax: fullProfile.preferences?.prefAgeMax ?? base.prefAgeMax,
+    prefHeightMinCm: fullProfile.preferences?.prefHeightMinCm ?? base.prefHeightMinCm,
+    prefHeightMaxCm: fullProfile.preferences?.prefHeightMaxCm ?? base.prefHeightMaxCm,
+    prefReligion: fullProfile.preferences?.prefReligions ?? base.prefReligion,
+    prefMaritalStatuses: (fullProfile.preferences as any)?.prefMaritalStatuses ?? base.prefMaritalStatuses,
+    prefCastes: fullProfile.preferences?.prefCastes ?? base.prefCastes,
+    prefMotherTongues: fullProfile.preferences?.prefMotherTongues ?? base.prefMotherTongues,
+    prefMinEducation: fullProfile.preferences?.prefMinEducation ?? base.prefMinEducation,
+    prefAcceptableIncomes: fullProfile.preferences?.prefAcceptableIncomes ?? base.prefAcceptableIncomes,
+    prefLocations: fullProfile.preferences?.prefLocations ?? base.prefLocations,
     photos: fullProfile.photos
       .map((p: { url?: string; s3Key?: string }) => p.url || p.s3Key)
       .filter((url): url is string => Boolean(url)),
@@ -1033,11 +1105,17 @@ export function usePayExtraContactUnlockMutation() {
   return useMutation({
     mutationFn: async (targetProfileId: string) => {
       const order = await apiClient.contacts.createPaidOrder(targetProfileId)
+      const { openRazorpayCheckout } = await import("@/lib/razorpay")
+      const paid = await openRazorpayCheckout({
+        keyId: order.keyId,
+        orderId: order.orderId,
+        amount: order.amount,
+        currency: order.currency,
+        description: "Extra contact unlock",
+      })
       const verified = await apiClient.contacts.verifyPaidUnlock({
         targetProfileId,
-        razorpayOrderId: order.orderId,
-        razorpayPaymentId: `pay_${Date.now()}`,
-        razorpaySignature: "demo_signature",
+        ...paid,
       })
       return { success: verified.success, contactPhone: verified.contactPhone ?? null }
     },

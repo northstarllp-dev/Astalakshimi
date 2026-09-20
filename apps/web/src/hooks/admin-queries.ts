@@ -60,9 +60,11 @@ export function useAdminLoginMutation() {
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
       const res = await apiClient.auth.adminLogin({ email, password })
       const session = {
+        staffId: res.user.id,
         role: res.user.role === 'admin' ? 'admin' : 'staff',
         email: (res.user as any).email || email,
-        name: res.user.phone || 'Admin User',
+        name: (res.user as any).email || res.user.phone || 'Admin User',
+        loggedInAt: new Date().toISOString(),
       } as AdminSession
       return session
     },
@@ -226,7 +228,7 @@ export function useApproveProfileMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ profileId, staff }: { profileId: string; staff: AdminSession }) => {
-      await tryAdminApi(() => apiClient.admin.updateVerificationStatus(profileId, 'verified'))
+      await apiClient.admin.updateVerificationStatus(profileId, 'verified')
       return approveProfile(profileId, staff)
     },
     onSuccess: () => invalidateAdmin(queryClient),
@@ -245,7 +247,7 @@ export function useRejectProfileMutation() {
       staff: AdminSession
       rejectionReason: string
     }) => {
-      await tryAdminApi(() => apiClient.admin.updateVerificationStatus(profileId, 'rejected', rejectionReason))
+      await apiClient.admin.updateVerificationStatus(profileId, 'rejected', rejectionReason)
       return rejectProfile(profileId, staff, rejectionReason)
     },
     onSuccess: () => invalidateAdmin(queryClient),

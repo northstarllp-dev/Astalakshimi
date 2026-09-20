@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Patch, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { ProfilesService } from './profiles.service';
-import { JwtAuthGuard, OptionalJwtAuthGuard } from '../common/guards/auth.guard';
-import { Public } from '../common/decorators/public.decorator';
+import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { AllowIncomplete } from '../common/decorators/allow-incomplete.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
@@ -28,6 +28,7 @@ const partialProfileSchema = updateProfileSchema;
 export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
 
+  @AllowIncomplete()
   @Post('complete-registration')
   async completeRegistration(
     @CurrentUser() user: UserSession,
@@ -36,6 +37,7 @@ export class ProfilesController {
     return this.profilesService.completeRegistration(user.userId, payload);
   }
 
+  @AllowIncomplete()
   @Get('me')
   async getMyProfile(@CurrentUser() user: UserSession) {
     return this.profilesService.getMyProfile(user.userId);
@@ -113,14 +115,12 @@ export class ProfilesController {
     return this.profilesService.reorderPhotos(user.userId, payload.photoIds);
   }
 
-  @Public()
-  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   async getProfileById(
     @Param('id', UuidValidationPipe) id: string,
-    @CurrentUser() user: UserSession | null,
+    @CurrentUser() user: UserSession,
   ) {
-    return this.profilesService.getProfileById(id, user?.userId);
+    return this.profilesService.getProfileById(id, user.userId);
   }
 
   @Post(':id/visit')

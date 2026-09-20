@@ -1,0 +1,50 @@
+[
+  {
+    "slug": "hindu",
+    "label": "Hindu"
+  },
+  {
+    "slug": "muslim",
+    "label": "Muslim"
+  },
+  {
+    "slug": "christian",
+    "label": "Christian"
+  },
+  {
+    "slug": "sikh",
+    "label": "Sikh"
+  },
+  {
+    "slug": "jain",
+    "label": "Jain"
+  },
+  {
+    "slug": "buddhist",
+    "label": "Buddhist"
+  },
+  {
+    "slug": "parsi",
+    "label": "Parsi"
+  },
+  {
+    "slug": "jewish",
+    "label": "Jewish"
+  },
+  {
+    "slug": "spiritual",
+    "label": "Spiritual"
+  },
+  {
+    "slug": "no-religion",
+    "label": "No Religion"
+  },
+  {
+    "slug": "inter-religion",
+    "label": "Inter-Religion"
+  },
+  {
+    "slug": "other",
+    "label": "Other"
+  }
+]

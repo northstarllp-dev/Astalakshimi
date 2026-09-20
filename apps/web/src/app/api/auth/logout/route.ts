@@ -22,5 +22,6 @@ export async function POST() {
   const response = NextResponse.json({ success: true });
   response.cookies.delete('astalakshimi.auth_token');
   response.cookies.delete('astalakshimi.refresh_token');
+  response.cookies.delete('astalakshimi.has_profile');
   return response;
 }

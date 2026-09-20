@@ -12,6 +12,9 @@ export class JwtAuthGuard extends PassportAuthGuard('jwt') {
   }
 
   canActivate(context: ExecutionContext) {
+    // Websocket connections do their own handshake auth (see ChatGateway);
+    // passport-jwt only understands HTTP requests.
+    if (context.getType() !== 'http') return true;
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),

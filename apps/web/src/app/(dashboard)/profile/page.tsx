@@ -7,9 +7,10 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { displayHeight } from "@/lib/input-units"
+import { maritalAsksChildren } from "@/lib/identity-fields"
 import { getMediaUrl } from "@/lib/utils"
 import { useProfileQuery } from "@/hooks/queries"
-import { emptySignupData, VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
+import { emptySignupData, VERIFICATION_SLA_HOURS, formatSiblings } from "@/lib/profile-store"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
 import { getProfileCompletenessStats, getRequiredFieldEditHash } from "@/lib/portal-access"
 import { apiClient } from "@/lib/api-client"
@@ -328,9 +329,34 @@ export default function MyProfilePage() {
                     <GridItem label="Gender" value={data.gender} />
                     <GridItem label="Marital status" value={data.maritalStatus} />
                     <GridItem label="Height" value={displayHeight(data.height)} />
+                    <GridItem label="Weight" value={data.weight} />
                     <GridItem label="Complexion" value={data.complexion} />
                     <GridItem label="Diet" value={data.diet} />
+                    <GridItem label="Smoking" value={data.smoking} />
+                    <GridItem label="Drinking" value={data.alcohol} />
+                    <GridItem label="Interests" value={(data.interests || []).join(", ")} />
                     <GridItem label="Profile for" value={data.profileFor} />
+                    {maritalAsksChildren(data.maritalStatus) && (
+                      <>
+                        <GridItem label="Has children" value={data.hasChildren ? "Yes" : "No"} />
+                        {data.hasChildren && (
+                          <>
+                            <GridItem label="Children" value={String(data.childrenCount || 0)} />
+                            <GridItem
+                              label="Children live with"
+                              value={
+                                data.childrenLivingWithMe === true
+                                  ? "Yes"
+                                  : data.childrenLivingWithMe === false
+                                    ? "No"
+                                    : "Not specified"
+                              }
+                            />
+                          </>
+                        )}
+                      </>
+                    )}
+                    {data.disability ? <GridItem label="Disability" value={data.disability} /> : null}
                     <GridItem label="Phone" value={data.phone ? `+91 ${data.phone}` : ""} />
                   </dl>
                 </div>
@@ -350,13 +376,19 @@ export default function MyProfilePage() {
                     <GridItem
                       label="Education"
                       value={
-                        [data.education, data.educationStream].filter(Boolean).join(" · ") ||
-                        data.otherEducation ||
+                        [data.educationLevel, data.degree].filter(Boolean).join(" · ") ||
                         ""
                       }
                     />
-                    <GridItem label="Occupation" value={data.otherOccupation || data.occupation} />
-                    <GridItem label="Company" value={data.companyName} />
+                    <GridItem label="College" value={data.collegeName} />
+                    <GridItem
+                      label="Occupation"
+                      value={[data.employmentStatus, data.profession].filter(Boolean).join(" · ")}
+                    />
+                    <GridItem
+                      label="Company"
+                      value={[data.companyName, data.companySector].filter(Boolean).join(" · ")}
+                    />
                     <GridItem label="Income" value={data.annualIncome} />
                   </dl>
                 </div>
@@ -375,7 +407,8 @@ export default function MyProfilePage() {
                   <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <GridItem label="Religion" value={data.religion} />
                     <GridItem label="Caste" value={data.caste} />
-                    <GridItem label="Subcaste / Gotra" value={data.subcaste || data.gotra} />
+                    {data.subcaste?.trim() ? <GridItem label="Subcaste" value={data.subcaste.trim()} /> : null}
+                    {data.gotra?.trim() ? <GridItem label="Gotra" value={data.gotra.trim()} /> : null}
                     <GridItem label="Mother Tongue" value={data.motherTongue} />
                   </dl>
                 </div>
@@ -407,9 +440,13 @@ export default function MyProfilePage() {
                   <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <GridItem label="Family Type" value={data.familyType} />
                     <GridItem label="Family Status" value={data.familyStatus} />
+                    <GridItem label="Family Values" value={data.familyValues ?? ""} />
                     <GridItem label="Father's Occupation" value={data.fatherOccupation} />
                     <GridItem label="Mother's Occupation" value={data.motherOccupation} />
-                    <GridItem label="Siblings" value={data.siblings} />
+                    <GridItem
+                      label="Siblings"
+                      value={formatSiblings(data.brothersCount, data.sistersCount)}
+                    />
                   </dl>
                 </div>
               </div>

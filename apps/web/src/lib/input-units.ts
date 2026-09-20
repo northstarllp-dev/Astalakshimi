@@ -72,6 +72,28 @@ export function maskWeightInput(raw: string): string {
 
 export const DEFAULT_HEIGHT_CM = 165
 
+/** Parse a height string into cm, or null if empty/unparseable. */
+export function parseHeightToCm(raw: string | undefined | null): number | null {
+  const text = String(raw ?? "").trim()
+  if (!text) return null
+
+  if (/^\d{2,3}$/.test(text)) {
+    const n = parseInt(text, 10)
+    return Number.isFinite(n) && n >= 120 && n <= 230 ? n : null
+  }
+
+  const match = text.match(/^(\d{1,2})[''′]?\s*(\d{1,2})"?\s*$/)
+  if (match) {
+    const feet = parseInt(match[1], 10)
+    const inches = parseInt(match[2], 10)
+    if (!Number.isFinite(feet) || !Number.isFinite(inches) || inches > 11) return null
+    const cm = Math.round(feet * 30.48 + inches * 2.54)
+    return cm >= 120 && cm <= 230 ? cm : null
+  }
+
+  return null
+}
+
 /** Format stored cm as feet and inches, e.g. 180 → 5'11" */
 export function formatHeightFromCm(cm: number): string {
   const totalInches = Math.round(cm / 2.54)
@@ -89,28 +111,23 @@ export function displayHeight(raw: string | undefined | null): string {
 }
 
 export function heightToCm(raw: string): number {
-  const text = raw.trim()
-  if (!text) return DEFAULT_HEIGHT_CM
+  return parseHeightToCm(raw) ?? DEFAULT_HEIGHT_CM
+}
 
-  if (/^\d{2,3}$/.test(text)) return parseInt(text, 10)
+/** Parse weight display strings like "65 kg" / "140 lbs" into whole kilograms. */
+export function weightToKg(raw: string | undefined | null): number | null {
+  const { amount, unit } = parseWeight(String(raw ?? ""))
+  if (!amount) return null
+  const n = Number(amount)
+  if (!Number.isFinite(n) || n <= 0) return null
+  const kg = unit === "lbs" ? Math.round(n / LBS_PER_KG) : Math.round(n)
+  if (kg < 30 || kg > 200) return null
+  return kg
+}
 
-  const match = text.match(/^(\d{1,2})[''′]?\s*(\d{1,2})"?\s*$/)
-  if (match) {
-    const feet = parseInt(match[1], 10)
-    const inches = parseInt(match[2], 10)
-    if (Number.isFinite(feet) && Number.isFinite(inches)) {
-      return Math.round(feet * 30.48 + inches * 2.54)
-    }
-  }
-
-  const digits = text.replace(/\D/g, "").slice(0, 3)
-  if (digits.length >= 2) {
-    const feet = parseInt(digits[0], 10)
-    const inches = Math.min(11, parseInt(digits.slice(1), 10) || 0)
-    return Math.round(feet * 30.48 + inches * 2.54)
-  }
-
-  return DEFAULT_HEIGHT_CM
+export function formatWeightFromKg(kg: number | null | undefined): string {
+  if (kg == null || !Number.isFinite(kg) || kg <= 0) return ""
+  return formatWeight(String(kg), "kg")
 }
 
 /** Mask typed digits into feet'inches" as the user types (e.g. 511 → 5'11"). */

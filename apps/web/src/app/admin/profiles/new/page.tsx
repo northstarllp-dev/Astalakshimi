@@ -166,7 +166,7 @@ export default function AdminCreateProfilePage() {
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Profile for" error={form.formState.errors.profileFor?.message}>
-            <Select value={form.watch("profileFor")} onValueChange={(v) => form.setValue("profileFor", v)}>
+            <Select value={form.watch("profileFor")} onValueChange={(v) => form.setValue("profileFor", v as AdminCreateProfileValues["profileFor"])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {["Myself", "Son", "Daughter", "Brother", "Sister", "Relative", "Friend"].map((v) => (
@@ -182,7 +182,7 @@ export default function AdminCreateProfilePage() {
             <Input {...form.register("fullName")} />
           </Field>
           <Field label="Gender" error={form.formState.errors.gender?.message}>
-            <Select value={form.watch("gender")} onValueChange={(v) => form.setValue("gender", v)}>
+            <Select value={form.watch("gender")} onValueChange={(v) => form.setValue("gender", v as AdminCreateProfileValues["gender"])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Female">Female</SelectItem>
@@ -198,7 +198,7 @@ export default function AdminCreateProfilePage() {
             </div>
           </Field>
           <Field label="Marital status">
-            <Select value={form.watch("maritalStatus")} onValueChange={(v) => form.setValue("maritalStatus", v)}>
+            <Select value={form.watch("maritalStatus")} onValueChange={(v) => form.setValue("maritalStatus", v as AdminCreateProfileValues["maritalStatus"])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {MARITAL_STATUSES.map((v) => (

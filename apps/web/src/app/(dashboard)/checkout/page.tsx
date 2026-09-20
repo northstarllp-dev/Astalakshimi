@@ -5,29 +5,11 @@ import { Button } from "@/components/ui/button"
 import * as React from "react"
 import Link from "next/link"
 import { getPlanById, type PlanId } from "@/lib/plans"
-import {
-  ArrowLeft,
-  CheckCircle2,
-  CreditCard,
-  Landmark,
-  Lock,
-  Smartphone,
-  Wallet,
-} from "lucide-react"
-import { checkoutSchema } from "@/lib/validation"
+import { ArrowLeft, CheckCircle2, Lock } from "lucide-react"
 import { queryKeys } from "@/hooks/queries"
 import { useQueryClient } from "@tanstack/react-query"
-import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
-
-type PayMethod = "upi" | "card" | "netbanking" | "wallet"
-
-const PAY_METHODS: { id: PayMethod; label: string; hint: string; icon: typeof Smartphone }[] = [
-  { id: "upi", label: "UPI", hint: "GPay, PhonePe, Paytm", icon: Smartphone },
-  { id: "card", label: "Card", hint: "Visa, Mastercard, RuPay", icon: CreditCard },
-  { id: "netbanking", label: "Netbanking", hint: "All major banks", icon: Landmark },
-  { id: "wallet", label: "Wallets", hint: "Paytm, Amazon Pay", icon: Wallet },
-]
+import { openRazorpayCheckout } from "@/lib/razorpay"
 
 function CheckoutInner() {
   const router = useRouter()
@@ -36,13 +18,9 @@ function CheckoutInner() {
   const isRenew = params.get("renew") === "1"
   const plan = getPlanById(planId)
   const queryClient = useQueryClient()
-  const [method, setMethod] = React.useState<PayMethod>("upi")
-  const [upiId, setUpiId] = React.useState("")
   const [paying, setPaying] = React.useState(false)
   const [done, setDone] = React.useState(false)
-  const [skipped, setSkipped] = React.useState(false)
   const [error, setError] = React.useState("")
-  const isDemoCheckout = process.env.NODE_ENV !== "production"
 
   if (!plan) {
     return (
@@ -61,27 +39,17 @@ function CheckoutInner() {
       : { label: plan.price, paise: plan.priceInPaise }
   const unlocks = plan.unlocks || []
 
-  const finishCheckout = async (asSkip = false) => {
+  const finishCheckout = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.subscription })
     await queryClient.invalidateQueries({ queryKey: queryKeys.invoices })
     await queryClient.invalidateQueries({ queryKey: queryKeys.paid })
     await queryClient.invalidateQueries({ queryKey: queryKeys.contactUsage })
     setPaying(false)
-    setSkipped(asSkip)
     setDone(true)
     window.setTimeout(() => router.push("/plans"), 1400)
   }
 
   const confirm = async () => {
-    const parsed = checkoutSchema.safeParse({
-      method,
-      upiId,
-      paidPlan: plan.priceInPaise > 0,
-    })
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check the payment details.")
-      return
-    }
     setError("")
     setPaying(true)
 
@@ -93,31 +61,24 @@ function CheckoutInner() {
         return
       }
 
-      if (order.orderId) {
-        await apiClient.payments.verifyPayment({
-          razorpayOrderId: order.orderId,
-          razorpayPaymentId: `pay_${Date.now()}`,
-          razorpaySignature: "demo_signature",
-        })
+      if (!order.orderId || !order.keyId) {
+        throw new Error("Could not start Razorpay checkout. Check RAZORPAY_KEY_ID on the API.")
       }
 
+      const paid = await openRazorpayCheckout({
+        keyId: order.keyId,
+        orderId: order.orderId,
+        amount: order.amount ?? plan.priceInPaise,
+        currency: order.currency || "INR",
+        name: "Ashtalakshmi",
+        description: `${plan.name} plan`,
+      })
+
+      await apiClient.payments.verifyPayment(paid)
       await finishCheckout()
     } catch (err: any) {
       console.error("Payment error:", err)
       setError(err?.message || "Payment processing failed. Please try again.")
-      setPaying(false)
-    }
-  }
-
-  const skipPayment = async () => {
-    setError("")
-    setPaying(true)
-    try {
-      await apiClient.payments.activateDemoPlan(plan.id)
-      await finishCheckout(true)
-    } catch (err: any) {
-      console.error("Demo skip error:", err)
-      setError(err?.message || "Could not activate the plan. Try again.")
       setPaying(false)
     }
   }
@@ -134,7 +95,7 @@ function CheckoutInner() {
         </Link>
         <div>
           <h1 className="font-serif text-2xl font-bold">{isRenew ? "Renew plan" : "Upgrade checkout"}</h1>
-          <p className="text-xs text-muted-foreground">Secured by Razorpay (demo flow)</p>
+          <p className="text-xs text-muted-foreground">Secured by Razorpay</p>
         </div>
       </div>
 
@@ -146,26 +107,12 @@ function CheckoutInner() {
             <p className="mt-1 text-sm text-muted-foreground">{plan.tagline}</p>
             <p className="mt-4 font-serif text-4xl font-bold text-primary">{priced.label}</p>
             <p className="text-xs text-muted-foreground">/ {plan.period}</p>
-
-            {plan.priceInPaise > 0 && plan.id === "silver" && (
-              <p className="mt-4 text-xs text-muted-foreground">
-                Extra contacts are ₹29 each after your included unlocks.
-              </p>
-            )}
-            {plan.id === "free" && (
-              <p className="mt-4 text-xs text-muted-foreground">
-                3 contact unlocks this month. Extra contacts are ₹29 each.
-              </p>
-            )}
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
             <p className="text-xs font-semibold tracking-[0.18em] text-gold uppercase">You&apos;ll unlock</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {unlocks.join(" · ")}.
-            </p>
             <ul className="mt-4 space-y-2">
-              {unlocks.map((item: any) => (
+              {unlocks.map((item: string) => (
                 <li key={item} className="flex items-center gap-2 text-sm">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Lock className="h-3.5 w-3.5" />
@@ -181,65 +128,17 @@ function CheckoutInner() {
           {done ? (
             <div className="py-8 text-center text-emerald-900">
               <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
-              <p className="mt-3 font-serif text-2xl font-bold">
-                {skipped ? "Plan activated" : "Payment successful"}
-              </p>
+              <p className="mt-3 font-serif text-2xl font-bold">Payment successful</p>
               <p className="mt-1 text-sm text-emerald-800/80">
-                {skipped
-                  ? `${plan.name} is active (demo skip). Returning to plans…`
-                  : `${plan.name} is active. Invoice saved. Returning to plans…`}
+                {plan.name} is active. Returning to plans…
               </p>
             </div>
           ) : (
             <>
               <h3 className="font-semibold">Pay with Razorpay</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                UPI, cards, netbanking, and wallets  demo checkout only.
+                UPI, cards, netbanking, and wallets open in the Razorpay checkout.
               </p>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {PAY_METHODS.map((m: any) => {
-                  const Icon = m.icon
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setMethod(m.id)}
-                      className={cn(
-                        "rounded-2xl border px-3 py-3 text-left transition-colors",
-                        method === m.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/40"
-                      )}
-                    >
-                      <Icon className="h-4 w-4 text-primary" />
-                      <p className="mt-2 text-sm font-semibold">{m.label}</p>
-                      <p className="text-[11px] text-muted-foreground">{m.hint}</p>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {method === "upi" && plan.priceInPaise > 0 && (
-                <div className="mt-4 space-y-1.5">
-                  <label htmlFor="upi" className="text-xs font-semibold">
-                    UPI ID
-                  </label>
-                  <input
-                    id="upi"
-                    value={upiId}
-                    onChange={(e) => setUpiId(e.target.value)}
-                    placeholder="name@oksbi"
-                    className="flex h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </div>
-              )}
-
-              {method === "card" && (
-                <div className="mt-4 space-y-2 rounded-xl border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-                  Card fields appear in the live Razorpay modal. This demo skips collecting card data.
-                </div>
-              )}
 
               {error && (
                 <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -254,21 +153,8 @@ function CheckoutInner() {
                     ? "Activate free plan"
                     : `Pay ${priced.label}`}
               </Button>
-              {isDemoCheckout && plan.priceInPaise > 0 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="mt-2 w-full"
-                  disabled={paying}
-                  onClick={skipPayment}
-                >
-                  Skip payment (demo)
-                </Button>
-              )}
               <p className="mt-3 text-center text-[11px] text-muted-foreground">
-                {isDemoCheckout
-                  ? "Demo checkout. Skip payment to activate this plan without Razorpay."
-                  : "One-tap upgrade. Live Razorpay keys plug in later  this saves plan + invoice on this device."}
+                Payments are processed by Razorpay. You will be redirected back after a successful payment.
               </p>
             </>
           )}
@@ -280,9 +166,7 @@ function CheckoutInner() {
 
 export default function CheckoutPage() {
   return (
-    <React.Suspense
-      fallback={<main className="px-4 py-10 text-center text-sm text-muted-foreground">Loading checkout…</main>}
-    >
+    <React.Suspense fallback={<main className="p-8 text-center text-sm text-muted-foreground">Loading checkout…</main>}>
       <CheckoutInner />
     </React.Suspense>
   )

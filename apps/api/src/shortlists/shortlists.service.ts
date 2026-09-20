@@ -4,6 +4,8 @@ import type { Database } from '@astalakshimi/database';
 import { shortlists, profiles, userSettings, interests, verifications } from '@astalakshimi/database';
 import { eq, and, or, desc, inArray } from 'drizzle-orm';
 import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
+import { loadViewerContext } from '../matches/viewer-context';
+import { scoreCandidate } from '../matches/match-scoring';
 
 @Injectable()
 export class ShortlistsService {
@@ -25,6 +27,9 @@ export class ShortlistsService {
 
   async getShortlists(userId: string) {
     const profileId = await this.getProfileId(userId);
+
+    // Viewer prefs power real compatibility scores for the shortlisted rows.
+    const viewer = await loadViewerContext(this.db, userId);
 
     const userShortlists = await this.db
       .select({
@@ -99,6 +104,7 @@ export class ShortlistsService {
       });
       const visibleKey = withholdKey ? null : (primaryPhoto?.s3Key ?? null);
       const isVerified = verificationByProfile.get(p.id) === 'verified';
+      const score = viewer ? scoreCandidate(p as any, viewer.prefs) : null;
 
       return {
         id: p.id,
@@ -121,7 +127,8 @@ export class ShortlistsService {
         motherTongue: p.motherTongue || 'Tamil',
         photos: visibleKey ? [visibleKey] : [],
         photo: visibleKey,
-        matchPercent: 92,
+        matchPercent: score?.percent ?? null,
+        matchReasons: score?.reasons ?? [],
         photoVerified: isVerified,
         isVerified,
         blurPhoto,

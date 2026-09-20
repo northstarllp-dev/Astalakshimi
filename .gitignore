@@ -10,6 +10,10 @@ node_modules
 
 # Testing
 coverage
+test-results/
+playwright-report/
+.playwright-mcp/
+.VSCodeCounter/
 
 # Next.js
 .next/
@@ -46,3 +50,6 @@ yarn-error.log*
 
 # OS
 Thumbs.db
+
+# Catalog import caches (GeoNames dumps)
+packages/reference/.cache/

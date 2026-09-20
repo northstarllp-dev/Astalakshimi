@@ -9,13 +9,13 @@ import { emptySignupData, type SignupData } from "@/lib/profile-store"
  *   Optional details (employer, specialization, family, horoscope PDF, …) do not block Discover.
  * - Frontend never talks to Postgres; this is computed from SignupData (session cache / API profile).
  *
- * Defaults from `emptySignupData()` (height 5'5", diet Vegetarian, etc.) do not count
+ * Defaults from `emptySignupData()` (diet Vegetarian, etc.) do not count
  * until the member actually sets them, except signup fields after submit.
  */
 
 const EMPTY = emptySignupData()
 
-export const PROFILE_DETAIL_TOTAL = 40
+export const PROFILE_DETAIL_TOTAL = 44
 
 export type ProfileDetailGroup =
   | "basics"
@@ -63,7 +63,7 @@ function filledSignupSelect(value: string | undefined | null, emptyDefault: stri
 }
 
 export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
-  // Signup (~25%): 10 fields
+  // Signup (~11 of 40 after height moved into register)
   { id: "profileFor", label: "Profile for", group: "basics", signup: true, required: true, filled: (d) => filledTyped(d.profileFor) },
   { id: "fullName", label: "Full name", group: "basics", signup: true, required: true, filled: (d) => filledTyped(d.fullName) },
   { id: "gender", label: "Gender", group: "basics", signup: true, required: true, filled: (d) => filledTyped(d.gender) },
@@ -84,6 +84,14 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     filled: (d) => filledSignupSelect(d.maritalStatus, EMPTY.maritalStatus, d),
   },
   { id: "city", label: "City", group: "basics", signup: true, required: true, filled: (d) => filledTyped(d.city) },
+  {
+    id: "height",
+    label: "Height",
+    group: "basics",
+    signup: true,
+    required: true,
+    filled: (d) => filledTyped(d.height),
+  },
   {
     id: "religion",
     label: "Religion",
@@ -112,10 +120,12 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
 
   // Post-signup (remaining 30)
   { id: "state", label: "State", group: "basics", signup: false, filled: (d) => filledCustom(d.state, EMPTY.state) },
-  { id: "height", label: "Height", group: "lifestyle", signup: false, filled: (d) => filledCustom(d.height, EMPTY.height) },
   { id: "weight", label: "Weight", group: "lifestyle", signup: false, filled: (d) => filledTyped(d.weight) },
   { id: "complexion", label: "Complexion", group: "lifestyle", signup: false, filled: (d) => filledTyped(d.complexion) },
-  { id: "diet", label: "Diet", group: "lifestyle", signup: false, filled: (d) => filledCustom(d.diet, EMPTY.diet) },
+  { id: "diet", label: "Diet", group: "lifestyle", signup: true, required: true, filled: (d) => filledCustom(d.diet, EMPTY.diet) },
+  { id: "smoking", label: "Smoking", group: "lifestyle", signup: false, filled: (d) => filledCustom(d.smoking, EMPTY.smoking) },
+  { id: "alcohol", label: "Drinking", group: "lifestyle", signup: false, filled: (d) => filledCustom(d.alcohol, EMPTY.alcohol) },
+  { id: "interests", label: "Interests", group: "lifestyle", signup: false, filled: (d) => (d.interests?.length ?? 0) > 0 },
   {
     id: "aboutMe",
     label: "About me",
@@ -150,7 +160,7 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     group: "career",
     signup: false,
     required: true,
-    filled: (d) => Boolean(d.educationId) || filledTyped(d.education) || filledTyped(d.degree) || filledTyped(d.otherEducation),
+    filled: (d) => filledTyped(d.educationLevel) || filledTyped(d.degree),
   },
   { id: "collegeName", label: "College", group: "career", signup: false, filled: (d) => filledTyped(d.collegeName) },
   {
@@ -159,9 +169,16 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     group: "career",
     signup: false,
     required: true,
-    filled: (d) => Boolean(d.occupationId) || filledTyped(d.occupation) || filledTyped(d.profession) || filledTyped(d.otherOccupation),
+    filled: (d) => filledTyped(d.employmentStatus) || filledTyped(d.profession),
   },
-  { id: "companyName", label: "Company", group: "career", signup: false, filled: (d) => Boolean(d.companyId) || filledTyped(d.companyName) },
+  { id: "companyName", label: "Company", group: "career", signup: false, filled: (d) => filledTyped(d.companyName) },
+  {
+    id: "companySector",
+    label: "Company sector",
+    group: "career",
+    signup: false,
+    filled: (d) => filledTyped(d.companySector),
+  },
   {
     id: "annualIncome",
     label: "Annual income",
@@ -298,6 +315,7 @@ export function getMissingRequiredFieldIds(data: SignupData | null): Set<string>
 /** Anchor on `/profile/edit` for a missing required field. */
 export function getRequiredFieldEditHash(field: ProfileDetailField): string {
   if (field.id === "city") return "#location"
+  if (field.id === "diet" || field.id === "smoking" || field.id === "alcohol" || field.id === "interests") return "#lifestyle"
   if (field.group === "photos") return "#photos"
   if (field.group === "career") return "#career"
   if (field.group === "horoscope") return "#horoscope"

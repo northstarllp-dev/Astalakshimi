@@ -22,6 +22,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { S3Provider } from '../media/providers/s3.provider';
 import { calculateProfileCompleteness } from './profile-completeness';
 import { isOwnedPhotoKey } from '../common/photo-access';
+import { ProfilesService } from '../profiles/profiles.service';
 
 @Injectable()
 export class AdminService {
@@ -29,6 +30,7 @@ export class AdminService {
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly notificationsService: NotificationsService,
     private readonly s3Provider: S3Provider,
+    private readonly profilesService: ProfilesService,
   ) {}
 
   async getStats() {
@@ -124,6 +126,8 @@ export class AdminService {
       .from(profiles)
       .where(eq(profiles.id, updated.profileId));
 
+    this.profilesService.invalidateProfileCache(updated.profileId);
+
     if (profile) {
       await this.notificationsService.createNotification({
         userId: profile.userId,
@@ -141,16 +145,42 @@ export class AdminService {
     return updated;
   }
 
-  async updateVerificationStatus(profileId: string, status: 'verified' | 'rejected', rejectionReason?: string) {
+  async updateVerificationStatus(
+    profileId: string,
+    status: 'verified' | 'rejected',
+    reviewerUserId: string,
+    rejectionReason?: string,
+  ) {
+    const now = new Date();
     const [updated] = await this.db
       .update(verifications)
-      .set({ status, rejectionReason })
+      .set({
+        status,
+        // Approving clears any prior rejection reason; rejecting records the reason.
+        rejectionReason: status === 'verified' ? null : (rejectionReason ?? null),
+        reviewedBy: reviewerUserId,
+        reviewedAt: now,
+        updatedAt: now,
+      })
       .where(eq(verifications.profileId, profileId))
       .returning();
 
     if (!updated) {
       throw new NotFoundException('Verification request not found for this profile');
     }
+
+    // Approving a profile also clears the photo moderation queue for that profile
+    // so approved members become visible without a second admin pass.
+    if (status === 'verified') {
+      await this.db
+        .update(profilePhotos)
+        .set({ status: 'approved' })
+        .where(and(eq(profilePhotos.profileId, profileId), eq(profilePhotos.status, 'pending')));
+    }
+
+    // Other-user profile views cache the verification status; bust it so the
+    // new verified/rejected state is visible immediately.
+    this.profilesService.invalidateProfileCache(profileId);
 
     const [profile] = await this.db.select({ userId: profiles.userId }).from(profiles).where(eq(profiles.id, profileId));
 
@@ -179,6 +209,7 @@ export class AdminService {
         verificationStatus: verifications.status,
         submittedAt: verifications.updatedAt,
         reviewedAt: verifications.reviewedAt,
+        reviewedBy: verifications.reviewedBy,
       })
       .from(profiles)
       .innerJoin(users, eq(profiles.userId, users.id))
@@ -261,6 +292,7 @@ export class AdminService {
         createdBy: p.createdBy,
         submittedAt: r.submittedAt || p.createdAt,
         reviewedAt: r.reviewedAt,
+        reviewedBy: r.reviewedBy,
         activeSubscription: activeSubByUserId.has(p.userId),
         plan: activeSubByUserId.get(p.userId)?.planName || 'Free',
         planExpiry: activeSubByUserId.get(p.userId)?.expiresAt || undefined,
@@ -372,6 +404,8 @@ export class AdminService {
       govtIdS3Key: v?.govtIdS3Key ? await this.s3Provider.getAdminSignedViewUrl(v.govtIdS3Key) : undefined,
       govtIdType: v?.govtIdType,
       rejectionReason: v?.rejectionReason,
+      reviewedBy: v?.reviewedBy,
+      reviewedAt: v?.reviewedAt,
       horoscopeName: h?.horoscopeS3Key ? h.horoscopeFileName || 'Uploaded Horoscope' : null,
       birthTime: h?.birthTime || null,
       birthPlace: h?.birthPlace || null,

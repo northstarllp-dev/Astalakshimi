@@ -17,8 +17,24 @@ export type PhotoBlurSetting = 'always' | 'when_not_connected' | 'never';
 export const DEFAULT_PHOTO_BLUR: PhotoBlurSetting = 'always';
 
 export function normalizePhotoBlur(value: string | null | undefined): PhotoBlurSetting {
-  if (value === 'never' || value === 'when_not_connected') return value;
+  // Legacy UI value `accepted` (profile.photoPrivacy) maps to when_not_connected.
+  if (value === 'never') return 'never';
+  if (value === 'when_not_connected' || value === 'accepted') return 'when_not_connected';
   return DEFAULT_PHOTO_BLUR;
+}
+
+/** Map profiles.photo_privacy ↔ user_settings.photo_blur (single viewer-facing rule). */
+export function photoPrivacyToBlur(privacy: string | null | undefined): PhotoBlurSetting {
+  if (privacy === 'visible') return 'never';
+  if (privacy === 'accepted') return 'when_not_connected';
+  return 'always'; // blurred / unknown
+}
+
+export function photoBlurToPrivacy(blur: string | null | undefined): 'blurred' | 'accepted' | 'visible' {
+  const n = normalizePhotoBlur(blur);
+  if (n === 'never') return 'visible';
+  if (n === 'when_not_connected') return 'accepted';
+  return 'blurred';
 }
 
 export type BlurDecision = {
@@ -95,7 +111,7 @@ export async function getApprovedPrimaryPhotos(
 
 /**
  * Fetches approved photos in display order for a single profile.
- * Used by full-profile and owner views, which show the whole gallery.
+ * Used by public/full-profile views — pending/rejected stay hidden.
  */
 export async function getApprovedPhotos(
   db: Database,
@@ -114,13 +130,21 @@ export async function getApprovedPhotos(
 }
 
 /**
- * Fetches all non-rejected photos in display order for a single profile.
- * Used by the owner view so they can see their own pending photos.
+ * Fetches photos the owner should see: pending + approved (excludes rejected).
+ * Used by GET /profiles/me so newly uploaded photos remain visible before moderation.
  */
-export async function getAllPhotos(
+export async function getOwnerPhotos(
   db: Database,
   profileId: string,
-): Promise<Array<{ id: string; s3Key: string; isPrimary: boolean; displayOrder: number; status: string }>> {
+): Promise<
+  Array<{
+    id: string;
+    s3Key: string;
+    isPrimary: boolean;
+    displayOrder: number;
+    status: 'pending' | 'approved' | 'rejected';
+  }>
+> {
   return db
     .select({
       id: profilePhotos.id,
@@ -130,7 +154,12 @@ export async function getAllPhotos(
       status: profilePhotos.status,
     })
     .from(profilePhotos)
-    .where(and(eq(profilePhotos.profileId, profileId), inArray(profilePhotos.status, ['approved', 'pending'])))
+    .where(
+      and(
+        eq(profilePhotos.profileId, profileId),
+        inArray(profilePhotos.status, ['pending', 'approved']),
+      ),
+    )
     .orderBy(profilePhotos.displayOrder);
 }
 
@@ -165,26 +194,21 @@ export function isOwnedPhotoKey(
   purpose: PhotoKeyPurpose,
 ): boolean {
   const pattern = PHOTO_KEY_PATTERNS[purpose];
-  console.log(`[DEBUG isOwnedPhotoKey] s3Key: "${s3Key}", userId: "${userId}", purpose: "${purpose}"`);
   const patternMatch = pattern.test(s3Key);
-  console.log(`[DEBUG isOwnedPhotoKey] pattern match: ${patternMatch}`);
 
   if (!patternMatch) {
     // Allow frontend fallback mock keys generated before authentication (e.g., profiles/123_file.jpg)
-    const isMockKey = 
-      (s3Key.startsWith('profiles/') || 
-       s3Key.startsWith('verifications/') || 
-       s3Key.startsWith('horoscopes/')) && 
-       s3Key.includes('_');
+    const isMockKey =
+      (s3Key.startsWith('profiles/') ||
+        s3Key.startsWith('verifications/') ||
+        s3Key.startsWith('horoscopes/')) &&
+      s3Key.includes('_');
 
     if (isMockKey) {
-      console.log(`[DEBUG isOwnedPhotoKey] Accepted as mock key: ${s3Key}`);
       return true;
     }
     return false;
   }
 
-  const includesUserId = s3Key.includes(userId);
-  console.log(`[DEBUG isOwnedPhotoKey] includes userId: ${includesUserId}`);
-  return includesUserId;
+  return s3Key.includes(userId);
 }

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -14,10 +14,6 @@ const verifyPaymentSchema = z.object({
   razorpayOrderId: z.string().min(3).max(200),
   razorpayPaymentId: z.string().min(3).max(200),
   razorpaySignature: z.string().min(8).max(1000),
-});
-
-const demoActivateSchema = z.object({
-  planId: z.string().min(1).max(200),
 });
 
 @UseGuards(JwtAuthGuard)
@@ -45,14 +41,6 @@ export class PaymentsController {
       body.razorpayPaymentId,
       body.razorpaySignature,
     );
-  }
-
-  @Post('demo-activate')
-  activateDemoPlan(
-    @CurrentUser() user: UserSession,
-    @Body(new ZodValidationPipe(demoActivateSchema)) body: { planId: string },
-  ) {
-    return this.paymentsService.activateDemoPlan(user.userId, body.planId);
   }
 
   @Get('subscription')

@@ -6,6 +6,7 @@ describe('Feature 14: Admin - AdminService (Unit Tests)', () => {
   let mockDb: any;
   let mockNotifications: { createNotification: jest.Mock };
   let mockS3: { generateUploadUrl: jest.Mock };
+  let mockProfiles: { invalidateProfileCache: jest.Mock };
 
   beforeEach(() => {
     mockNotifications = { createNotification: jest.fn() };
@@ -17,13 +18,14 @@ describe('Feature 14: Admin - AdminService (Unit Tests)', () => {
         expiresInSeconds: 900,
       }),
     };
+    mockProfiles = { invalidateProfileCache: jest.fn() };
     mockDb = {
       select: jest.fn(),
       update: jest.fn(),
       insert: jest.fn(),
       transaction: jest.fn(),
     };
-    adminService = new AdminService(mockDb, mockNotifications as any, mockS3 as any);
+    adminService = new AdminService(mockDb, mockNotifications as any, mockS3 as any, mockProfiles as any);
   });
 
   const mockQueryBuilder = (resolveValues: any[]) => {
@@ -85,7 +87,10 @@ describe('Feature 14: Admin - AdminService (Unit Tests)', () => {
       mockDb.select = mockQueryBuilder([dbRows]);
 
       const result = await adminService.getPendingVerifications();
-      expect(result).toEqual(dbRows);
+      // Service spreads the row and resolves S3 keys (null when no key present).
+      expect(result).toEqual([
+        { ...dbRows[0], selfieS3Key: null, govtIdS3Key: null },
+      ]);
     });
   });
 
@@ -95,15 +100,16 @@ describe('Feature 14: Admin - AdminService (Unit Tests)', () => {
       mockDb.update = mockQueryBuilder([[mockUpdated]]);
       mockDb.select = mockQueryBuilder([[{ userId: 'user-1' }]]);
 
-      const result = await adminService.updateVerificationStatus('p1', 'verified');
+      const result = await adminService.updateVerificationStatus('p1', 'verified', 'staff-1');
       expect(result).toEqual(mockUpdated);
+      expect(mockProfiles.invalidateProfileCache).toHaveBeenCalledWith('p1');
       expect(mockNotifications.createNotification).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if verification request is not found', async () => {
       mockDb.update = mockQueryBuilder([[]]);
 
-      await expect(adminService.updateVerificationStatus('missing-p', 'verified')).rejects.toThrow(
+      await expect(adminService.updateVerificationStatus('missing-p', 'verified', 'staff-1')).rejects.toThrow(
         NotFoundException
       );
     });

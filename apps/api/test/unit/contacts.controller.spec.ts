@@ -34,14 +34,15 @@ describe('ContactsController', () => {
   it('unlocks a target profile', async () => {
     contactsService.unlock.mockResolvedValue({ success: true });
     await expect(
-      controller.unlock({ userId: 'u1', phone: '1', role: 'member' }, { targetProfileId: 'p1' })
+      controller.unlock({ userId: 'u1', phone: '1', role: 'member' }, 'p1')
     ).resolves.toEqual({ success: true });
     expect(contactsService.unlock).toHaveBeenCalledWith('u1', 'p1');
   });
 
-  it('rejects unlock without targetProfileId', async () => {
-    await expect(
-      controller.unlock({ userId: 'u1', phone: '1', role: 'member' }, {})
-    ).rejects.toBeInstanceOf(BadRequestException);
+  it('forwards an empty targetProfileId to the service (UUID validation is the pipe\'s job, covered in e2e)', async () => {
+    contactsService.unlock.mockResolvedValue({ success: false });
+    await controller.unlock({ userId: 'u1', phone: '1', role: 'member' }, '');
+    // Pipe does not run in a direct unit call; the controller forwards as-is.
+    expect(contactsService.unlock).toHaveBeenCalledWith('u1', '');
   });
 });

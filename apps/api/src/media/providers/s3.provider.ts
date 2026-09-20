@@ -4,45 +4,28 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 import type { UploadPurpose, PresignedUploadResponse } from '@astalakshimi/types';
-import { demoUploadStore } from '../demo-upload.store';
 
 @Injectable()
 export class S3Provider {
   private readonly logger = new Logger(S3Provider.name);
-  private s3Client: S3Client;
-  private mediaBucket: string;
-  private vaultBucket: string;
-  private isConfigured: boolean;
-  private useDemoStorage: boolean;
+  private readonly s3Client: S3Client;
+  private readonly mediaBucket: string;
+  private readonly vaultBucket: string;
 
   constructor(private readonly configService: ConfigService) {
-    const region = this.configService.get<string>('storage.region') || 'ap-south-1';
-    const accessKeyId = this.configService.get<string>('storage.accessKeyId') || '';
-    const secretAccessKey = this.configService.get<string>('storage.secretAccessKey') || '';
-    const mockUploads =
-      this.configService.get<boolean>('storage.mockUploads') === true ||
-      process.env.MOCK_S3_UPLOADS === 'true' ||
-      (process.env.NODE_ENV !== 'production' && process.env.MOCK_S3_UPLOADS !== 'false');
+    const region = this.configService.getOrThrow<string>('storage.region');
+    const accessKeyId = this.configService.getOrThrow<string>('storage.accessKeyId');
+    const secretAccessKey = this.configService.getOrThrow<string>('storage.secretAccessKey');
 
-    this.mediaBucket = this.configService.get<string>('storage.mediaBucket') || 'astalakshimi-media-dev';
-    this.vaultBucket = this.configService.get<string>('storage.vaultBucket') || 'astalakshimi-vault-dev';
-    this.useDemoStorage = mockUploads || !accessKeyId || !secretAccessKey;
-    this.isConfigured = !this.useDemoStorage;
-
-    if (this.isConfigured) {
-      this.s3Client = new S3Client({
-        region,
-        credentials: { accessKeyId, secretAccessKey },
-      });
-      this.logger.log('[S3Provider] Using live AWS S3 uploads.');
-    } else {
-      this.logger.warn(
-        mockUploads
-          ? '[S3Provider] Demo upload mode — files stored in memory (no S3).'
-          : '[S3Provider] AWS credentials not configured. Running in demo upload mode.',
-      );
-      this.s3Client = new S3Client({ region });
-    }
+    this.mediaBucket = this.configService.getOrThrow<string>('storage.mediaBucket');
+    this.vaultBucket = this.configService.getOrThrow<string>('storage.vaultBucket');
+    this.s3Client = new S3Client({
+      region,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+    this.logger.log(
+      `[S3Provider] Live AWS S3 ready (media=${this.mediaBucket}, vault=${this.vaultBucket}, region=${region}).`,
+    );
   }
 
   private normalizeImageContentType(contentType: string): string {
@@ -61,18 +44,14 @@ export class S3Provider {
     const normalizedType = purpose === 'horoscope' ? contentType : this.normalizeImageContentType(contentType);
     const isPdf = normalizedType === 'application/pdf';
 
-    // Validate Purpose vs File Type
     if (purpose === 'horoscope') {
       if (!isPdf || fileSize > 10 * 1024 * 1024) {
         throw new BadRequestException('Horoscope must be a PDF file under 10 MB.');
       }
-    } else {
-      if (!allowedImages.includes(normalizedType) || fileSize > 5 * 1024 * 1024) {
-        throw new BadRequestException('Photos must be JPG, PNG, or WEBP under 5 MB.');
-      }
+    } else if (!allowedImages.includes(normalizedType) || fileSize > 5 * 1024 * 1024) {
+      throw new BadRequestException('Photos must be JPG, PNG, or WEBP under 5 MB.');
     }
 
-    // Determine target bucket & structured S3 key
     let bucket = this.mediaBucket;
     let s3Key = '';
     const ext = isPdf ? 'pdf' : normalizedType.split('/')[1] === 'jpg' ? 'jpeg' : normalizedType.split('/')[1] || 'jpg';
@@ -97,17 +76,7 @@ export class S3Provider {
         break;
     }
 
-    const expiresInSeconds = 600; // 10 minutes
-
-    if (this.useDemoStorage) {
-      // Demo mode — no AWS calls
-      return {
-        uploadUrl: `https://${bucket}.s3.amazonaws.com/${s3Key}?mock-signature=${uniqueId}`,
-        s3Key,
-        bucket,
-        expiresInSeconds,
-      };
-    }
+    const expiresInSeconds = 600;
 
     try {
       const command = new PutObjectCommand({
@@ -136,26 +105,17 @@ export class S3Provider {
 
   async getAdminSignedViewUrl(s3Key: string, isMedia = false): Promise<string> {
     const bucketName = isMedia ? this.mediaBucket : this.vaultBucket;
-    if (!this.isConfigured) {
-      return `https://${bucketName}.s3.amazonaws.com/${s3Key}?mock-view-token=valid`;
-    }
 
     const command = new GetObjectCommand({
       Bucket: bucketName,
       Key: s3Key,
     });
 
-    return getSignedUrl(this.s3Client, command, { expiresIn: 900 }); // 15 minutes
+    return getSignedUrl(this.s3Client, command, { expiresIn: 900 });
   }
 
   async putObject(s3Key: string, body: Buffer, contentType: string, bucket?: string): Promise<void> {
     const normalizedType = this.normalizeImageContentType(contentType);
-
-    if (this.useDemoStorage) {
-      demoUploadStore.set(s3Key, body, normalizedType);
-      this.logger.debug(`[S3Provider] Demo upload stored: ${s3Key}`);
-      return;
-    }
 
     try {
       await this.s3Client.send(
@@ -167,16 +127,12 @@ export class S3Provider {
         }),
       );
     } catch (error) {
-      this.logger.warn(
-        `[S3Provider] S3 upload failed, storing in demo memory instead: ${(error as Error).message}`,
-      );
-      demoUploadStore.set(s3Key, body, normalizedType);
+      this.logger.error(`[S3Provider] S3 putObject failed for ${s3Key}: ${(error as Error).message}`);
+      throw new BadRequestException('Failed to upload file to S3. Please try again.');
     }
   }
 
   async deleteObject(s3Key: string, isVault = false): Promise<void> {
-    if (!this.isConfigured) return;
-
     try {
       await this.s3Client.send(
         new DeleteObjectCommand({

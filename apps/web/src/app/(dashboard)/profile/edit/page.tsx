@@ -30,28 +30,33 @@ import { OccupationSelect } from "@/components/profile/occupation-select"
 import { MultiSelect } from "@/components/profile/multi-select"
 import { SearchableSelect } from "@/components/profile/searchable-select"
 import { CityAutocomplete } from "@/components/profile/city-autocomplete"
-import { CommunityFields } from "@/components/profile/community-fields"
-import {
-  getCommunitiesForReligion,
-  getSubcastesForCommunity,
-  getGotrasForReligion,
-} from "@/lib/community-data"
+import { ChildrenFields } from "@/components/profile/children-fields"
+import { getCommunityLabelsForReligion, findCommunityByLabel, getCommunities } from "@/lib/community-data"
 import {
   emptySignupData,
   type SignupData,
   COMPLEXIONS,
   DIETS,
+  HABIT_FREQUENCY,
+  INTERESTS,
   MARITAL_STATUSES,
+  PROFILE_FOR_OPTIONS,
   RELIGIONS,
   MOTHER_TONGUES,
+  EDUCATION_LEVELS,
   FAMILY_TYPES,
   FAMILY_STATUS,
+  FAMILY_VALUES,
+  PARENT_OCCUPATIONS,
   RELOCATE_OPTIONS,
   MANGLIK_OPTIONS,
   PHOTO_PRIVACY,
   INCOME_BANDS,
+  COMPANY_SECTORS,
   STARS,
   RASHIS,
+  formatSiblings,
+  SIBLING_COUNTS,
 } from "@/lib/profile-store"
 import {
   useProfileQuery,
@@ -73,7 +78,7 @@ import { ArrowLeft, Camera, Check, ExternalLink, Eye, FileText, GripVertical, St
 import { cn } from "@/lib/utils"
 import { hashFile } from "@/lib/file-hash"
 
-const ABOUT_MAX = 300
+const ABOUT_MAX = 1000
 const MAX_PHOTOS = 10
 
 type PhotoItem = {
@@ -142,13 +147,25 @@ function firstValidationError(errors: Record<string, unknown>): string | undefin
 }
 
 const SAVE_FIELD_SECTION: Record<string, string> = {
+  profileFor: "#basics",
+  fullName: "#basics",
+  height: "#basics",
+  hasChildren: "#basics",
+  childrenCount: "#basics",
+  childrenLivingWithMe: "#basics",
   caste: "#community",
   subcaste: "#community",
   gotra: "#community",
   religion: "#community",
   motherTongue: "#community",
-  educationId: "#career",
-  occupationId: "#career",
+  diet: "#lifestyle",
+  smoking: "#lifestyle",
+  alcohol: "#lifestyle",
+  interests: "#lifestyle",
+  educationLevel: "#career",
+  degree: "#career",
+  employmentStatus: "#career",
+  profession: "#career",
   annualIncome: "#career",
   birthTime: "#horoscope",
   birthPlace: "#horoscope",
@@ -166,14 +183,24 @@ export default function ProfileEditPage() {
   const deletePhotoMutation = useDeletePhotoMutation()
   const reorderPhotosMutation = useReorderPhotosMutation()
 
-  const form = useForm({
-    resolver: zodResolver(profileEditSchema),
+  const form = useForm<SignupData>({
+    resolver: zodResolver(profileEditSchema) as any,
     values: profileQuery.data ?? emptySignupData(),
   })
   const data = form.watch() as SignupData
   const { errors } = form.formState
   const completenessStats = React.useMemo(() => getProfileCompletenessStats(data), [data])
   const missingIds = React.useMemo(() => getMissingRequiredFieldIds(data), [data])
+  const communityOptions = React.useMemo(() => {
+    try {
+      const list = Array.from(new Set(getCommunities().map((c) => c.label))).sort((a, b) =>
+        a.localeCompare(b),
+      )
+      return list
+    } catch {
+      return []
+    }
+  }, [])
   const isMissing = React.useCallback((id: string) => missingIds.has(id), [missingIds])
   const invalidCls = REQUIRED_FIELD_INVALID_CLASS
   const [saved, setSaved] = React.useState(false)
@@ -365,6 +392,16 @@ export default function ProfileEditPage() {
       )}
 
       <EditSection id="basics" title="Basic info">
+        <Field label="Profile for" required missing={isMissing("profileFor")} error={fieldError(errors, "profileFor")}>
+          <SearchableSelect
+            value={data.profileFor || undefined}
+            onValueChange={(v) => update({ profileFor: v })}
+            options={[...PROFILE_FOR_OPTIONS]}
+            placeholder="Who is this profile for?"
+            searchPlaceholder="Search…"
+            className={cn(isMissing("profileFor") && invalidCls)}
+          />
+        </Field>
         <Field label="Full name" required missing={isMissing("fullName")} error={fieldError(errors, "fullName")}>
           <Input
             value={data.fullName}
@@ -386,7 +423,14 @@ export default function ProfileEditPage() {
           <Field label="Marital status" required missing={isMissing("maritalStatus")} error={fieldError(errors, "maritalStatus")}>
             <SearchableSelect
               value={data.maritalStatus || undefined}
-              onValueChange={(v) => update({ maritalStatus: v })}
+              onValueChange={(v) =>
+                update({
+                  maritalStatus: v,
+                  ...(v === "Divorced" || v === "Widowed"
+                    ? {}
+                    : { hasChildren: false, childrenCount: 0, childrenLivingWithMe: null }),
+                })
+              }
               options={MARITAL_STATUSES}
               placeholder="Select marital status"
               searchPlaceholder="Search status…"
@@ -416,29 +460,30 @@ export default function ProfileEditPage() {
             <WeightInput value={data.weight} onChange={(weight) => update({ weight })} />
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Complexion">
-            <SearchableSelect
-              value={data.complexion || undefined}
-              onValueChange={(v) => update({ complexion: v })}
-              options={COMPLEXIONS}
-              placeholder="Select complexion"
-              searchPlaceholder="Search…"
-            />
-          </Field>
-          <Field label="Diet">
-            <SearchableSelect
-              value={data.diet || undefined}
-              onValueChange={(v) => update({ diet: v })}
-              options={DIETS}
-              placeholder="Select diet"
-              searchPlaceholder="Search…"
-            />
-          </Field>
-        </div>
+        <Field label="Complexion">
+          <SearchableSelect
+            value={data.complexion || undefined}
+            onValueChange={(v) => update({ complexion: v })}
+            options={COMPLEXIONS}
+            placeholder="Select complexion"
+            searchPlaceholder="Search…"
+          />
+        </Field>
         <Field label="Disability (optional)">
           <Input value={data.disability} onChange={(e) => update({ disability: e.target.value })} placeholder="Leave blank if none" />
         </Field>
+        <ChildrenFields
+          maritalStatus={data.maritalStatus}
+          hasChildren={data.hasChildren}
+          childrenCount={data.childrenCount}
+          childrenLivingWithMe={data.childrenLivingWithMe}
+          errors={{
+            hasChildren: fieldError(errors, "hasChildren"),
+            childrenCount: fieldError(errors, "childrenCount"),
+            childrenLivingWithMe: fieldError(errors, "childrenLivingWithMe"),
+          }}
+          onChange={(next) => update(next)}
+        />
       </EditSection>
 
       <EditSection id="community" title="Community details">
@@ -450,6 +495,7 @@ export default function ProfileEditPage() {
                 update({
                   religion: v,
                   caste: "",
+                  communitySlug: "",
                   subcaste: "",
                   gotra: "",
                 })
@@ -475,45 +521,40 @@ export default function ProfileEditPage() {
           <Field label="Caste / community" required missing={isMissing("caste")} error={fieldError(errors, "caste")}>
             <SearchableSelect
               value={data.caste || undefined}
-              onValueChange={(next) =>
+              onValueChange={(next) => {
+                const match = findCommunityByLabel(next, data.religion)
                 update({
                   caste: next,
+                  communitySlug: match?.slug ?? "",
                   subcaste: next === data.caste ? data.subcaste : "",
                 })
-              }
-              options={getCommunitiesForReligion(data.religion)}
+              }}
+              options={getCommunityLabelsForReligion(data.religion)}
               placeholder={data.religion ? "Select caste / community…" : "Select religion first"}
-              searchPlaceholder="Search or type caste…"
+              searchPlaceholder="Search caste…"
               emptyText="No matching community found."
               disabled={!data.religion}
               className={cn(isMissing("caste") && invalidCls)}
-              allowCustom={true}
+              allowCustom={false}
             />
           </Field>
 
           <Field label="Subcaste (optional)">
-            <SearchableSelect
-              value={data.subcaste || undefined}
-              onValueChange={(next) => update({ subcaste: next })}
-              options={getSubcastesForCommunity(data.caste, data.religion)}
-              placeholder={data.caste ? "Select subcaste (optional)…" : "Select caste first"}
-              searchPlaceholder="Search or type subcaste…"
-              emptyText="No matching subcaste found."
-              disabled={!data.caste}
-              allowCustom={true}
+            <Input
+              value={data.subcaste}
+              onChange={(e) => update({ subcaste: e.target.value })}
+              placeholder="Type subcaste if applicable"
+              maxLength={100}
             />
           </Field>
 
           {(data.religion === "Hindu" || data.religion === "Jain") && (
             <Field label="Gotra (optional)" className="sm:col-span-2">
-              <SearchableSelect
-                value={data.gotra || undefined}
-                onValueChange={(next) => update({ gotra: next })}
-                options={getGotrasForReligion(data.religion)}
-                placeholder="Select gotra (optional)…"
-                searchPlaceholder="Search or type gotra…"
-                emptyText="No matching gotra found."
-                allowCustom={true}
+              <Input
+                value={data.gotra}
+                onChange={(e) => update({ gotra: e.target.value })}
+                placeholder="Type gotra if applicable"
+                maxLength={100}
               />
             </Field>
           )}
@@ -522,34 +563,36 @@ export default function ProfileEditPage() {
 
       <EditSection id="career" title="Education & career">
         <EducationFields
-          educationId={data.educationId}
-          specializationId={data.specializationId}
-          otherEducation={data.otherEducation || (!data.educationId ? data.education || data.degree || "" : "")}
-          educationStream={data.educationStream}
+          educationLevel={data.educationLevel}
+          degree={data.degree}
           educationMissing={isMissing("education")}
-          educationError={fieldError(errors, "educationId") || fieldError(errors, "education")}
+          educationError={fieldError(errors, "educationLevel") || fieldError(errors, "education")}
           educationClassName={cn(isMissing("education") && invalidCls)}
+          degreeClassName={cn(isMissing("education") && invalidCls)}
           onEducationChange={(value) =>
             update({
-              educationId: value.educationId,
-              education: value.otherEducation || value.education,
-              degree: value.otherEducation || value.education,
-              specializationId: value.specializationId,
-              educationStream: value.educationStream,
-              otherEducation: value.otherEducation,
+              educationLevel: value.educationLevel,
+              degree: value.degree,
             })
           }
         />
-        <Field label="Occupation" required missing={isMissing("occupation")} error={fieldError(errors, "occupationId") || fieldError(errors, "occupation")}>
+        <Field label="College / university (optional)">
+          <Input
+            value={data.collegeName}
+            onChange={(e) => update({ collegeName: e.target.value })}
+            placeholder="e.g. Anna University, IIT Madras"
+          />
+        </Field>
+        <Field label="Occupation" required missing={isMissing("occupation")} error={fieldError(errors, "employmentStatus") || fieldError(errors, "occupation")}>
           <OccupationSelect
-            occupationId={data.occupationId}
+            employmentStatus={data.employmentStatus}
+            profession={data.profession}
             className={cn(isMissing("occupation") && invalidCls)}
+            missing={isMissing("occupation")}
             onOccupationChange={(value) =>
               update({
-                occupationId: value.occupationId,
-                occupation: value.occupation,
+                employmentStatus: value.employmentStatus,
                 profession: value.profession,
-                otherOccupation: "",
               })
             }
           />
@@ -558,21 +601,30 @@ export default function ProfileEditPage() {
           <Field label="Employer name (optional)">
             <Input
               value={data.companyName}
-              onChange={(e) => update({ companyName: e.target.value, companyId: null })}
+              onChange={(e) => update({ companyName: e.target.value })}
               placeholder="e.g. Deloitte, Infosys, Self-employed"
             />
           </Field>
-          <Field label="Annual income" required missing={isMissing("annualIncome")} error={fieldError(errors, "annualIncome")}>
+          <Field label="Company sector (optional)">
             <SearchableSelect
-              value={data.annualIncome || undefined}
-              onValueChange={(v) => update({ annualIncome: v })}
-              options={INCOME_BANDS}
-              placeholder="Select income band"
-              searchPlaceholder="Search income…"
-              className={cn(isMissing("annualIncome") && invalidCls)}
+              value={data.companySector || undefined}
+              onValueChange={(v) => update({ companySector: v })}
+              options={[...COMPANY_SECTORS]}
+              placeholder="Select sector"
+              searchPlaceholder="Search sector…"
             />
           </Field>
         </div>
+        <Field label="Annual income" required missing={isMissing("annualIncome")} error={fieldError(errors, "annualIncome")}>
+          <SearchableSelect
+            value={data.annualIncome || undefined}
+            onValueChange={(v) => update({ annualIncome: v })}
+            options={INCOME_BANDS}
+            placeholder="Select income band"
+            searchPlaceholder="Search income…"
+            className={cn(isMissing("annualIncome") && invalidCls)}
+          />
+        </Field>
       </EditSection>
 
       <EditSection id="family" title="Family details">
@@ -581,7 +633,7 @@ export default function ProfileEditPage() {
             <SearchableSelect
               value={data.familyType || undefined}
               onValueChange={(v) => update({ familyType: v })}
-              options={FAMILY_TYPES}
+              options={[...FAMILY_TYPES]}
               placeholder="Select family type"
             />
           </Field>
@@ -589,22 +641,74 @@ export default function ProfileEditPage() {
             <SearchableSelect
               value={data.familyStatus || undefined}
               onValueChange={(v) => update({ familyStatus: v })}
-              options={FAMILY_STATUS}
+              options={[...FAMILY_STATUS]}
               placeholder="Select family status"
             />
           </Field>
         </div>
+        <Field label="Family values">
+          <SearchableSelect
+            value={data.familyValues || undefined}
+            onValueChange={(v) => update({ familyValues: v })}
+            options={[...FAMILY_VALUES]}
+            placeholder="Select family values"
+          />
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Father's occupation">
-            <Input value={data.fatherOccupation} onChange={(e) => update({ fatherOccupation: e.target.value })} placeholder="e.g. Retired banker" />
+            <SearchableSelect
+              value={data.fatherOccupation || undefined}
+              onValueChange={(v) => update({ fatherOccupation: v })}
+              options={[...PARENT_OCCUPATIONS]}
+              placeholder="Select father's occupation"
+            />
           </Field>
           <Field label="Mother's occupation">
-            <Input value={data.motherOccupation} onChange={(e) => update({ motherOccupation: e.target.value })} placeholder="e.g. Homemaker" />
+            <SearchableSelect
+              value={data.motherOccupation || undefined}
+              onValueChange={(v) => update({ motherOccupation: v })}
+              options={[...PARENT_OCCUPATIONS]}
+              placeholder="Select mother's occupation"
+            />
           </Field>
         </div>
-        <Field label="Number of siblings">
-          <Input value={data.siblings} onChange={(e) => update({ siblings: e.target.value })} placeholder="e.g. 1 brother, 1 sister" />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Brothers">
+            <SearchableSelect
+              value={String(data.brothersCount)}
+              onValueChange={(v) =>
+                update({
+                  brothersCount: Number(v),
+                  siblings: formatSiblings(Number(v), data.sistersCount),
+                })
+              }
+              options={SIBLING_COUNTS.map((n) => ({
+                value: String(n),
+                label: n === 5 ? "5+" : String(n),
+              }))}
+              placeholder="Brothers"
+            />
+          </Field>
+          <Field label="Sisters">
+            <SearchableSelect
+              value={String(data.sistersCount)}
+              onValueChange={(v) =>
+                update({
+                  sistersCount: Number(v),
+                  siblings: formatSiblings(data.brothersCount, Number(v)),
+                })
+              }
+              options={SIBLING_COUNTS.map((n) => ({
+                value: String(n),
+                label: n === 5 ? "5+" : String(n),
+              }))}
+              placeholder="Sisters"
+            />
+          </Field>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {formatSiblings(data.brothersCount, data.sistersCount)}
+        </p>
       </EditSection>
 
       <EditSection id="location" title="Location">
@@ -613,7 +717,10 @@ export default function ProfileEditPage() {
             <CityAutocomplete
               city={data.city}
               state={data.state}
-              onCityChange={({ city, state }) => update({ city, state })}
+              citySlug={data.citySlug}
+              onCityChange={({ city, state, citySlug }) =>
+                update({ city, state, citySlug: citySlug ?? "" })
+              }
               placeholder="Search city…"
               className={cn(isMissing("city") && invalidCls)}
             />
@@ -649,6 +756,73 @@ export default function ProfileEditPage() {
         />
       </EditSection>
 
+      <EditSection id="lifestyle" title="Lifestyle">
+        <p className="text-sm text-muted-foreground">Diet, habits, and interests shown on your profile.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Diet" required missing={isMissing("diet")} error={fieldError(errors, "diet")}>
+            <>
+              <SearchableSelect
+                value={data.diet || undefined}
+                onValueChange={(v) => update({ diet: v })}
+                options={DIETS}
+                placeholder="Select diet"
+                searchPlaceholder="Search…"
+                allowCustom={false}
+                className={cn(isMissing("diet") && invalidCls)}
+              />
+              {data.diet && (
+                <button type="button" className="text-xs text-muted-foreground hover:text-primary" onClick={() => update({ diet: "" })}>
+                  Clear
+                </button>
+              )}
+            </>
+          </Field>
+          <Field label="Smoking">
+            <>
+              <SearchableSelect
+                value={data.smoking || undefined}
+                onValueChange={(v) => update({ smoking: v })}
+                options={[...HABIT_FREQUENCY]}
+                placeholder="Select"
+                searchPlaceholder="Search…"
+                allowCustom={false}
+              />
+              {data.smoking && (
+                <button type="button" className="text-xs text-muted-foreground hover:text-primary" onClick={() => update({ smoking: "" })}>
+                  Clear
+                </button>
+              )}
+            </>
+          </Field>
+        </div>
+        <Field label="Drinking">
+          <>
+            <SearchableSelect
+              value={data.alcohol || undefined}
+              onValueChange={(v) => update({ alcohol: v })}
+              options={[...HABIT_FREQUENCY]}
+              placeholder="Select"
+              searchPlaceholder="Search…"
+              allowCustom={false}
+            />
+            {data.alcohol && (
+              <button type="button" className="text-xs text-muted-foreground hover:text-primary" onClick={() => update({ alcohol: "" })}>
+                Clear
+              </button>
+            )}
+          </>
+        </Field>
+        <Field label="Interests" error={fieldError(errors, "interests")}>
+          <MultiSelect
+            values={data.interests || []}
+            onValuesChange={(values) => update({ interests: values })}
+            options={[...INTERESTS]}
+            placeholder="Pick up to 7"
+            searchPlaceholder="Search interests…"
+          />
+        </Field>
+      </EditSection>
+
       <EditSection id="preferences" title="Partner preferences">
         <p className="text-sm text-muted-foreground">Changes affect your daily match results immediately.</p>
         <div className="grid grid-cols-2 gap-4">
@@ -659,6 +833,28 @@ export default function ProfileEditPage() {
             <Input type="number" value={data.prefAgeMax} onChange={(e) => update({ prefAgeMax: Number(e.target.value) || 40 })} />
           </Field>
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Min height (cm)">
+            <Input
+              type="number"
+              value={data.prefHeightMinCm ?? ""}
+              onChange={(e) =>
+                update({ prefHeightMinCm: e.target.value === "" ? undefined : Number(e.target.value) })
+              }
+              placeholder="e.g. 150"
+            />
+          </Field>
+          <Field label="Max height (cm)">
+            <Input
+              type="number"
+              value={data.prefHeightMaxCm ?? ""}
+              onChange={(e) =>
+                update({ prefHeightMaxCm: e.target.value === "" ? undefined : Number(e.target.value) })
+              }
+              placeholder="e.g. 185"
+            />
+          </Field>
+        </div>
         <Field label="Preferred religions" required error={fieldError(errors, "prefReligion")}>
           <MultiSelect
             values={data.prefReligion || []}
@@ -666,6 +862,56 @@ export default function ProfileEditPage() {
             options={RELIGIONS}
             placeholder="Select religions"
             searchPlaceholder="Search religions…"
+          />
+        </Field>
+        <Field label="Preferred marital status">
+          <MultiSelect
+            values={data.prefMaritalStatuses || []}
+            onValuesChange={(values) => update({ prefMaritalStatuses: values })}
+            options={[...MARITAL_STATUSES]}
+            placeholder="Any marital status"
+            searchPlaceholder="Search…"
+          />
+        </Field>
+        <Field label="Preferred communities">
+          <MultiSelect
+            values={data.prefCastes || []}
+            onValuesChange={(values) => update({ prefCastes: values })}
+            options={communityOptions}
+            placeholder="Any community"
+            searchPlaceholder="Search communities…"
+          />
+        </Field>
+        <Field label="Preferred mother tongues">
+          <MultiSelect
+            values={data.prefMotherTongues || []}
+            onValuesChange={(values) => update({ prefMotherTongues: values })}
+            options={MOTHER_TONGUES}
+            placeholder="Any mother tongue"
+            searchPlaceholder="Search languages…"
+          />
+        </Field>
+        <Field label="Minimum education">
+          <SearchableSelect
+            value={data.prefMinEducation || undefined}
+            onValueChange={(v) => update({ prefMinEducation: v })}
+            options={[...EDUCATION_LEVELS]}
+            placeholder="No preference"
+            searchPlaceholder="Search education…"
+          />
+        </Field>
+        <Field label="Preferred locations">
+          <Input
+            value={(data.prefLocations || []).join(", ")}
+            onChange={(e) =>
+              update({
+                prefLocations: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="e.g. Chennai, Bengaluru"
           />
         </Field>
       </EditSection>

@@ -85,8 +85,7 @@ describe('Feature 1: Authentication - JwtStrategy (Unit Tests)', () => {
     ).rejects.toThrow('User account is not active or no longer exists');
   });
 
-  it('should throw UnauthorizedException if user status is deactivated', async () => {
-    const deactivatedUser = {
+  it('should throw UnauthorizedException if user status is deactivated', async () => {    const deactivatedUser = {
       id: 'user-123',
       phone: '9876543210',
       role: 'member',
@@ -106,5 +105,56 @@ describe('Feature 1: Authentication - JwtStrategy (Unit Tests)', () => {
         role: 'member',
       })
     ).rejects.toThrow('User account is not active or no longer exists');
+  });
+
+  it('should reject a refresh-type token even for an active user', async () => {
+    const activeUser = {
+      id: 'user-123',
+      phone: '9876543210',
+      role: 'member',
+      status: 'active',
+    };
+
+    mockDb.select.mockReturnValue({
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([activeUser]),
+    });
+
+    await expect(
+      jwtStrategy.validate({
+        sub: 'user-123',
+        phone: '9876543210',
+        role: 'member',
+        type: 'refresh',
+      }),
+    ).rejects.toThrow('Refresh tokens cannot be used for authentication');
+  });
+
+  it('should preserve the staff role in the session', async () => {
+    const adminUser = {
+      id: 'admin-1',
+      phone: '9000000001',
+      role: 'admin',
+      status: 'active',
+    };
+
+    mockDb.select.mockReturnValue({
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([adminUser]),
+    });
+
+    const result = await jwtStrategy.validate({
+      sub: 'admin-1',
+      phone: '9000000001',
+      role: 'admin',
+    });
+
+    expect(result).toEqual({
+      userId: 'admin-1',
+      phone: '9000000001',
+      role: 'admin',
+    });
   });
 });

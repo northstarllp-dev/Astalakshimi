@@ -12,7 +12,9 @@ describe('Feature 1: Authentication - AuthController (Integration Tests)', () =>
     const mockAuthService = {
       sendOtp: jest.fn(),
       verifyOtp: jest.fn(),
+      adminLogin: jest.fn(),
       refreshToken: jest.fn(),
+      logout: jest.fn(),
       getMe: jest.fn(),
     };
 
@@ -138,6 +140,84 @@ describe('Feature 1: Authentication - AuthController (Integration Tests)', () =>
 
       expect(authService.getMe).toHaveBeenCalledWith('user-1');
       expect(result).toEqual(expectedResponse);
+    });
+  });
+
+  describe('POST /auth/logout', () => {
+    it('should revoke the session for the authenticated user', async () => {
+      const mockSession: UserSession = {
+        userId: 'user-1',
+        phone: '9876543210',
+        role: 'member',
+      };
+      authService.logout.mockResolvedValue({ success: true });
+
+      const result = await controller.logout(mockSession);
+
+      expect(authService.logout).toHaveBeenCalledWith('user-1');
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('POST /auth/admin-login', () => {
+    it('should forward staff credentials to AuthService.adminLogin', async () => {
+      const input = { email: 'admin@example.com', password: 'secret123' };
+      const expectedResponse = { accessToken: 'a', refreshToken: 'r', hasProfile: false } as any;
+      authService.adminLogin.mockResolvedValue(expectedResponse);
+
+      const result = await controller.adminLogin(input);
+
+      expect(authService.adminLogin).toHaveBeenCalledWith(input);
+      expect(result).toEqual(expectedResponse);
+    });
+
+    it('should propagate service errors (unknown email / wrong password)', async () => {
+      authService.adminLogin.mockRejectedValue(new BadRequestException('Invalid credentials'));
+
+      await expect(
+        controller.adminLogin({ email: 'nobody@example.com', password: 'x' }),
+      ).rejects.toThrow('Invalid credentials');
+    });
+  });
+
+  describe('POST /auth/refresh hardening', () => {
+    it('should reject a short (non-token) refresh value without calling the service', async () => {
+      await expect(controller.refresh('short')).rejects.toThrow(
+        new BadRequestException('Refresh token is required'),
+      );
+      expect(authService.refreshToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('route security metadata', () => {
+    it('keeps OTP + refresh endpoints public and session endpoints guarded', async () => {
+      const { Reflector } = await import('@nestjs/core');
+      const { IS_PUBLIC_KEY } = await import(
+        '../../src/common/decorators/public.decorator'
+      );
+      const { ALLOW_INCOMPLETE_KEY } = await import(
+        '../../src/common/decorators/allow-incomplete.decorator'
+      );
+      const reflector = new Reflector();
+      const proto = AuthController.prototype as any;
+
+      for (const method of ['sendOtp', 'verifyOtp', 'adminLogin', 'refresh']) {
+        expect(
+          reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [proto[method], AuthController]),
+        ).toBe(true);
+      }
+
+      for (const method of ['logout', 'getMe']) {
+        expect(
+          reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [proto[method], AuthController]),
+        ).toBeFalsy();
+        expect(
+          reflector.getAllAndOverride<boolean>(ALLOW_INCOMPLETE_KEY, [
+            proto[method],
+            AuthController,
+          ]),
+        ).toBe(true);
+      }
     });
   });
 });

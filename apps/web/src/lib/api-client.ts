@@ -7,19 +7,7 @@ import type {
   CompleteRegistrationPayload,
   PresignedUploadRequest,
   PresignedUploadResponse,
-  CityAutocompleteResult,
-  ResolvedCity,
-  StateOption,
-  EducationLevelOption,
-  SpecializationOption,
-  ResolvedEducation,
-  OccupationOption,
-  CompanySearchResult,
-  ResolvedOccupation,
-  ResolvedCompany,
-  CommunityAutocompleteResult,
-  SubcasteAutocompleteResult,
-  GotraAutocompleteResult,
+  TopMatch,
 } from '@astalakshimi/types';
 import type { PartnerPreferencesInput } from '@astalakshimi/validation';
 
@@ -74,6 +62,12 @@ class ApiClient {
       this.clearToken();
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname + window.location.search;
+        // Clear httpOnly cookies too — localStorage alone leaves middleware thinking you're logged in.
+        try {
+          await fetch('/api/auth/logout', { method: 'POST' });
+        } catch {
+          /* best-effort */
+        }
         if (currentPath.startsWith('/admin')) {
           if (!currentPath.startsWith('/admin/login')) {
             const callbackUrl = encodeURIComponent(currentPath);
@@ -130,6 +124,13 @@ class ApiClient {
 
     getMe: () => this.request<{ user: User; hasProfile: boolean }>('/auth/me'),
 
+    syncEnrollment: () =>
+      fetch('/api/auth/sync-enrollment', { method: 'POST' }).then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to sync enrollment');
+        return data as { hasProfile: boolean };
+      }),
+
     logout: async () => {
       await fetch('/api/auth/logout', { method: 'POST' });
       this.clearToken();
@@ -169,22 +170,12 @@ class ApiClient {
       contentType: string,
       purpose?: PresignedUploadRequest['purpose'],
     ): Promise<void> => {
-      if (uploadUrl.includes('mock-signature=')) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        return;
-      }
-
       if (purpose && file instanceof File) {
         await this.media.uploadMediaFile(file, purpose);
         return;
       }
 
-      let finalUrl = uploadUrl;
-      if (finalUrl.startsWith('/api/media/demo-upload')) {
-        finalUrl = `/api/proxy${finalUrl.replace('/api/media', '/media')}`;
-      }
-
-      const response = await fetch(finalUrl, {
+      const response = await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': contentType,
@@ -294,7 +285,7 @@ class ApiClient {
 
   // --- Matches APIs ---
   matches = {
-    getTop: () => this.request<any[]>('/matches/top'),
+    getTop: () => this.request<TopMatch[]>('/matches/top'),
   };
 
   // --- Activity APIs ---
@@ -455,15 +446,6 @@ class ApiClient {
     getSubscription: () => this.request<any>('/payments/subscription'),
 
     getInvoices: () => this.request<any[]>('/payments/invoices'),
-
-    activateDemoPlan: (planId: string) =>
-      this.request<{ success: boolean; demoActivated?: boolean; planName?: string; planSlug?: string }>(
-        '/payments/demo-activate',
-        {
-          method: 'POST',
-          body: JSON.stringify({ planId }),
-        }
-      ),
   };
 
   contacts = {
@@ -527,80 +509,6 @@ class ApiClient {
           unlockedAt: string
         }[]
       >('/contacts/unlocked'),
-  };
-
-  locations = {
-    listStates: () => this.request<StateOption[]>('/locations/states'),
-
-    autocomplete: (q: string, state?: string, limit = 10) => {
-      const params = new URLSearchParams({ q, limit: String(limit) })
-      if (state) params.set('state', state)
-      return this.request<CityAutocompleteResult[]>(`/locations/cities/autocomplete?${params.toString()}`)
-    },
-
-    resolve: (q: string) => {
-      const params = new URLSearchParams({ q })
-      return this.request<ResolvedCity | null>(`/locations/cities/resolve?${params.toString()}`)
-    },
-  };
-
-  educations = {
-    listLevels: () => this.request<EducationLevelOption[]>('/educations/levels'),
-
-    listSpecializations: (educationId: number) => {
-      const params = new URLSearchParams({ educationId: String(educationId) })
-      return this.request<SpecializationOption[]>(`/educations/specializations?${params.toString()}`)
-    },
-
-    resolve: (q: string) => {
-      const params = new URLSearchParams({ q })
-      return this.request<ResolvedEducation | null>(`/educations/resolve?${params.toString()}`)
-    },
-  };
-
-  careers = {
-    listOccupations: () => this.request<OccupationOption[]>('/careers/occupations'),
-
-    resolveOccupation: (q: string) => {
-      const params = new URLSearchParams({ q })
-      return this.request<ResolvedOccupation | null>(`/careers/occupations/resolve?${params.toString()}`)
-    },
-
-    searchCompanies: (q: string, limit = 10) => {
-      const params = new URLSearchParams({ q, limit: String(limit) })
-      return this.request<CompanySearchResult[]>(`/careers/companies/search?${params.toString()}`)
-    },
-
-    resolveCompany: (q: string) => {
-      const params = new URLSearchParams({ q })
-      return this.request<ResolvedCompany | null>(`/careers/companies/resolve?${params.toString()}`)
-    },
-  };
-
-  communities = {
-    autocomplete: (q: string, religion: string, limit = 12) => {
-      const params = new URLSearchParams({ q, religion, limit: String(limit) })
-      return this.request<CommunityAutocompleteResult[]>(`/communities/autocomplete?${params.toString()}`)
-    },
-
-    autocompleteSubcastes: (
-      q: string,
-      filters: { communityId?: number; community?: string; religion?: string; limit?: number },
-    ) => {
-      const params = new URLSearchParams({ q, limit: String(filters.limit ?? 12) })
-      if (filters.communityId) params.set('communityId', String(filters.communityId))
-      if (filters.community) params.set('community', filters.community)
-      if (filters.religion) params.set('religion', filters.religion)
-      return this.request<SubcasteAutocompleteResult[]>(
-        `/communities/subcastes/autocomplete?${params.toString()}`,
-      )
-    },
-
-    autocompleteGotras: (q: string, religion?: string, limit = 12) => {
-      const params = new URLSearchParams({ q, limit: String(limit) })
-      if (religion) params.set('religion', religion)
-      return this.request<GotraAutocompleteResult[]>(`/communities/gotras/autocomplete?${params.toString()}`)
-    },
   };
 
   // --- Admin APIs ---

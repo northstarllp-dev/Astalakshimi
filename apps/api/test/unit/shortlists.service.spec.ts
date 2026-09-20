@@ -47,7 +47,9 @@ describe('Feature 7: Shortlisting - ShortlistsService (Unit Tests)', () => {
   describe('getShortlists', () => {
     it('should return empty array if user has no shortlists', async () => {
       mockDb.select = mockQueryBuilder([
-        [{ id: 'prof-curr' }], // Profile exists
+        [{ id: 'prof-curr' }], // getProfileId
+        [{ id: 'prof-curr', gender: 'Male' }], // loadViewerContext: viewer profile
+        [], // loadViewerContext: preferences
         [], // No shortlists
       ]);
 
@@ -72,8 +74,13 @@ describe('Feature 7: Shortlisting - ShortlistsService (Unit Tests)', () => {
 
       mockDb.select = mockQueryBuilder([
         [{ id: 'prof-curr' }], // getProfileId
+        [{ id: 'prof-curr', gender: 'Male' }], // loadViewerContext: viewer profile
+        [], // loadViewerContext: preferences
         mockShortlists, // userShortlists query
         mockPhotos, // photos query
+        [], // user settings
+        [], // accepted interests
+        [], // verifications
       ]);
 
       const result = await shortlistsService.getShortlists('user-uuid-1');
@@ -82,7 +89,10 @@ describe('Feature 7: Shortlisting - ShortlistsService (Unit Tests)', () => {
       expect(result[0].fullName).toBe('Target User');
       expect(result[0].photos).toEqual(['photo-url.jpg']);
       // 2026 - 1995 = ~31
-      expect(result[0].age).toBeGreaterThanOrEqual(30); 
+      expect(result[0].age).toBeGreaterThanOrEqual(30);
+      // Real compatibility score (base 40 + age-fit 5 with empty prefs), not a hardcoded 92.
+      expect(result[0].matchPercent).toBe(45);
+      expect(result[0].matchReasons).toEqual(['Age match']);
     });
   });
 

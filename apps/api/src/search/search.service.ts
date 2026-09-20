@@ -4,7 +4,13 @@ import type { Database } from '@astalakshimi/database';
 import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans, verifications } from '@astalakshimi/database';
 import { eq, and, ne, inArray, gte, lte, or, desc, sql, isNotNull, gt } from 'drizzle-orm';
 import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
+import { loadViewerContext } from '../matches/viewer-context';
+import { scoreCandidate } from '../matches/match-scoring';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+
+// Hard cap for the score-ranked default tab: we fetch + score the whole
+// filtered candidate set in Node (bounded), rank, then paginate in memory.
+const SCORE_POOL_CAP = 2000;
 
 @Injectable()
 export class SearchService {
@@ -49,11 +55,10 @@ export class SearchService {
     profiles: Array<Record<string, unknown>>;
     totalCount: number;
   }> {
-    const [currentUser] = await this.db
-      .select({ id: profiles.id, gender: profiles.gender })
-      .from(profiles)
-      .where(eq(profiles.userId, userId))
-      .limit(1);
+    // Viewer profile + partner preferences — powers gender targeting,
+    // connection lookups, and compatibility scoring in one load.
+    const viewer = await loadViewerContext(this.db, userId);
+    const currentUser = viewer ? { id: viewer.profileId, gender: viewer.gender } : undefined;
 
     const conditions: any[] = [ne(profiles.userId, userId)];
 
@@ -82,13 +87,10 @@ export class SearchService {
     conditions.push(isNotNull(profiles.aboutMe));
     conditions.push(sql`EXISTS (SELECT 1 FROM profile_photos WHERE profile_photos.profile_id = profiles.id AND profile_photos.is_primary = true)`);
     
-    // advanced filters (paid entitlement)
+    // advanced filters (paid entitlement). The Discover client always sends
+    // its advanced object, even when every filter is empty — only enforce the
+    // entitlement (and apply filters) when something is actually set.
     if (filters.advanced) {
-      const hasAdvanced = await this.entitlementsService.checkEntitlement(userId, 'advanced_filters');
-      if (!hasAdvanced) {
-        throw new ForbiddenException('Advanced filters require a paid plan. Please upgrade your plan.');
-      }
-
       // Only swallow JSON.parse failures. Validation throws (BadRequestException)
       // must propagate so the client gets a real 400 instead of a silent pass.
       let adv: any;
@@ -97,6 +99,19 @@ export class SearchService {
           typeof filters.advanced === 'string' ? JSON.parse(filters.advanced) : filters.advanced;
       } catch {
         throw new BadRequestException('Invalid "advanced" payload (must be JSON)');
+      }
+
+      const hasAnyAdvancedFilter =
+        adv &&
+        Object.values(adv).some(
+          (v) => (Array.isArray(v) && v.length > 0) || (!Array.isArray(v) && v != null && v !== ''),
+        );
+
+      if (hasAnyAdvancedFilter) {
+        const hasAdvanced = await this.entitlementsService.checkEntitlement(userId, 'advanced_filters');
+        if (!hasAdvanced) {
+          throw new ForbiddenException('Advanced filters require a paid plan. Please upgrade your plan.');
+        }
       }
 
       if (adv.heights && adv.heights.length > 0) {
@@ -121,49 +136,77 @@ export class SearchService {
     const limit = parseInt(filters.limit || '10', 10);
     const offset = (page - 1) * limit;
 
-    let orderByClause: any;
-    if (filters.tab === 'new') {
-      orderByClause = desc(profiles.createdAt);
-    }
+    const isScoreRanked = filters.tab !== 'new';
 
-    let query: any = this.db
-      .select({
-        id: profiles.id,
-        userId: profiles.userId,
-        fullName: profiles.fullName,
-        gender: profiles.gender,
-        dob: profiles.dob,
-        religion: profiles.religion,
-        caste: profiles.caste,
-        maritalStatus: profiles.maritalStatus,
-        heightCm: profiles.heightCm,
-        educationLevel: profiles.educationLevel,
-        profession: profiles.profession,
-        companyName: profiles.companyName,
-        annualIncome: profiles.annualIncome,
-        motherTongue: profiles.motherTongue,
-        aboutMe: profiles.aboutMe,
-        city: profiles.city,
-        state: profiles.state,
-        country: profiles.country,
-        createdAt: profiles.createdAt,
-      })
-      .from(profiles)
-      .where(and(...conditions))
-      .limit(limit)
-      .offset(offset);
-      
-    if (orderByClause) {
-      query = query.orderBy(orderByClause);
-    }
-    
-    const countQuery = this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(profiles)
-      .where(and(...conditions));
+    const selectFields = {
+      id: profiles.id,
+      userId: profiles.userId,
+      fullName: profiles.fullName,
+      gender: profiles.gender,
+      dob: profiles.dob,
+      religion: profiles.religion,
+      caste: profiles.caste,
+      maritalStatus: profiles.maritalStatus,
+      heightCm: profiles.heightCm,
+      educationLevel: profiles.educationLevel,
+      profession: profiles.profession,
+      companyName: profiles.companyName,
+      annualIncome: profiles.annualIncome,
+      motherTongue: profiles.motherTongue,
+      aboutMe: profiles.aboutMe,
+      city: profiles.city,
+      state: profiles.state,
+      country: profiles.country,
+      createdAt: profiles.createdAt,
+    };
 
-    const [result, countResult] = await Promise.all([query, countQuery]);
-    const totalCount = countResult[0]?.count ?? 0;
+    let result: Array<any>;
+    let totalCount: number;
+
+    if (isScoreRanked) {
+      // Default tab: rank the whole (bounded) filtered set by compatibility,
+      // then paginate in memory. Newest first breaks score ties.
+      const candidates = await this.db
+        .select(selectFields)
+        .from(profiles)
+        .where(and(...conditions))
+        .orderBy(desc(profiles.createdAt))
+        .limit(SCORE_POOL_CAP);
+
+      const scored = candidates.map((p) => ({
+        p,
+        score: viewer ? scoreCandidate(p as any, viewer.prefs) : null,
+      }));
+      scored.sort(
+        (a, b) =>
+          (b.score?.percent ?? 0) - (a.score?.percent ?? 0) ||
+          new Date(b.p.createdAt).getTime() - new Date(a.p.createdAt).getTime(),
+      );
+      totalCount = scored.length;
+      result = scored.slice(offset, offset + limit).map((s) => ({ ...s.p, score: s.score }));
+    } else {
+      // "New" tab: SQL ordering + pagination as-is, score the returned page.
+      let query: any = this.db
+        .select(selectFields)
+        .from(profiles)
+        .where(and(...conditions))
+        .limit(limit)
+        .offset(offset);
+
+      query = query.orderBy(desc(profiles.createdAt));
+
+      const countQuery = this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(profiles)
+        .where(and(...conditions));
+
+      const [rows, countResult] = await Promise.all([query, countQuery]);
+      totalCount = countResult[0]?.count ?? 0;
+      result = rows.map((p: any) => ({
+        ...p,
+        score: viewer ? scoreCandidate(p as any, viewer.prefs) : null,
+      }));
+    }
 
     const profileIds = result.map((p) => p.id);
     const userIds = result.map((p) => p.userId);
@@ -257,7 +300,7 @@ export class SearchService {
       verificationRows.map((v: any) => [v.profileId, v.status]),
     );
 
-    const mappedResult = result.map((profile) => {
+    const mappedResult = result.map(({ score, ...profile }: any) => {
       const primaryPhoto = photos.get(profile.id);
       const setting = settings.find((s) => s.userId === profile.userId);
       const userSub = activeSubs.find((s) => s.userId === profile.userId);
@@ -296,6 +339,8 @@ export class SearchService {
         lastActive: 'Online now',
         community: profile.caste || 'Unknown',
         height: profile.heightCm ? `${profile.heightCm} cm` : 'Unknown',
+        matchPercent: score?.percent ?? null,
+        matchReasons: score?.reasons ?? [],
       };
     });
 

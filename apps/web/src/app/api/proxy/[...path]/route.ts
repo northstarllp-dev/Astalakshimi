@@ -113,8 +113,19 @@ async function handleProxy(request: NextRequest, { params }: { params: Promise<{
           });
           finalResponse.cookies.delete('astalakshimi.auth_token');
           finalResponse.cookies.delete('astalakshimi.refresh_token');
+          finalResponse.cookies.delete('astalakshimi.has_profile');
           return finalResponse;
         }
+      } else {
+        // Access token bad and no refresh token — clear session so middleware can't loop.
+        const finalResponse = new NextResponse(res.body, {
+          status: 401,
+          statusText: 'Unauthorized',
+        });
+        finalResponse.cookies.delete('astalakshimi.auth_token');
+        finalResponse.cookies.delete('astalakshimi.refresh_token');
+        finalResponse.cookies.delete('astalakshimi.has_profile');
+        return finalResponse;
       }
     }
 

@@ -13,7 +13,12 @@
     "build": "pnpm --filter @astalakshimi/web build",
     "start": "pnpm --filter @astalakshimi/web start",
     "lint": "pnpm --filter @astalakshimi/web lint",
-    "typecheck": "pnpm --filter @astalakshimi/web typecheck",
+    "typecheck": "pnpm -r --filter @astalakshimi/web --filter @astalakshimi/api --filter @astalakshimi/reference --filter @astalakshimi/validation --filter @astalakshimi/types typecheck",
+    "test": "pnpm -r --filter @astalakshimi/api --filter @astalakshimi/web --filter @astalakshimi/reference --filter @astalakshimi/validation test",
+    "test:api": "pnpm --filter @astalakshimi/api test",
+    "test:web": "pnpm --filter @astalakshimi/web test",
+    "test:packages": "pnpm --filter @astalakshimi/reference --filter @astalakshimi/validation test",
+    "test:e2e": "playwright test",
     "db:migrate": "pnpm --filter @astalakshimi/database db:migrate",
     "db:push": "pnpm --filter @astalakshimi/database db:push",
     "db:generate": "pnpm --filter @astalakshimi/database db:generate",
@@ -22,7 +27,8 @@
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
-    "typescript": "^5.8.3"
+    "@playwright/test": "^1",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "next-auth": "5.0.0-beta.32"

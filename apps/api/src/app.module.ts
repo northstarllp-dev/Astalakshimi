@@ -23,12 +23,10 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { BlocksModule } from './blocks/blocks.module';
 import { ContactsModule } from './contacts/contacts.module';
-import { LocationsModule } from './locations/locations.module';
-import { EducationsModule } from './educations/educations.module';
-import { CareersModule } from './careers/careers.module';
-import { CommunitiesModule } from './communities/communities.module';
 import { CommonModule } from './common/common.module';
 import { EnrollmentGuard } from './common/guards/enrollment.guard';
+import { ProfileGuard } from './common/guards/profile.guard';
+import { JwtAuthGuard } from './common/guards/auth.guard';
 
 @Module({
   imports: [
@@ -59,18 +57,20 @@ import { EnrollmentGuard } from './common/guards/enrollment.guard';
     ChatModule,
     BlocksModule,
     ContactsModule,
-    LocationsModule,
-    EducationsModule,
-    CareersModule,
-    CommunitiesModule,
   ],
   providers: [
     // Global rate limiting (per-IP). Auth endpoints apply stricter per-route limits.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Global authentication: every HTTP route needs a valid JWT unless @Public().
+    // Registered globally (not just per-controller) so authorization guards below
+    // always see request.user populated. Order matters: JWT first.
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
     // Single uniform authz resolver. Routes that declare @Roles() or
     // @RequireEntitlement() get checked here; everything else is unaffected.
-    // Runs after JwtAuthGuard populates request.user (see JwtAuthGuard comment).
     { provide: APP_GUARD, useClass: EnrollmentGuard },
+    // Enrollment gate: authenticated users without a profile can only reach
+    // @AllowIncomplete() onboarding routes (or @Roles staff routes). Runs last.
+    { provide: APP_GUARD, useClass: ProfileGuard },
   ],
 })
 export class AppModule {}

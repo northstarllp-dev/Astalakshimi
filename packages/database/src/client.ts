@@ -3,12 +3,15 @@ import postgres from 'postgres';
 import * as schema from './schema/index';
 
 export function createDbClient(connectionString?: string) {
-  const url =
-    connectionString ||
-    process.env.DATABASE_URL ||
-    'postgresql://postgres:postgres@localhost:5432/astalakshimi';
+  const url = connectionString || process.env.DATABASE_URL?.trim();
+  if (!url) {
+    throw new Error('DATABASE_URL is required to create a database client.');
+  }
 
-  const isSsl = url.includes('rds.amazonaws.com') || url.includes('sslmode=require') || process.env.DATABASE_SSL === 'true';
+  const isSsl =
+    url.includes('rds.amazonaws.com') ||
+    url.includes('sslmode=require') ||
+    process.env.DATABASE_SSL === 'true';
 
   const client = postgres(url, {
     max: 10,

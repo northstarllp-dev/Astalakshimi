@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -13,11 +17,24 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@astalakshimi/types": ["../../packages/types/src/index.ts"],
-      "@astalakshimi/validation": ["../../packages/validation/src/index.ts"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@astalakshimi/reference": [
+        "../../packages/reference/src/index.ts"
+      ],
+      "@astalakshimi/types": [
+        "../../packages/types/src/index.ts"
+      ],
+      "@astalakshimi/validation": [
+        "../../packages/validation/src/index.ts"
+      ]
     }
   },
   "include": [
@@ -26,7 +43,10 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    ".next/dev/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

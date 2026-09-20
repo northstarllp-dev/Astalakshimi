@@ -21,6 +21,7 @@ import {
   ProfileContactUnlockDialog,
   type ContactAccessState,
 } from "@/components/profile/profile-contact-unlock-dialog"
+import { maritalAsksChildren } from "@/lib/identity-fields"
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -48,11 +49,21 @@ type ProfileAboutSectionProps = {
   profileId: string
   gender: string
   maritalStatus: string
+  hasChildren?: boolean | null
+  childrenCount?: number | null
+  childrenLivingWithMe?: boolean | null
+  height?: string
+  weight?: string
+  complexion?: string
+  disability?: string
   religion: string
   community: string
+  subcaste?: string
+  gotra?: string
   motherTongue: string
   city: string
   state: string
+  willingToRelocate?: string
   hasHoroscope?: boolean
   horoscopeFileName?: string | null
   horoscopeS3Key?: string | null
@@ -65,11 +76,21 @@ export function ProfileAboutSection({
   profileId,
   gender,
   maritalStatus,
+  hasChildren = false,
+  childrenCount = 0,
+  childrenLivingWithMe = null,
+  height,
+  weight,
+  complexion,
+  disability,
   religion,
   community,
+  subcaste,
+  gotra,
   motherTongue,
   city,
   state,
+  willingToRelocate,
   hasHoroscope,
   horoscopeFileName,
   horoscopeS3Key,
@@ -123,10 +144,37 @@ export function ProfileAboutSection({
 
         <dl>
           <DetailRow label="Marital status" value={maritalStatus} />
+          {maritalAsksChildren(maritalStatus) && (
+            <>
+              <DetailRow label="Has children" value={hasChildren ? "Yes" : "No"} />
+              {hasChildren ? (
+                <>
+                  <DetailRow label="Children" value={String(childrenCount || 0)} />
+                  <DetailRow
+                    label="Children live with"
+                    value={
+                      childrenLivingWithMe === true
+                        ? "Yes"
+                        : childrenLivingWithMe === false
+                          ? "No"
+                          : "Not specified"
+                    }
+                  />
+                </>
+              ) : null}
+            </>
+          )}
+          {height ? <DetailRow label="Height" value={height} /> : null}
+          {weight ? <DetailRow label="Weight" value={weight} /> : null}
+          {complexion ? <DetailRow label="Complexion" value={complexion} /> : null}
+          {disability ? <DetailRow label="Disability" value={disability} /> : null}
           <DetailRow label="Religion" value={religion} />
           <DetailRow label="Community" value={community} />
+          {subcaste?.trim() ? <DetailRow label="Subcaste" value={subcaste.trim()} /> : null}
+          {gotra?.trim() ? <DetailRow label="Gotra" value={gotra.trim()} /> : null}
           <DetailRow label="Mother tongue" value={motherTongue} />
           <DetailRow label="Lives in" value={`${city}, ${state}`} />
+          {willingToRelocate ? <DetailRow label="Willing to relocate" value={willingToRelocate} /> : null}
 
           <div className="flex items-start justify-between gap-4 border-b border-border/70 py-3 last:border-0">
             <dt className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">

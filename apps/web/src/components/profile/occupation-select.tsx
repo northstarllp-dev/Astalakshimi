@@ -1,61 +1,53 @@
 "use client"
 
 import * as React from "react"
+import { Input } from "@/components/ui/input"
 import { SearchableSelect } from "@/components/profile/searchable-select"
-import { apiClient } from "@/lib/api-client"
-import type { OccupationOption } from "@astalakshimi/types"
+import { cn } from "@/lib/utils"
+import { EMPLOYMENT_STATUSES } from "@/lib/profile-store"
 
+/**
+ * Occupation is now flat: an `employmentStatus` enum (Employed / Business
+ * Owner / Freelancer / Not Working) plus a free-text `profession`. No catalog
+ * FK ids and no backend autocomplete — everything is client-side.
+ */
 type OccupationSelectProps = {
-  occupationId?: number | null
-  onOccupationChange: (value: { occupationId: number | null; occupation: string; profession: string }) => void
+  employmentStatus?: string
+  profession?: string
+  onOccupationChange: (value: { employmentStatus: string; profession: string }) => void
   className?: string
+  missing?: boolean
+  error?: string
 }
 
-export function OccupationSelect({ occupationId, onOccupationChange, className }: OccupationSelectProps) {
-  const [occupations, setOccupations] = React.useState<OccupationOption[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [loadError, setLoadError] = React.useState<string | null>(null)
-
-  React.useEffect(() => {
-    setLoading(true)
-    setLoadError(null)
-    apiClient.careers
-      .listOccupations()
-      .then(setOccupations)
-      .catch((error) => {
-        console.error(error)
-        setOccupations([])
-        setLoadError("Could not load occupations. Please refresh and try again.")
-      })
-      .finally(() => setLoading(false))
-  }, [])
-
-  const options = occupations.map((item) => ({
-    value: String(item.id),
-    label: item.category ? `${item.name} · ${item.category}` : item.name,
-  }))
+export function OccupationSelect({
+  employmentStatus = "",
+  profession = "",
+  onOccupationChange,
+  className,
+  missing,
+  error,
+}: OccupationSelectProps) {
+  const options = EMPLOYMENT_STATUSES.map((status) => ({ value: status, label: status }))
 
   return (
-    <SearchableSelect
-      value={occupationId ? String(occupationId) : undefined}
-      onValueChange={(value) => {
-        const next = occupations.find((item) => String(item.id) === value)
-        onOccupationChange({
-          occupationId: next?.id ?? null,
-          occupation: next?.name ?? "",
-          profession: next?.name ?? "",
-        })
-      }}
-      options={options}
-      placeholder={loading ? "Loading occupations…" : "Select occupation"}
-      searchPlaceholder="Search occupation…"
-      emptyText={
-        loading
-          ? "Loading occupations…"
-          : loadError ?? (options.length === 0 ? "No occupations available." : "No results found.")
-      }
-      disabled={loading || Boolean(loadError)}
-      className={className}
-    />
+    <div className="space-y-2">
+      <SearchableSelect
+        value={employmentStatus || undefined}
+        onValueChange={(value) => onOccupationChange({ employmentStatus: value, profession })}
+        options={options}
+        placeholder="Select employment status"
+        searchPlaceholder="Search employment status…"
+        emptyText="No results found."
+        className={cn(missing && "border-destructive", className)}
+      />
+      <Input
+        value={profession}
+        onChange={(e) => onOccupationChange({ employmentStatus, profession: e.target.value })}
+        placeholder="Enter your profession / designation"
+        className={className}
+      />
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </div>
   )
 }

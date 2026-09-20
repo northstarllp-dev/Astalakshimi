@@ -9,17 +9,34 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class PaymentsService {
-  private razorpay: Razorpay;
+  private razorpay: Razorpay | null = null;
   private readonly logger = new Logger(PaymentsService.name);
 
   constructor(
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly configService: ConfigService,
   ) {
-    this.razorpay = new Razorpay({
-      key_id: this.configService.get<string>('payments.razorpayKeyId'),
-      key_secret: this.configService.get<string>('payments.razorpayKeySecret'),
-    });
+    const keyId = this.configService.get<string>('payments.razorpayKeyId') || '';
+    const keySecret = this.configService.get<string>('payments.razorpayKeySecret') || '';
+    if (keyId && keySecret) {
+      this.razorpay = new Razorpay({
+        key_id: keyId,
+        key_secret: keySecret,
+      });
+    } else {
+      this.logger.warn(
+        '[PaymentsService] Razorpay keys not set — paid checkout/contact unlock will fail until RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are configured.',
+      );
+    }
+  }
+
+  private requireRazorpay(): Razorpay {
+    if (!this.razorpay) {
+      throw new BadRequestException(
+        'Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env.',
+      );
+    }
+    return this.razorpay;
   }
 
   async createOrder(userId: string, planIdentifier: string) {
@@ -71,6 +88,7 @@ export class PaymentsService {
     }
 
     try {
+      const razorpay = this.requireRazorpay();
       // 4. Backend creates payment order with Razorpay
       const options = {
         amount: amountPaise,
@@ -85,7 +103,7 @@ export class PaymentsService {
       
       let order: any;
       try {
-        order = await this.razorpay.orders.create(options);
+        order = await razorpay.orders.create(options);
       } catch (rError) {
         this.logger.error('Razorpay order creation failed:', rError);
         throw new InternalServerErrorException('Failed to create payment order with provider');
@@ -112,13 +130,12 @@ export class PaymentsService {
         planName: plan.name,
       };
     } catch (err) {
+      if (err instanceof BadRequestException || err instanceof NotFoundException || err instanceof InternalServerErrorException) {
+        throw err;
+      }
       this.logger.error('Error creating payment order:', err);
       throw new InternalServerErrorException('Failed to create payment order');
     }
-  }
-
-  private isDemoPaymentsEnabled() {
-    return process.env.NODE_ENV !== 'production';
   }
 
   private async activatePlanForUser(
@@ -145,48 +162,17 @@ export class PaymentsService {
     });
   }
 
-  async activateDemoPlan(userId: string, planIdentifier: string) {
-    if (!this.isDemoPaymentsEnabled()) {
-      throw new BadRequestException('Demo plan activation is disabled in production.');
-    }
-
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(planIdentifier);
-    const planCondition = isUuid ? eq(plans.id, planIdentifier) : eq(plans.slug, planIdentifier);
-    const [plan] = await this.db.select().from(plans).where(planCondition).limit(1);
-    if (!plan) throw new NotFoundException(`Plan '${planIdentifier}' not found`);
-
-    const stamp = Date.now();
-    const [payment] = await this.db
-      .insert(payments)
-      .values({
-        userId,
-        planId: plan.id,
-        amountPaise: plan.pricePaise,
-        currency: 'INR',
-        provider: 'razorpay',
-        providerOrderId: `demo_skip_${plan.slug}_${stamp}`,
-        providerPaymentId: `demo_pay_${stamp}`,
-        status: 'captured',
-      })
-      .returning();
-
-    await this.activatePlanForUser(userId, plan, payment?.id);
-
-    return {
-      success: true,
-      demoActivated: true,
-      planName: plan.name,
-      planSlug: plan.slug,
-    };
-  }
-
   async verifyPayment(
     userId: string,
     razorpayOrderId: string,
     razorpayPaymentId: string,
     razorpaySignature: string,
   ) {
+    this.requireRazorpay();
     const secret = this.configService.getOrThrow<string>('payments.razorpayKeySecret');
+    if (!secret) {
+      throw new BadRequestException('Razorpay is not configured.');
+    }
 
     // Verify signature
     const generatedSignature = crypto
@@ -323,29 +309,21 @@ export class PaymentsService {
 
     const amountPaise = 2900; // ₹29 extra contact unlock
     const keyId = this.configService.get<string>('payments.razorpayKeyId');
+    const razorpay = this.requireRazorpay();
 
     try {
-      let orderId = `order_cu_${Date.now()}`;
-      let orderAmount: number | string = amountPaise;
-      let orderCurrency = 'INR';
+      const options = {
+        amount: amountPaise,
+        currency: 'INR',
+        receipt: `rcpt_cu_${profile.id.substring(0, 8)}_${Date.now()}`,
+        notes: {
+          userId,
+          type: 'contact_unlock',
+          targetProfileId,
+        },
+      };
 
-      if (keyId && keyId !== 'test_key') {
-        const options = {
-          amount: amountPaise,
-          currency: 'INR',
-          receipt: `rcpt_cu_${profile.id.substring(0, 8)}_${Date.now()}`,
-          notes: {
-            userId,
-            type: 'contact_unlock',
-            targetProfileId,
-          },
-        };
-
-        const order = await this.razorpay.orders.create(options);
-        orderId = order.id;
-        orderAmount = order.amount;
-        orderCurrency = order.currency;
-      }
+      const order = await razorpay.orders.create(options);
 
       // Bind the order to the target at creation so verify can never redirect it.
       await this.db.insert(payments).values({
@@ -353,19 +331,20 @@ export class PaymentsService {
         amountPaise,
         currency: 'INR',
         provider: 'razorpay',
-        providerOrderId: orderId,
+        providerOrderId: order.id,
         status: 'created',
         targetProfileId,
       });
 
       return {
-        orderId,
-        amount: orderAmount,
-        currency: orderCurrency,
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
         keyId,
         targetProfileId,
       };
     } catch (err) {
+      if (err instanceof BadRequestException) throw err;
       this.logger.error('Error creating contact unlock order:', err);
       throw new InternalServerErrorException('Failed to create payment order');
     }
@@ -378,18 +357,18 @@ export class PaymentsService {
     razorpayPaymentId: string,
     razorpaySignature: string,
   ) {
+    this.requireRazorpay();
     const secret = this.configService.getOrThrow<string>('payments.razorpayKeySecret');
+    if (!secret) {
+      throw new BadRequestException('Razorpay is not configured.');
+    }
 
-    // Signature check. The demo path is dev-only (env-gated) so it can never ship
-    // to production, and production itself refuses to start without a real secret.
     const generatedSignature = crypto
       .createHmac('sha256', secret)
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
-    const isDevDemo =
-      process.env.NODE_ENV !== 'production' && razorpaySignature === 'demo_signature';
-    if (generatedSignature !== razorpaySignature && !isDevDemo) {
+    if (generatedSignature !== razorpaySignature) {
       throw new BadRequestException('Invalid payment signature');
     }
 

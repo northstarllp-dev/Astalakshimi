@@ -26,8 +26,11 @@ import {
   RELIGIONS,
   MOTHER_TONGUES,
   MARITAL_STATUSES,
+  DIETS,
   FAMILY_TYPES,
   FAMILY_STATUS,
+  FAMILY_VALUES,
+  PARENT_OCCUPATIONS,
   loadSignupDraft,
   saveSignupDraft,
   clearSignupDraft,
@@ -37,6 +40,8 @@ import {
 import { StepHeading, StepProgress, TapCard } from "@/components/signup/shared"
 import { CityAutocomplete } from "@/components/profile/city-autocomplete"
 import { CommunityFields } from "@/components/profile/community-fields"
+import { HeightInput } from "@/components/profile/input-with-unit"
+import { ChildrenFields } from "@/components/profile/children-fields"
 import { Step4Verify, VerificationSubmitted } from "@/components/signup/step-verify"
 import { useSaveProfileMutation } from "@/hooks/queries"
 import {
@@ -66,7 +71,14 @@ function SignupPageInner() {
     const draft = loadSignupDraft()
     if (draft?.data.submittedAt) {
       clearSignupDraft()
-      router.replace("/home")
+      void (async () => {
+        try {
+          await apiClient.auth.syncEnrollment()
+        } catch {
+          /* still try home; middleware will bounce if incomplete */
+        }
+        router.replace("/home")
+      })()
       return
     }
     if (draft) {
@@ -99,6 +111,27 @@ function SignupPageInner() {
     }
     setHydrated(true)
   }, [router, presetPhone, fromLogin])
+
+  // Heal: already-enrolled users (or missing has_profile cookie) shouldn't stay on onboarding.
+  React.useEffect(() => {
+    if (!hydrated || submitted) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const me = await apiClient.auth.getMe()
+        if (cancelled) return
+        if (me.hasProfile) {
+          await apiClient.auth.syncEnrollment()
+          router.replace("/home")
+        }
+      } catch {
+        /* not logged in yet — stay on register */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [hydrated, submitted, router])
 
   React.useEffect(() => {
     const ref = searchParams.get("ref")
@@ -133,7 +166,10 @@ function SignupPageInner() {
   }
 
   const finishVerification = async (enteredOtp?: string) => {
-    const otpToUse = enteredOtp || data.otp || '123456'
+    const otpToUse = enteredOtp || data.otp
+    if (!otpToUse) {
+      throw new Error('Enter the OTP sent to your phone.')
+    }
     
     // First verify OTP and get token
     try {
@@ -181,7 +217,7 @@ function SignupPageInner() {
                 <ArrowLeft className="h-4 w-4" />
               </button>
             )}
-            <Logo />
+            <Logo href={null} />
           </div>
           {!submitted && <StepProgress step={step} total={TOTAL_STEPS} />}
         </div>
@@ -269,7 +305,7 @@ function Step1AccountCreation({
 }) {
   const [loading, setLoading] = useState(false)
   const form = useForm({
-    resolver: zodResolver(signupStep1Schema),
+    resolver: zodResolver(signupStep1Schema) as any,
     defaultValues: { profileFor: data.profileFor, phone: data.phone, terms: false },
     mode: "onChange",
   })
@@ -515,7 +551,7 @@ function Step2Identity({
 }) {
   const p = genderPrefix(data.profileFor, data.gender)
   const form = useForm({
-    resolver: zodResolver(signupStep2Schema),
+    resolver: zodResolver(signupStep2Schema) as any,
     values: {
       fullName: data.fullName,
       gender: data.gender,
@@ -523,7 +559,12 @@ function Step2Identity({
       dobMonth: data.dobMonth,
       dobYear: data.dobYear,
       maritalStatus: data.maritalStatus,
+      diet: data.diet,
       city: data.city,
+      height: data.height,
+      hasChildren: data.hasChildren,
+      childrenCount: data.childrenCount,
+      childrenLivingWithMe: data.childrenLivingWithMe,
     },
     mode: "onChange",
   })
@@ -580,7 +621,14 @@ function Step2Identity({
           <Label>{p}Marital status</Label>
           <Select
             value={data.maritalStatus || undefined}
-            onValueChange={(maritalStatus) => updateData({ maritalStatus })}
+            onValueChange={(maritalStatus) =>
+              updateData({
+                maritalStatus,
+                ...(maritalStatus === "Divorced" || maritalStatus === "Widowed"
+                  ? {}
+                  : { hasChildren: false, childrenCount: 0, childrenLivingWithMe: null }),
+              })
+            }
           >
             <SelectTrigger className="w-full" aria-label="Marital status">
               <SelectValue placeholder="Select marital status" />
@@ -595,13 +643,57 @@ function Step2Identity({
           </Select>
           </div>
 
+        {/* Diet */}
+        <div className="space-y-2">
+          <Label>{p}Diet</Label>
+          <Select
+            value={data.diet || undefined}
+            onValueChange={(diet) => updateData({ diet })}
+          >
+            <SelectTrigger className="w-full" aria-label="Diet">
+              <SelectValue placeholder="Select diet" />
+            </SelectTrigger>
+            <SelectContent>
+              {DIETS.map((d) => (
+                <SelectItem key={d} value={d}>
+                  {d}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.diet && <p className="text-xs text-destructive">{errors.diet.message}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label>{p}Height</Label>
+          <HeightInput value={data.height} onChange={(height) => updateData({ height })} />
+          {errors.height && <p className="text-xs text-destructive">{errors.height.message}</p>}
+        </div>
+
+        <ChildrenFields
+          maritalStatus={data.maritalStatus}
+          hasChildren={data.hasChildren}
+          childrenCount={data.childrenCount}
+          childrenLivingWithMe={data.childrenLivingWithMe}
+          prefix={p}
+          errors={{
+            hasChildren: errors.hasChildren?.message,
+            childrenCount: errors.childrenCount?.message,
+            childrenLivingWithMe: errors.childrenLivingWithMe?.message,
+          }}
+          onChange={(next) => updateData(next)}
+        />
+
         {/* Location */}
         <div className="space-y-2">
           <Label htmlFor="city">{p}Current city</Label>
           <CityAutocomplete
             city={data.city}
             state={data.state}
-            onCityChange={({ city, state }) => updateData({ city, state })}
+            citySlug={data.citySlug}
+            onCityChange={({ city, state, citySlug }) =>
+              updateData({ city, state, citySlug: citySlug ?? "" })
+            }
             placeholder="Search city…"
           />
           {errors.city && <p className="text-xs text-destructive">{errors.city.message}</p>}
@@ -659,7 +751,15 @@ function Step3Community({
           <Label htmlFor="religion">{p}Religion / community</Label>
           <Select
             value={data.religion || undefined}
-            onValueChange={(religion) => updateData({ religion })}
+            onValueChange={(religion) =>
+              updateData({
+                religion,
+                caste: "",
+                communitySlug: "",
+                subcaste: "",
+                gotra: "",
+              })
+            }
           >
             <SelectTrigger id="religion" className="w-full">
               <SelectValue placeholder="Select religion" />
@@ -679,6 +779,7 @@ function Step3Community({
           <CommunityFields
             religion={data.religion}
             caste={data.caste}
+            communitySlug={data.communitySlug}
             subcaste={data.subcaste}
             gotra={data.gotra}
             onChange={(value) => updateData(value)}
@@ -746,13 +847,72 @@ function Step3Community({
                 <SelectValue placeholder="Select family status" />
               </SelectTrigger>
               <SelectContent>
-                {FAMILY_STATUS.map((s: any) => (
+                {FAMILY_STATUS.map((s) => (
                   <SelectItem key={s} value={s}>
                     {s}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+        </div>
+
+          {/* Family values */}
+        <div className="space-y-2">
+            <Label htmlFor="familyValues">{p}Family values</Label>
+            <Select
+              value={data.familyValues || undefined}
+              onValueChange={(familyValues) => updateData({ familyValues })}
+            >
+              <SelectTrigger id="familyValues" className="w-full bg-card">
+                <SelectValue placeholder="Select family values" />
+              </SelectTrigger>
+              <SelectContent>
+                {FAMILY_VALUES.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {v}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="fatherOccupation">{p}Father&apos;s occupation</Label>
+            <Select
+              value={data.fatherOccupation || undefined}
+              onValueChange={(fatherOccupation) => updateData({ fatherOccupation })}
+            >
+              <SelectTrigger id="fatherOccupation" className="w-full bg-card">
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                {PARENT_OCCUPATIONS.map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="motherOccupation">{p}Mother&apos;s occupation</Label>
+            <Select
+              value={data.motherOccupation || undefined}
+              onValueChange={(motherOccupation) => updateData({ motherOccupation })}
+            >
+              <SelectTrigger id="motherOccupation" className="w-full bg-card">
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                {PARENT_OCCUPATIONS.map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {o}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
           {/* Siblings */}

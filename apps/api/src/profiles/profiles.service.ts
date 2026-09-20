@@ -3,8 +3,6 @@ import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { BlocksService } from '../blocks/blocks.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
-import { EducationsService } from '../educations/educations.service';
-import { CareersService } from '../careers/careers.service';
 import {
   profiles,
   users,
@@ -18,12 +16,24 @@ import {
   interests,
   plans,
   subscriptions,
-  specializations,
 } from '@astalakshimi/database';
 import { eq, asc, and, or, inArray, sql } from 'drizzle-orm';
 import type { CompleteRegistrationPayload, FullProfileView } from '@astalakshimi/types';
-import { getApprovedPhotos, getAllPhotos, computeBlurDecision, isOwnedPhotoKey } from '../common/photo-access';
+import { resolveChildrenFields, maritalAsksChildren, PROFILE_FOR_VALUES, MARITAL_STATUS_VALUES } from '@astalakshimi/validation';
+import {
+  findCityBySlug,
+  findCityByNameState,
+  findCommunityBySlug,
+  findCommunityByLabel,
+  isValidReligion,
+  findReligionByLabel,
+  isValidMotherTongue,
+  findMotherTongueByLabel,
+} from '@astalakshimi/reference';
+import { getApprovedPhotos, getOwnerPhotos, computeBlurDecision, isOwnedPhotoKey, photoPrivacyToBlur, photoBlurToPrivacy } from '../common/photo-access';
 import { LruCache } from '../common/cache/lru-cache';
+import { loadViewerContext } from '../matches/viewer-context';
+import { scoreCandidate } from '../matches/match-scoring';
 
 @Injectable()
 export class ProfilesService {
@@ -36,20 +46,118 @@ export class ProfilesService {
     @Inject(DB_CLIENT) private readonly db: Database,
     private readonly blocksService: BlocksService,
     private readonly entitlementsService: EntitlementsService,
-    private readonly educationsService: EducationsService,
-    private readonly careersService: CareersService,
   ) {}
 
-  private invalidateProfileCache(profileId: string) {
+  /** Drizzle `.limit(1)` returns an array; API consumers expect a single row or null. */
+  private firstRow<T>(rows: T[] | T | null | undefined): T | null {
+    if (rows == null) return null;
+    if (Array.isArray(rows)) return rows[0] ?? null;
+    return rows;
+  }
+
+  /** Clear cached public profile base (photos, privacy fields, etc.). */
+  invalidateProfileCache(profileId: string) {
     this.profileViewCache.delete(`base:${profileId}`);
-    this.profileViewCache.delete(`stats:${profileId}`);
+    this.profileViewCache.delete(profileId);
+  }
+
+  async invalidateProfileCacheForUser(userId: string) {
+    const [row] = await this.db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .limit(1);
+    if (row?.id) this.invalidateProfileCache(row.id);
   }
 
   /** Treat blank strings as missing so Postgres enums/varchars never get "". */
-  private emptyToNull(value?: string | null): string | null {
-    if (value == null) return null;
+  private emptyToUndef(value?: string | null): string | undefined {
+    if (value == null) return undefined;
     const trimmed = String(value).trim();
-    return trimmed === '' ? null : trimmed;
+    return trimmed === '' ? undefined : trimmed;
+  }
+
+  private emptyToNull(value?: string | null): string | null {
+    return this.emptyToUndef(value) ?? null;
+  }
+
+  /** Resolve city/caste/religion/tongue against the shared reference catalog. */
+  private resolveCatalogFields(input: {
+    city?: string;
+    state?: string;
+    country?: string;
+    citySlug?: string | null;
+    religion?: string;
+    caste?: string;
+    communitySlug?: string | null;
+    motherTongue?: string;
+    requireLocation?: boolean;
+    requireCommunity?: boolean;
+  }) {
+    const out: {
+      city?: string;
+      state?: string;
+      country?: string;
+      citySlug?: string | null;
+      religion?: string;
+      caste?: string;
+      communitySlug?: string | null;
+      motherTongue?: string;
+    } = {};
+
+    if (input.citySlug || input.city) {
+      const bySlug = input.citySlug ? findCityBySlug(input.citySlug) : undefined;
+      const byName =
+        bySlug ||
+        (input.city
+          ? findCityByNameState(input.city, input.state) || findCityByNameState(input.city)
+          : undefined);
+      if (!byName) {
+        throw new BadRequestException('City must be selected from the catalog');
+      }
+      out.city = byName.label;
+      out.state = byName.state;
+      out.country = byName.country;
+      out.citySlug = byName.slug;
+    } else if (input.requireLocation) {
+      throw new BadRequestException('City is required');
+    }
+
+    if (input.religion !== undefined) {
+      if (!isValidReligion(input.religion)) {
+        throw new BadRequestException('Invalid religion');
+      }
+      out.religion = findReligionByLabel(input.religion)?.label || input.religion;
+    }
+
+    if (input.communitySlug || input.caste) {
+      const bySlug = input.communitySlug ? findCommunityBySlug(input.communitySlug) : undefined;
+      const byLabel =
+        bySlug ||
+        (input.caste
+          ? findCommunityByLabel(input.caste, out.religion || input.religion)
+          : undefined);
+      if (!byLabel) {
+        throw new BadRequestException('Caste / community must be selected from the catalog');
+      }
+      if (out.religion && byLabel.religion !== 'Other' && byLabel.religion !== out.religion) {
+        throw new BadRequestException('Caste does not match the selected religion');
+      }
+      out.caste = byLabel.label;
+      out.communitySlug = byLabel.slug;
+    } else if (input.requireCommunity) {
+      throw new BadRequestException('Caste is required');
+    }
+
+    if (input.motherTongue !== undefined) {
+      if (!isValidMotherTongue(input.motherTongue)) {
+        throw new BadRequestException('Invalid mother tongue');
+      }
+      out.motherTongue =
+        findMotherTongueByLabel(input.motherTongue)?.label || input.motherTongue;
+    }
+
+    return out;
   }
 
   private requireEnum<T extends string>(
@@ -80,50 +188,43 @@ export class ProfilesService {
     const gender = this.requireEnum(payload.gender, ['Male', 'Female', 'Other'] as const, 'gender');
     const maritalStatus = this.requireEnum(
       payload.maritalStatus,
-      ['Never Married', 'Divorced', 'Widowed', 'Awaiting Divorce'] as const,
+      MARITAL_STATUS_VALUES,
       'maritalStatus',
     );
-    const familyValues = this.requireEnum(
-      payload.familyValues,
-      ['Traditional', 'Moderate', 'Liberal'] as const,
-      'familyValues',
-      'Moderate',
-    );
-    const familyType = this.requireEnum(
-      payload.familyType,
-      ['Nuclear', 'Joint', 'Extended'] as const,
-      'familyType',
-      'Nuclear',
-    );
-    const fatherOccupation = this.requireEnum(
-      payload.fatherOccupation,
-      ['Employed', 'Business', 'Retired', 'Homemaker', 'Passed Away'] as const,
-      'fatherOccupation',
-      'Employed',
-    );
-    const motherOccupation = this.requireEnum(
-      payload.motherOccupation,
-      ['Employed', 'Business', 'Retired', 'Homemaker', 'Passed Away'] as const,
-      'motherOccupation',
-      'Homemaker',
-    );
+    const familyValues =
+      this.optionalEnum(
+        payload.familyValues,
+        ['Traditional', 'Moderate', 'Liberal'] as const,
+      ) ?? undefined;
+    const familyType =
+      this.optionalEnum(
+        payload.familyType,
+        ['Nuclear', 'Joint', 'Extended'] as const,
+      ) ?? undefined;
+    const fatherOccupation =
+      this.optionalEnum(
+        payload.fatherOccupation,
+        ['Employed', 'Business', 'Retired', 'Homemaker', 'Passed Away'] as const,
+      ) ?? undefined;
+    const motherOccupation =
+      this.optionalEnum(
+        payload.motherOccupation,
+        ['Employed', 'Business', 'Retired', 'Homemaker', 'Passed Away'] as const,
+      ) ?? undefined;
+    // Diet is required at registration; smoking/alcohol are not collected here
+    // and default to NULL (nullable columns) — no fabricated 'Never' default.
     const diet = this.requireEnum(
       payload.diet,
       ['Vegetarian', 'Non-vegetarian', 'Eggetarian', 'Jain', 'Vegan'] as const,
       'diet',
-      'Vegetarian',
     );
-    const smoking = this.requireEnum(
+    const smoking = this.optionalEnum(
       payload.smoking,
       ['Never', 'Occasionally', 'Regularly', 'Planning to quit'] as const,
-      'smoking',
-      'Never',
     );
-    const alcohol = this.requireEnum(
+    const alcohol = this.optionalEnum(
       payload.alcohol,
       ['Never', 'Occasionally', 'Regularly', 'Planning to quit'] as const,
-      'alcohol',
-      'Never',
     );
     const manglik = this.requireEnum(
       payload.manglik,
@@ -146,46 +247,54 @@ export class ProfilesService {
 
     return {
       ...payload,
-      profileFor: this.emptyToNull(payload.profileFor) || 'Myself',
-      fullName: this.emptyToNull(payload.fullName) || payload.fullName,
+      profileFor: this.requireEnum(
+        payload.profileFor,
+        PROFILE_FOR_VALUES,
+        'profileFor',
+      ),
+      fullName: this.emptyToUndef(payload.fullName) || payload.fullName,
       gender,
       maritalStatus,
-      aboutMe: this.emptyToNull(payload.aboutMe) ?? undefined,
-      city: this.emptyToNull(payload.city) || payload.city,
-      state: this.emptyToNull(payload.state) || payload.state,
-      country: this.emptyToNull(payload.country) || 'India',
-      religion: this.emptyToNull(payload.religion) || payload.religion,
-      caste: this.emptyToNull(payload.caste) || payload.caste,
-      subcaste: this.emptyToNull(payload.subcaste) ?? undefined,
-      gotra: this.emptyToNull(payload.gotra) ?? undefined,
-      motherTongue: this.emptyToNull(payload.motherTongue) || payload.motherTongue,
+      aboutMe: this.emptyToUndef(payload.aboutMe),
+      city: this.emptyToUndef(payload.city) || payload.city,
+      state: this.emptyToUndef(payload.state) || payload.state,
+      country: this.emptyToUndef(payload.country) || 'India',
+      citySlug: this.emptyToUndef(payload.citySlug as string | undefined),
+      willingToRelocate: this.emptyToUndef(payload.willingToRelocate),
+      religion: this.emptyToUndef(payload.religion) || payload.religion,
+      caste: this.emptyToUndef(payload.caste) || payload.caste,
+      communitySlug: this.emptyToUndef(payload.communitySlug as string | undefined),
+      subcaste: this.emptyToUndef(payload.subcaste),
+      gotra: this.emptyToUndef(payload.gotra),
+      motherTongue: this.emptyToUndef(payload.motherTongue) || payload.motherTongue,
       educationLevel: this.optionalEnum(
         payload.educationLevel,
         ['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'High School'] as const,
       ) ?? undefined,
-      degree: this.emptyToNull(payload.degree) ?? undefined,
-      collegeName: this.emptyToNull(payload.collegeName) ?? undefined,
+      degree: this.emptyToUndef(payload.degree),
+      collegeName: this.emptyToUndef(payload.collegeName),
       employmentStatus: this.optionalEnum(
         payload.employmentStatus,
         ['Employed', 'Business Owner', 'Freelancer', 'Not Working'] as const,
       ) ?? undefined,
-      profession: this.emptyToNull(payload.profession) ?? undefined,
-      companyName: this.emptyToNull(payload.companyName) ?? undefined,
+      profession: this.emptyToUndef(payload.profession),
+      companyName: this.emptyToUndef(payload.companyName),
       companySector: this.normalizeCompanySector(payload.companySector) ?? undefined,
-      annualIncome: this.emptyToNull(payload.annualIncome) ?? undefined,
+      annualIncome: this.emptyToUndef(payload.annualIncome),
       familyValues,
       familyType,
+      familyStatus: this.emptyToUndef(payload.familyStatus as string | undefined) ?? undefined,
       fatherOccupation,
       motherOccupation,
       diet,
       smoking,
       alcohol,
       interests: payload.interests ?? [],
-      birthTime: this.emptyToNull(payload.birthTime) ?? undefined,
-      birthPlace: this.emptyToNull(payload.birthPlace) ?? undefined,
+      birthTime: this.emptyToUndef(payload.birthTime),
+      birthPlace: this.emptyToUndef(payload.birthPlace),
       manglik,
-      rashi: this.emptyToNull(payload.rashi) ?? undefined,
-      nakshatra: this.emptyToNull(payload.nakshatra) ?? undefined,
+      rashi: this.emptyToUndef(payload.rashi),
+      nakshatra: this.emptyToUndef(payload.nakshatra),
       prefReligions: payload.prefReligions?.length ? payload.prefReligions : ['Hindu'],
       prefCastes: payload.prefCastes ?? [],
       prefMotherTongues: payload.prefMotherTongues ?? [],
@@ -194,100 +303,18 @@ export class ProfilesService {
         : ['Never Married'],
       prefAcceptableIncomes: payload.prefAcceptableIncomes ?? [],
       prefLocations: payload.prefLocations ?? [],
-      prefMinEducation: this.emptyToNull(payload.prefMinEducation) ?? undefined,
+      prefMinEducation: this.emptyToUndef(payload.prefMinEducation),
       photoS3Keys: payload.photoS3Keys ?? [],
       photoPrivacy,
       verificationMethod,
-      selfieS3Key: this.emptyToNull(payload.selfieS3Key) ?? undefined,
+      selfieS3Key: this.emptyToUndef(payload.selfieS3Key),
       govtIdType: this.optionalEnum(
         payload.govtIdType,
         ['Aadhaar', 'PAN card', 'Passport', 'Driving licence', 'Voter ID'] as const,
       ) ?? undefined,
-      govtIdS3Key: this.emptyToNull(payload.govtIdS3Key) ?? undefined,
-      horoscopeS3Key: this.emptyToNull(payload.horoscopeS3Key) ?? undefined,
-      horoscopeFileName: this.emptyToNull(payload.horoscopeFileName) ?? undefined,
-    };
-  }
-
-  private async buildEducationUpdate(
-    payload: Partial<CompleteRegistrationPayload>,
-    existingEducationId?: number | null,
-  ) {
-    const update: {
-      educationId?: number | null;
-      specializationId?: number | null;
-      degree?: string | null;
-    } = {};
-
-    const nextEducationId =
-      payload.educationId !== undefined ? payload.educationId : existingEducationId ?? null;
-
-    if (payload.educationId !== undefined) {
-      if (payload.educationId === null) {
-        update.educationId = null;
-        update.specializationId = null;
-        update.degree = null;
-        return update;
-      }
-
-      const levelName = await this.educationsService.getLevelName(payload.educationId);
-      if (!levelName) {
-        throw new BadRequestException('Invalid education level');
-      }
-
-      update.educationId = payload.educationId;
-      update.degree = payload.degree || levelName;
-      if (payload.specializationId === undefined) {
-        update.specializationId = null;
-      }
-    }
-
-    if (payload.specializationId !== undefined) {
-      if (payload.specializationId === null) {
-        update.specializationId = null;
-        if (payload.degree) {
-          update.degree = payload.degree;
-        }
-        return update;
-      }
-
-      const [spec] = await this.db
-        .select({
-          id: specializations.id,
-          educationId: specializations.educationId,
-        })
-        .from(specializations)
-        .where(eq(specializations.id, payload.specializationId))
-        .limit(1);
-
-      if (!spec) {
-        throw new BadRequestException('Invalid specialization');
-      }
-      if (nextEducationId && spec.educationId !== nextEducationId) {
-        throw new BadRequestException('Specialization does not match selected education');
-      }
-
-      update.specializationId = payload.specializationId;
-    }
-
-    return update;
-  }
-
-  private async enrichProfileEducation<T extends { educationId?: number | null; specializationId?: number | null; degree?: string | null }>(
-    profile: T,
-  ) {
-    const degree =
-      profile.degree ??
-      (profile.educationId ? await this.educationsService.getLevelName(profile.educationId) : null);
-
-    const specializationName = profile.specializationId
-      ? await this.educationsService.getSpecializationName(profile.specializationId)
-      : null;
-
-    return {
-      ...profile,
-      degree: degree ?? profile.degree,
-      specializationName,
+      govtIdS3Key: this.emptyToUndef(payload.govtIdS3Key),
+      horoscopeS3Key: this.emptyToUndef(payload.horoscopeS3Key),
+      horoscopeFileName: this.emptyToUndef(payload.horoscopeFileName),
     };
   }
 
@@ -313,98 +340,13 @@ export class ProfilesService {
     return this.mapCompanySector(trimmed) ?? null;
   }
 
-  private async buildCareerUpdate(payload: Partial<CompleteRegistrationPayload>) {
-    const update: {
-      occupationId?: number | null;
-      profession?: string | null;
-      companyId?: number | null;
-      companyName?: string | null;
-      companySector?: 'Private' | 'Govt' | 'MNC' | 'Startup' | 'Business';
-    } = {};
-
-    if (payload.occupationId !== undefined && payload.occupationId !== null) {
-      const occupationName = await this.careersService.getOccupationName(payload.occupationId);
-      if (!occupationName) {
-        throw new BadRequestException('Invalid occupation');
-      }
-      update.occupationId = payload.occupationId;
-      update.profession = occupationName;
-    } else if (payload.profession) {
-      const resolved = await this.careersService.resolveOccupation(payload.profession);
-      if (resolved) {
-        update.occupationId = resolved.id;
-        update.profession = resolved.name;
-      } else {
-        update.occupationId = null;
-        update.profession = payload.profession;
-      }
-    } else if (payload.occupationId === null) {
-      update.occupationId = null;
-      update.profession = null;
-    }
-
-    if (payload.companyId !== undefined && payload.companyId !== null) {
-      const companyName = await this.careersService.getCompanyName(payload.companyId);
-      if (!companyName) {
-        throw new BadRequestException('Invalid company');
-      }
-      const resolved = await this.careersService.resolveCompany(companyName);
-      update.companyId = payload.companyId;
-      update.companyName = companyName;
-      const sector = this.mapCompanySector(resolved?.sector);
-      if (sector) update.companySector = sector;
-    } else if (payload.companyName !== undefined) {
-      const trimmed = payload.companyName ? payload.companyName.trim() : '';
-      if (!trimmed) {
-        update.companyId = null;
-        update.companyName = null;
-      } else {
-        const resolved = await this.careersService.resolveCompany(trimmed);
-        if (resolved) {
-          update.companyId = resolved.id;
-          update.companyName = resolved.name;
-          const sector = this.mapCompanySector(resolved.sector);
-          if (sector) update.companySector = sector;
-        } else {
-          update.companyId = null;
-          update.companyName = trimmed;
-        }
-      }
-    } else if (payload.companyId === null) {
-      update.companyId = null;
-    }
-
-    if (payload.profession !== undefined && update.profession === undefined && !payload.occupationId) {
-      update.profession = payload.profession;
-    }
-
-    return update;
-  }
-
-  private async enrichProfileCareer<T extends {
-    occupationId?: number | null;
-    profession?: string | null;
-    companyId?: number | null;
-    companyName?: string | null;
-  }>(profile: T) {
-    const profession =
-      profile.profession ??
-      (profile.occupationId ? await this.careersService.getOccupationName(profile.occupationId) : null);
-
-    const companyName =
-      profile.companyName ??
-      (profile.companyId ? await this.careersService.getCompanyName(profile.companyId) : null);
-
-    return {
-      ...profile,
-      profession: profession ?? profile.profession,
-      companyName: companyName ?? profile.companyName,
-    };
-  }
-
+  /**
+   * Education & career are now flat columns (enum + free text). No FK
+   * enrichment is needed — the stored `educationLevel`/`degree`/`profession`
+   * /`companyName`/`companySector`/`annualIncome` values are already human-readable.
+   */
   private async enrichProfileDetails<T extends Record<string, unknown>>(profile: T) {
-    const withEducation = await this.enrichProfileEducation(profile as any);
-    return this.enrichProfileCareer(withEducation);
+    return profile;
   }
 
   private async getMutualConnectState(
@@ -459,16 +401,60 @@ export class ProfilesService {
     };
   }
 
+  /** Gender-aware minimum age for matrimony profiles (Male 21, others 18). */
+  private assertDobAge(dobYear: string, dobMonth: string, dobDay: string, gender: string) {
+    const year = parseInt(dobYear, 10);
+    const month = parseInt(dobMonth, 10) - 1;
+    const day = parseInt(dobDay, 10);
+    const date = new Date(year, month, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
+      throw new BadRequestException('Invalid date of birth');
+    }
+    const today = new Date();
+    let age = today.getFullYear() - year;
+    const m = today.getMonth() - month;
+    if (m < 0 || (m === 0 && today.getDate() < day)) age--;
+    const minAge = gender === 'Male' ? 21 : 18;
+    if (age < minAge) {
+      throw new BadRequestException(`Must be at least ${minAge} years old (${gender})`);
+    }
+  }
+
   async completeRegistration(userId: string, payload: CompleteRegistrationPayload) {
     const data = this.sanitizeRegistrationPayload(payload);
-    const educationFields = await this.buildEducationUpdate(data);
-    const careerFields = await this.buildCareerUpdate(data);
+    const catalog = this.resolveCatalogFields({
+      city: data.city,
+      state: data.state,
+      citySlug: data.citySlug,
+      religion: data.religion,
+      caste: data.caste,
+      communitySlug: data.communitySlug,
+      motherTongue: data.motherTongue,
+      requireLocation: true,
+      requireCommunity: true,
+    });
+    data.city = catalog.city!;
+    data.state = catalog.state!;
+    data.country = catalog.country || data.country || 'India';
+    data.citySlug = catalog.citySlug;
+    data.religion = catalog.religion!;
+    data.caste = catalog.caste!;
+    data.communitySlug = catalog.communitySlug;
+    data.motherTongue = catalog.motherTongue!;
+
+    this.assertDobAge(data.dobYear, data.dobMonth, data.dobDay, data.gender);
 
     return this.db.transaction(async (tx) => {
       // 1. Format DOB as YYYY-MM-DD
       const month = data.dobMonth.padStart(2, '0');
       const day = data.dobDay.padStart(2, '0');
       const dobStr = `${data.dobYear}-${month}-${day}`;
+      const children = resolveChildrenFields({
+        maritalStatus: data.maritalStatus,
+        hasChildren: data.hasChildren,
+        childrenCount: data.childrenCount,
+        childrenLivingWithMe: data.childrenLivingWithMe,
+      });
 
       // 2. Check if profile already exists for user
       const [existingProfile] = await tx
@@ -489,31 +475,32 @@ export class ProfilesService {
             gender: data.gender,
             dob: dobStr,
             maritalStatus: data.maritalStatus,
-            hasChildren: data.hasChildren ?? false,
-            childrenCount: data.childrenCount ?? 0,
-            childrenLivingWithMe: data.childrenLivingWithMe ?? null,
+            hasChildren: children.hasChildren,
+            childrenCount: children.childrenCount,
+            childrenLivingWithMe: children.childrenLivingWithMe,
             heightCm: data.heightCm,
             aboutMe: data.aboutMe ?? null,
+            weightKg: data.weightKg ?? null,
+            complexion: data.complexion ?? null,
+            disability: data.disability ?? null,
             city: data.city,
             state: data.state,
             country: data.country || 'India',
+            citySlug: data.citySlug ?? null,
+            willingToRelocate: data.willingToRelocate ?? null,
             religion: data.religion,
             caste: data.caste,
+            communitySlug: data.communitySlug ?? null,
             subcaste: data.subcaste ?? null,
             gotra: data.gotra ?? null,
             motherTongue: data.motherTongue,
-            educationId: educationFields.educationId ?? data.educationId ?? null,
-            specializationId: educationFields.specializationId ?? data.specializationId ?? null,
             educationLevel: data.educationLevel ?? null,
-            degree: educationFields.degree ?? data.degree ?? null,
+            degree: data.degree ?? null,
             collegeName: data.collegeName ?? null,
             employmentStatus: data.employmentStatus ?? null,
-            occupationId: careerFields.occupationId ?? data.occupationId ?? null,
-            profession: careerFields.profession ?? data.profession ?? null,
-            companyId: careerFields.companyId ?? data.companyId ?? null,
-            companyName: careerFields.companyName ?? data.companyName ?? null,
-            companySector:
-              careerFields.companySector ?? this.normalizeCompanySector(data.companySector),
+            profession: data.profession ?? null,
+            companyName: data.companyName ?? null,
+            companySector: this.normalizeCompanySector(data.companySector),
             annualIncome: data.annualIncome ?? null,
             photoPrivacy: data.photoPrivacy || 'blurred',
             updatedAt: new Date(),
@@ -524,36 +511,38 @@ export class ProfilesService {
           .insert(profiles)
           .values({
             userId,
+            createdBy: 'self',
             profileFor: data.profileFor,
             fullName: data.fullName,
             gender: data.gender,
             dob: dobStr,
             maritalStatus: data.maritalStatus,
-            hasChildren: data.hasChildren ?? false,
-            childrenCount: data.childrenCount ?? 0,
-            childrenLivingWithMe: data.childrenLivingWithMe ?? null,
+            hasChildren: children.hasChildren,
+            childrenCount: children.childrenCount,
+            childrenLivingWithMe: children.childrenLivingWithMe,
             heightCm: data.heightCm,
             aboutMe: data.aboutMe ?? null,
+            weightKg: data.weightKg ?? null,
+            complexion: data.complexion ?? null,
+            disability: data.disability ?? null,
             city: data.city,
             state: data.state,
             country: data.country || 'India',
+            citySlug: data.citySlug ?? null,
+            willingToRelocate: data.willingToRelocate ?? null,
             religion: data.religion,
             caste: data.caste,
+            communitySlug: data.communitySlug ?? null,
             subcaste: data.subcaste ?? null,
             gotra: data.gotra ?? null,
             motherTongue: data.motherTongue,
-            educationId: educationFields.educationId ?? data.educationId ?? null,
-            specializationId: educationFields.specializationId ?? data.specializationId ?? null,
             educationLevel: data.educationLevel ?? null,
-            degree: educationFields.degree ?? data.degree ?? null,
+            degree: data.degree ?? null,
             collegeName: data.collegeName ?? null,
             employmentStatus: data.employmentStatus ?? null,
-            occupationId: careerFields.occupationId ?? data.occupationId ?? null,
-            profession: careerFields.profession ?? data.profession ?? null,
-            companyId: careerFields.companyId ?? data.companyId ?? null,
-            companyName: careerFields.companyName ?? data.companyName ?? null,
-            companySector:
-              careerFields.companySector ?? this.normalizeCompanySector(data.companySector),
+            profession: data.profession ?? null,
+            companyName: data.companyName ?? null,
+            companySector: this.normalizeCompanySector(data.companySector),
             annualIncome: data.annualIncome ?? null,
             photoPrivacy: data.photoPrivacy || 'blurred',
           })
@@ -566,27 +555,30 @@ export class ProfilesService {
         .insert(familyDetails)
         .values({
           profileId,
-          familyValues: data.familyValues,
-          familyType: data.familyType,
-          fatherOccupation: data.fatherOccupation,
-          motherOccupation: data.motherOccupation,
+          familyValues: data.familyValues ?? null,
+          familyType: data.familyType ?? null,
+          familyStatus: data.familyStatus ?? null,
+          fatherOccupation: data.fatherOccupation ?? null,
+          motherOccupation: data.motherOccupation ?? null,
           brothersCount: data.brothersCount ?? 0,
           sistersCount: data.sistersCount ?? 0,
         })
         .onConflictDoUpdate({
           target: familyDetails.profileId,
           set: {
-            familyValues: data.familyValues,
-            familyType: data.familyType,
-            fatherOccupation: data.fatherOccupation,
-            motherOccupation: data.motherOccupation,
+            familyValues: data.familyValues ?? null,
+            familyType: data.familyType ?? null,
+            familyStatus: data.familyStatus ?? null,
+            fatherOccupation: data.fatherOccupation ?? null,
+            motherOccupation: data.motherOccupation ?? null,
             brothersCount: data.brothersCount ?? 0,
             sistersCount: data.sistersCount ?? 0,
             updatedAt: new Date(),
           },
         });
 
-      // 4. Upsert Lifestyle & Interests
+      // 4. Upsert Lifestyle & Interests — smoking/alcohol not collected at
+      // registration → NULL; diet required; interests default to [].
       await tx
         .insert(lifestyleInterests)
         .values({
@@ -600,8 +592,8 @@ export class ProfilesService {
           target: lifestyleInterests.profileId,
           set: {
             diet: data.diet,
-            smoking: data.smoking || 'Never',
-            alcohol: data.alcohol || 'Never',
+            smoking: data.smoking ?? null,
+            alcohol: data.alcohol ?? null,
             interests: data.interests || [],
             updatedAt: new Date(),
           },
@@ -641,10 +633,10 @@ export class ProfilesService {
         .insert(partnerPreferences)
         .values({
           profileId,
-          prefAgeMin: data.prefAgeMin ?? null,
-          prefAgeMax: data.prefAgeMax ?? null,
-          prefHeightMinCm: data.prefHeightMinCm ?? null,
-          prefHeightMaxCm: data.prefHeightMaxCm ?? null,
+          prefAgeMin: data.prefAgeMin,
+          prefAgeMax: data.prefAgeMax,
+          prefHeightMinCm: data.prefHeightMinCm,
+          prefHeightMaxCm: data.prefHeightMaxCm,
           prefMaritalStatuses: data.prefMaritalStatuses || [],
           prefReligions: data.prefReligions || [],
           prefCastes: data.prefCastes || [],
@@ -656,10 +648,10 @@ export class ProfilesService {
         .onConflictDoUpdate({
           target: partnerPreferences.profileId,
           set: {
-            prefAgeMin: data.prefAgeMin ?? null,
-            prefAgeMax: data.prefAgeMax ?? null,
-            prefHeightMinCm: data.prefHeightMinCm ?? null,
-            prefHeightMaxCm: data.prefHeightMaxCm ?? null,
+            prefAgeMin: data.prefAgeMin,
+            prefAgeMax: data.prefAgeMax,
+            prefHeightMinCm: data.prefHeightMinCm,
+            prefHeightMaxCm: data.prefHeightMaxCm,
             prefMaritalStatuses: data.prefMaritalStatuses || [],
             prefReligions: data.prefReligions || [],
             prefCastes: data.prefCastes || [],
@@ -685,12 +677,26 @@ export class ProfilesService {
         const photoRecords = uniqueKeys.map((s3Key, index) => ({
           profileId,
           s3Key,
+          contentHash: Array.isArray((data as any).photoContentHashes)
+            ? ((data as any).photoContentHashes[index] as string | undefined) ?? null
+            : null,
           isPrimary: index === 0,
           displayOrder: index,
           status: 'pending' as const,
         }));
         await tx.insert(profilePhotos).values(photoRecords);
       }
+
+      // Ensure user_settings exists and photo_blur mirrors profiles.photo_privacy
+      // (viewer blur is driven by user_settings.photo_blur, not profiles.photo_privacy).
+      const initialBlur = photoPrivacyToBlur(data.photoPrivacy || 'blurred');
+      await tx
+        .insert(userSettings)
+        .values({ userId, photoBlur: initialBlur })
+        .onConflictDoUpdate({
+          target: userSettings.userId,
+          set: { photoBlur: initialBlur, updatedAt: new Date() },
+        });
 
       // 8. Upsert Verification
       const method = data.verificationMethod || 'selfie';
@@ -724,6 +730,9 @@ export class ProfilesService {
             govtIdType,
             govtIdS3Key,
             status: 'pending',
+            rejectionReason: null,
+            reviewedBy: null,
+            reviewedAt: null,
             updatedAt: new Date(),
           },
         });
@@ -764,13 +773,22 @@ export class ProfilesService {
     });
   }
 
-  async updateMyProfile(userId: string, payload: Partial<CompleteRegistrationPayload>) {
+  async updateMyProfile(
+    userId: string,
+    payload: Partial<CompleteRegistrationPayload>,
+  ): Promise<FullProfileView> {
     const [profile] = await this.db
       .select({
         id: profiles.id,
-        educationId: profiles.educationId,
-        occupationId: profiles.occupationId,
-        companyId: profiles.companyId,
+        maritalStatus: profiles.maritalStatus,
+        gender: profiles.gender,
+        city: profiles.city,
+        state: profiles.state,
+        citySlug: profiles.citySlug,
+        religion: profiles.religion,
+        caste: profiles.caste,
+        communitySlug: profiles.communitySlug,
+        motherTongue: profiles.motherTongue,
       })
       .from(profiles)
       .where(eq(profiles.userId, userId))
@@ -778,42 +796,118 @@ export class ProfilesService {
     if (!profile) throw new NotFoundException('Profile not found');
     const profileId = profile.id;
     this.invalidateProfileCache(profileId);
-    const educationFields = await this.buildEducationUpdate(payload, profile.educationId);
-    const careerFields = await this.buildCareerUpdate(payload);
 
-    return this.db.transaction(async (tx) => {
+    await this.db.transaction(async (tx) => {
       // Check if any fields belong to profiles
       const profilesUpdate: any = {};
-      if (payload.profileFor !== undefined) profilesUpdate.profileFor = payload.profileFor;
+      if (payload.profileFor !== undefined) {
+        profilesUpdate.profileFor = this.requireEnum(
+          payload.profileFor,
+          PROFILE_FOR_VALUES,
+          'profileFor',
+        );
+      }
       if (payload.fullName !== undefined) profilesUpdate.fullName = payload.fullName;
-      if (payload.gender !== undefined) profilesUpdate.gender = payload.gender;
-      if (payload.maritalStatus !== undefined) profilesUpdate.maritalStatus = payload.maritalStatus;
-      if (payload.hasChildren !== undefined) profilesUpdate.hasChildren = payload.hasChildren;
-      if (payload.childrenCount !== undefined) profilesUpdate.childrenCount = payload.childrenCount;
-      if (payload.childrenLivingWithMe !== undefined) profilesUpdate.childrenLivingWithMe = payload.childrenLivingWithMe;
+      if (payload.gender !== undefined) {
+        profilesUpdate.gender = this.requireEnum(
+          payload.gender,
+          ['Male', 'Female', 'Other'] as const,
+          'gender',
+        );
+      }
+      if (payload.maritalStatus !== undefined) {
+        profilesUpdate.maritalStatus = this.requireEnum(
+          payload.maritalStatus,
+          MARITAL_STATUS_VALUES,
+          'maritalStatus',
+        );
+      }
+      const childrenTouched =
+        payload.maritalStatus !== undefined ||
+        payload.hasChildren !== undefined ||
+        payload.childrenCount !== undefined ||
+        payload.childrenLivingWithMe !== undefined;
+      if (childrenTouched) {
+        const maritalForChildren =
+          (profilesUpdate.maritalStatus as string | undefined) ?? profile.maritalStatus;
+        // Zod cannot see stored maritalStatus on partial patches — enforce here.
+        if (maritalAsksChildren(maritalForChildren) && payload.hasChildren === true) {
+          if (payload.childrenCount == null || payload.childrenCount < 1) {
+            throw new BadRequestException('Enter how many children');
+          }
+          if (payload.childrenLivingWithMe === undefined || payload.childrenLivingWithMe === null) {
+            throw new BadRequestException('Please say if the children live with you');
+          }
+        }
+        const children = resolveChildrenFields({
+          maritalStatus: maritalForChildren,
+          hasChildren: payload.hasChildren,
+          childrenCount: payload.childrenCount,
+          childrenLivingWithMe: payload.childrenLivingWithMe,
+        });
+        profilesUpdate.hasChildren = children.hasChildren;
+        profilesUpdate.childrenCount = children.childrenCount;
+        profilesUpdate.childrenLivingWithMe = children.childrenLivingWithMe;
+      }
       if (payload.heightCm !== undefined) profilesUpdate.heightCm = payload.heightCm;
-      if (payload.weight !== undefined) profilesUpdate.weight = this.emptyToNull(payload.weight);
       if (payload.complexion !== undefined) profilesUpdate.complexion = this.emptyToNull(payload.complexion);
       if (payload.disability !== undefined) profilesUpdate.disability = this.emptyToNull(payload.disability);
       if (payload.willingToRelocate !== undefined) profilesUpdate.willingToRelocate = this.emptyToNull(payload.willingToRelocate);
       if (payload.aboutMe !== undefined) profilesUpdate.aboutMe = payload.aboutMe;
-      if (payload.city !== undefined) profilesUpdate.city = payload.city;
-      if (payload.state !== undefined) profilesUpdate.state = payload.state;
-      if (payload.country !== undefined) profilesUpdate.country = payload.country;
-      if (payload.religion !== undefined) profilesUpdate.religion = payload.religion;
-      if (payload.caste !== undefined) profilesUpdate.caste = payload.caste;
+      if (payload.weightKg !== undefined) profilesUpdate.weightKg = payload.weightKg;
+      // complexion/disability already null-coerced above via emptyToNull —
+      // do NOT reassign raw payload values here (would store "" instead of null).
       if (payload.subcaste !== undefined) profilesUpdate.subcaste = this.emptyToNull(payload.subcaste);
       if (payload.gotra !== undefined) profilesUpdate.gotra = this.emptyToNull(payload.gotra);
-      if (payload.motherTongue !== undefined) profilesUpdate.motherTongue = payload.motherTongue;
-      Object.assign(profilesUpdate, educationFields);
-      Object.assign(profilesUpdate, careerFields);
+
+      const locationTouched =
+        payload.city !== undefined ||
+        payload.state !== undefined ||
+        payload.citySlug !== undefined;
+      const communityTouched =
+        payload.religion !== undefined ||
+        payload.caste !== undefined ||
+        payload.communitySlug !== undefined;
+      const tongueTouched = payload.motherTongue !== undefined;
+
+      if (locationTouched || communityTouched || tongueTouched) {
+        const catalog = this.resolveCatalogFields({
+          city: locationTouched ? (payload.city ?? profile.city) : undefined,
+          state: locationTouched ? (payload.state ?? profile.state) : undefined,
+          citySlug: locationTouched
+            ? (payload.citySlug !== undefined ? payload.citySlug : profile.citySlug)
+            : undefined,
+          religion: communityTouched
+            ? (payload.religion ?? profile.religion)
+            : tongueTouched
+              ? profile.religion
+              : undefined,
+          caste: communityTouched ? (payload.caste ?? profile.caste) : undefined,
+          communitySlug: communityTouched
+            ? (payload.communitySlug !== undefined
+                ? payload.communitySlug
+                : profile.communitySlug)
+            : undefined,
+          motherTongue: tongueTouched ? payload.motherTongue : undefined,
+        });
+        if (catalog.city !== undefined) profilesUpdate.city = catalog.city;
+        if (catalog.state !== undefined) profilesUpdate.state = catalog.state;
+        if (catalog.country !== undefined) profilesUpdate.country = catalog.country;
+        if (catalog.citySlug !== undefined) profilesUpdate.citySlug = catalog.citySlug;
+        if (catalog.religion !== undefined) profilesUpdate.religion = catalog.religion;
+        if (catalog.caste !== undefined) profilesUpdate.caste = catalog.caste;
+        if (catalog.communitySlug !== undefined) {
+          profilesUpdate.communitySlug = catalog.communitySlug;
+        }
+        if (catalog.motherTongue !== undefined) profilesUpdate.motherTongue = catalog.motherTongue;
+      }
       if (payload.educationLevel !== undefined) {
         profilesUpdate.educationLevel = this.optionalEnum(
           payload.educationLevel,
           ['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'High School'] as const,
         );
       }
-      if (payload.degree !== undefined && educationFields.degree === undefined) {
+      if (payload.degree !== undefined) {
         profilesUpdate.degree = this.emptyToNull(payload.degree);
       }
       if (payload.collegeName !== undefined) profilesUpdate.collegeName = this.emptyToNull(payload.collegeName);
@@ -823,21 +917,50 @@ export class ProfilesService {
           ['Employed', 'Business Owner', 'Freelancer', 'Not Working'] as const,
         );
       }
-      if (payload.profession !== undefined && careerFields.profession === undefined) {
+      if (payload.profession !== undefined) {
         profilesUpdate.profession = this.emptyToNull(payload.profession);
       }
-      if (payload.companyName !== undefined && careerFields.companyName === undefined) {
+      if (payload.companyName !== undefined) {
         profilesUpdate.companyName = this.emptyToNull(payload.companyName);
       }
-      if (payload.companySector !== undefined && careerFields.companySector === undefined) {
+      if (payload.companySector !== undefined) {
         profilesUpdate.companySector = this.normalizeCompanySector(payload.companySector);
       }
       if (payload.annualIncome !== undefined) {
         profilesUpdate.annualIncome = this.emptyToNull(payload.annualIncome);
       }
-      if (payload.photoPrivacy !== undefined) profilesUpdate.photoPrivacy = payload.photoPrivacy;
-      // Special handling for DOB
-      if (payload.dobYear !== undefined && payload.dobMonth !== undefined && payload.dobDay !== undefined) {
+      if (payload.photoPrivacy !== undefined) {
+        profilesUpdate.photoPrivacy = payload.photoPrivacy;
+        // Keep viewer-facing blur setting in sync (settings UI + profile edit).
+        await tx
+          .insert(userSettings)
+          .values({
+            userId,
+            photoBlur: photoPrivacyToBlur(payload.photoPrivacy as string),
+          })
+          .onConflictDoUpdate({
+            target: userSettings.userId,
+            set: {
+              photoBlur: photoPrivacyToBlur(payload.photoPrivacy as string),
+              updatedAt: new Date(),
+            },
+          });
+      }
+      // DOB: all three parts required together; re-check age against payload or stored gender.
+      const dobTouched =
+        payload.dobYear !== undefined ||
+        payload.dobMonth !== undefined ||
+        payload.dobDay !== undefined;
+      if (dobTouched) {
+        if (
+          payload.dobYear === undefined ||
+          payload.dobMonth === undefined ||
+          payload.dobDay === undefined
+        ) {
+          throw new BadRequestException('Date of birth requires day, month, and year together');
+        }
+        const genderForAge = profilesUpdate.gender ?? profile.gender;
+        this.assertDobAge(payload.dobYear, payload.dobMonth, payload.dobDay, genderForAge);
         profilesUpdate.dob = `${payload.dobYear}-${payload.dobMonth.padStart(2, '0')}-${payload.dobDay.padStart(2, '0')}`;
       }
       if (Object.keys(profilesUpdate).length > 0) {
@@ -847,16 +970,53 @@ export class ProfilesService {
 
       // Check if any fields belong to familyDetails
       const familyDetailsUpdate: any = {};
-      if (payload.familyValues !== undefined) familyDetailsUpdate.familyValues = payload.familyValues;
-      if (payload.familyType !== undefined) familyDetailsUpdate.familyType = payload.familyType;
-      if (payload.familyStatus !== undefined) familyDetailsUpdate.familyStatus = payload.familyStatus;
-      if (payload.fatherOccupation !== undefined) familyDetailsUpdate.fatherOccupation = payload.fatherOccupation;
-      if (payload.motherOccupation !== undefined) familyDetailsUpdate.motherOccupation = payload.motherOccupation;
+      if (payload.familyValues !== undefined) {
+        familyDetailsUpdate.familyValues = this.optionalEnum(
+          payload.familyValues,
+          ['Traditional', 'Moderate', 'Liberal'] as const,
+        );
+      }
+      if (payload.familyType !== undefined) {
+        familyDetailsUpdate.familyType = this.optionalEnum(
+          payload.familyType,
+          ['Nuclear', 'Joint', 'Extended'] as const,
+        );
+      }
+      if (payload.familyStatus !== undefined) {
+        familyDetailsUpdate.familyStatus = this.emptyToNull(payload.familyStatus as string | null);
+      }
+      if (payload.fatherOccupation !== undefined) {
+        familyDetailsUpdate.fatherOccupation = this.optionalEnum(
+          payload.fatherOccupation,
+          ['Employed', 'Business', 'Retired', 'Homemaker', 'Passed Away'] as const,
+        );
+      }
+      if (payload.motherOccupation !== undefined) {
+        familyDetailsUpdate.motherOccupation = this.optionalEnum(
+          payload.motherOccupation,
+          ['Employed', 'Business', 'Retired', 'Homemaker', 'Passed Away'] as const,
+        );
+      }
       if (payload.brothersCount !== undefined) familyDetailsUpdate.brothersCount = payload.brothersCount;
       if (payload.sistersCount !== undefined) familyDetailsUpdate.sistersCount = payload.sistersCount;
       if (Object.keys(familyDetailsUpdate).length > 0) {
         familyDetailsUpdate.updatedAt = new Date();
-        await tx.update(familyDetails).set(familyDetailsUpdate).where(eq(familyDetails.profileId, profileId));
+        await tx
+          .insert(familyDetails)
+          .values({
+            profileId,
+            familyValues: familyDetailsUpdate.familyValues ?? null,
+            familyType: familyDetailsUpdate.familyType ?? null,
+            familyStatus: familyDetailsUpdate.familyStatus ?? null,
+            fatherOccupation: familyDetailsUpdate.fatherOccupation ?? null,
+            motherOccupation: familyDetailsUpdate.motherOccupation ?? null,
+            brothersCount: familyDetailsUpdate.brothersCount ?? 0,
+            sistersCount: familyDetailsUpdate.sistersCount ?? 0,
+          })
+          .onConflictDoUpdate({
+            target: familyDetails.profileId,
+            set: familyDetailsUpdate,
+          });
       }
 
       // Check if any fields belong to lifestyleInterests
@@ -867,19 +1027,50 @@ export class ProfilesService {
       if (payload.interests !== undefined) lifestyleInterestsUpdate.interests = payload.interests;
       if (Object.keys(lifestyleInterestsUpdate).length > 0) {
         lifestyleInterestsUpdate.updatedAt = new Date();
-        await tx.update(lifestyleInterests).set(lifestyleInterestsUpdate).where(eq(lifestyleInterests.profileId, profileId));
+        await tx
+          .insert(lifestyleInterests)
+          .values({
+            profileId,
+            diet: lifestyleInterestsUpdate.diet ?? null,
+            smoking: lifestyleInterestsUpdate.smoking ?? null,
+            alcohol: lifestyleInterestsUpdate.alcohol ?? null,
+            interests: lifestyleInterestsUpdate.interests ?? [],
+          })
+          .onConflictDoUpdate({
+            target: lifestyleInterests.profileId,
+            set: lifestyleInterestsUpdate,
+          });
       }
 
       // Check if any fields belong to horoscopes
       const horoscopesUpdate: any = {};
-      if (payload.birthTime !== undefined) horoscopesUpdate.birthTime = payload.birthTime;
-      if (payload.birthPlace !== undefined) horoscopesUpdate.birthPlace = payload.birthPlace;
+      if (payload.birthTime !== undefined) {
+        horoscopesUpdate.birthTime = this.emptyToNull(payload.birthTime as string | null);
+      }
+      if (payload.birthPlace !== undefined) {
+        horoscopesUpdate.birthPlace = this.emptyToNull(payload.birthPlace as string | null);
+      }
       if (payload.manglik !== undefined) horoscopesUpdate.manglik = payload.manglik;
-      if (payload.rashi !== undefined) horoscopesUpdate.rashi = payload.rashi;
-      if (payload.nakshatra !== undefined) horoscopesUpdate.nakshatra = payload.nakshatra;
-      if (payload.horoscopeS3Key !== undefined) horoscopesUpdate.horoscopeS3Key = payload.horoscopeS3Key;
-      if (payload.horoscopeFileName !== undefined) horoscopesUpdate.horoscopeFileName = payload.horoscopeFileName;
-      if (payload.horoscopeFileSizeBytes !== undefined) horoscopesUpdate.horoscopeFileSizeBytes = payload.horoscopeFileSizeBytes;
+      if (payload.rashi !== undefined) {
+        horoscopesUpdate.rashi = this.emptyToNull(payload.rashi as string | null);
+      }
+      if (payload.nakshatra !== undefined) {
+        horoscopesUpdate.nakshatra = this.emptyToNull(payload.nakshatra as string | null);
+      }
+      if (payload.horoscopeS3Key !== undefined) {
+        horoscopesUpdate.horoscopeS3Key = this.emptyToNull(payload.horoscopeS3Key as string | null);
+      }
+      if (payload.horoscopeFileName !== undefined) {
+        horoscopesUpdate.horoscopeFileName = this.emptyToNull(
+          payload.horoscopeFileName as string | null,
+        );
+      }
+      if (payload.horoscopeFileSizeBytes !== undefined) {
+        horoscopesUpdate.horoscopeFileSizeBytes =
+          payload.horoscopeFileSizeBytes == null || payload.horoscopeFileSizeBytes === 0
+            ? null
+            : payload.horoscopeFileSizeBytes;
+      }
       if (Object.keys(horoscopesUpdate).length > 0) {
         horoscopesUpdate.updatedAt = new Date();
         await tx
@@ -911,16 +1102,43 @@ export class ProfilesService {
       if (payload.prefReligions !== undefined) partnerPreferencesUpdate.prefReligions = payload.prefReligions;
       if (payload.prefCastes !== undefined) partnerPreferencesUpdate.prefCastes = payload.prefCastes;
       if (payload.prefMotherTongues !== undefined) partnerPreferencesUpdate.prefMotherTongues = payload.prefMotherTongues;
-      if (payload.prefMinEducation !== undefined) partnerPreferencesUpdate.prefMinEducation = payload.prefMinEducation;
+      if (payload.prefMinEducation !== undefined) {
+        partnerPreferencesUpdate.prefMinEducation = this.emptyToNull(
+          payload.prefMinEducation as string | null,
+        );
+      }
       if (payload.prefAcceptableIncomes !== undefined) partnerPreferencesUpdate.prefAcceptableIncomes = payload.prefAcceptableIncomes;
       if (payload.prefLocations !== undefined) partnerPreferencesUpdate.prefLocations = payload.prefLocations;
       if (Object.keys(partnerPreferencesUpdate).length > 0) {
         partnerPreferencesUpdate.updatedAt = new Date();
-        await tx.update(partnerPreferences).set(partnerPreferencesUpdate).where(eq(partnerPreferences.profileId, profileId));
+        await tx
+          .insert(partnerPreferences)
+          .values({
+            profileId,
+            prefAgeMin: partnerPreferencesUpdate.prefAgeMin ?? 21,
+            prefAgeMax: partnerPreferencesUpdate.prefAgeMax ?? 35,
+            prefHeightMinCm: partnerPreferencesUpdate.prefHeightMinCm ?? 140,
+            prefHeightMaxCm: partnerPreferencesUpdate.prefHeightMaxCm ?? 200,
+            prefMaritalStatuses: partnerPreferencesUpdate.prefMaritalStatuses ?? ['Never Married'],
+            prefReligions: partnerPreferencesUpdate.prefReligions ?? [],
+            prefCastes: partnerPreferencesUpdate.prefCastes ?? [],
+            prefMotherTongues: partnerPreferencesUpdate.prefMotherTongues ?? [],
+            prefMinEducation: partnerPreferencesUpdate.prefMinEducation ?? null,
+            prefAcceptableIncomes: partnerPreferencesUpdate.prefAcceptableIncomes ?? [],
+            prefLocations: partnerPreferencesUpdate.prefLocations ?? [],
+          })
+          .onConflictDoUpdate({
+            target: partnerPreferences.profileId,
+            set: partnerPreferencesUpdate,
+          });
       }
 
-      return this.getMyProfile(userId);
+      return;
     });
+
+    // Read after commit — calling getMyProfile inside the tx callback used a
+    // separate pool connection that could not see uncommitted writes.
+    return this.getMyProfile(userId);
   }
 
   async addPhoto(userId: string, s3Key: string, contentHash?: string) {
@@ -959,6 +1177,7 @@ export class ProfilesService {
   async deletePhoto(userId: string, photoId: string) {
     const [profile] = await this.db.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
     if (!profile) throw new NotFoundException('Profile not found');
+    this.invalidateProfileCache(profile.id);
     
     const [photo] = await this.db.select().from(profilePhotos).where(eq(profilePhotos.id, photoId)).limit(1);
     if (!photo || photo.profileId !== profile.id) {
@@ -1030,87 +1249,8 @@ export class ProfilesService {
       throw new NotFoundException('Profile not found for this user. Please complete registration.');
     }
 
-    const [family, lifestyle, horoscope, verificationRes, prefRes, photos] = await Promise.all([
-      this.db
-        .select()
-        .from(familyDetails)
-        .where(eq(familyDetails.profileId, profile.id))
-        .limit(1),
-      this.db
-        .select()
-        .from(lifestyleInterests)
-        .where(eq(lifestyleInterests.profileId, profile.id))
-        .limit(1),
-      this.db
-        .select()
-        .from(horoscopes)
-        .where(eq(horoscopes.profileId, profile.id))
-        .limit(1),
-      this.db
-        .select()
-        .from(verifications)
-        .where(eq(verifications.profileId, profile.id))
-        .limit(1),
-      this.db
-        .select()
-        .from(partnerPreferences)
-        .where(eq(partnerPreferences.profileId, profile.id))
-        .limit(1),
-      getAllPhotos(this.db, profile.id),
-    ]);
-
-    const familyObj = Array.isArray(family) ? family[0] : family;
-    const lifestyleObj = Array.isArray(lifestyle) ? lifestyle[0] : lifestyle;
-    const horoscopeObj = Array.isArray(horoscope) ? horoscope[0] : horoscope;
-    const verification = Array.isArray(verificationRes) ? verificationRes[0] : verificationRes;
-    const partnerPreferencesObj = Array.isArray(prefRes) ? prefRes[0] : prefRes;
-
-    return {
-      profile: await this.enrichProfileDetails(profile as any),
-      family: (familyObj as any) || null,
-      lifestyle: (lifestyleObj as any) || null,
-      horoscope: (horoscopeObj as any) || null,
-      partnerPreferences: (partnerPreferencesObj as any) || null,
-      verification: verification || null,
-      photos,
-      verificationStatus: verification?.status || 'idle',
-    };
-  }
-
-  async getProfileById(profileId: string, viewerUserId?: string): Promise<FullProfileView> {
-    // Cache only the viewer-independent parts. Viewer-specific decisions
-    // (withholdKey, contactAccess, isMutualConnect) are re-applied per call.
-    const cachedBase = this.profileViewCache.get(`base:${profileId}`);
-
-    let profile: typeof profiles.$inferSelect | undefined;
-    let family: any = null;
-    let lifestyle: any = null;
-    let horoscopeRow: any = null;
-    let verification: any = null;
-    let partnerPrefs: any = null;
-    let photos: Array<{ id: string; s3Key: string; isPrimary: boolean; displayOrder: number }> = [];
-
-    if (cachedBase) {
-      const c = cachedBase as any;
-      profile = c.profile;
-      family = c.family;
-      lifestyle = c.lifestyle;
-      horoscopeRow = c.horoscopeRow;
-      verification = c.verification;
-      partnerPrefs = c.partnerPreferences;
-      photos = c.photos;
-    } else {
-      [profile] = await this.db
-        .select()
-        .from(profiles)
-        .where(eq(profiles.id, profileId))
-        .limit(1);
-
-      if (!profile) {
-        throw new NotFoundException('Profile not found');
-      }
-
-      [family, lifestyle, horoscopeRow, verification, partnerPrefs, photos] = await Promise.all([
+    const [familyRows, lifestyleRows, horoscopeRows, verificationRows, preferenceRows, photos] =
+      await Promise.all([
         this.db
           .select()
           .from(familyDetails)
@@ -1136,16 +1276,86 @@ export class ProfilesService {
           .from(partnerPreferences)
           .where(eq(partnerPreferences.profileId, profile.id))
           .limit(1),
+        getOwnerPhotos(this.db, profile.id),
+      ]);
+
+    const verification = this.firstRow(verificationRows);
+
+    return {
+      profile: await this.enrichProfileDetails(profile as any),
+      family: this.firstRow(familyRows) as any,
+      lifestyle: this.firstRow(lifestyleRows) as any,
+      horoscope: this.firstRow(horoscopeRows) as any,
+      preferences: this.firstRow(preferenceRows) as any,
+      verification: verification || null,
+      photos,
+      verificationStatus: (verification?.status as FullProfileView['verificationStatus']) || 'idle',
+    };
+  }
+
+  async getProfileById(profileId: string, viewerUserId?: string): Promise<FullProfileView> {
+    // Cache only the viewer-independent parts. Viewer-specific decisions
+    // (withholdKey, contactAccess, isMutualConnect) are re-applied per call.
+    const cachedBase = this.profileViewCache.get(`base:${profileId}`);
+
+    let profile: typeof profiles.$inferSelect | undefined;
+    let family: any = null;
+    let lifestyle: any = null;
+    let horoscopeRow: any = null;
+    let verification: any = null;
+    let partnerPrefs: any = null;
+    let photos: Array<{ id: string; s3Key: string; isPrimary: boolean; displayOrder: number }> = [];
+
+    if (cachedBase) {
+      const c = cachedBase as any;
+      profile = c.profile;
+      family = c.family;
+      lifestyle = c.lifestyle;
+      horoscopeRow = c.horoscopeRow;
+      verification = c.verification;
+      partnerPrefs = c.partnerPreferences;
+    } else {
+      [profile] = await this.db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, profileId))
+        .limit(1);
+
+      if (!profile) {
+        throw new NotFoundException('Profile not found');
+      }
+
+      [family, lifestyle, horoscopeRow, verification, partnerPrefs] = await Promise.all([
         this.db
-          .select({
-            id: profilePhotos.id,
-            s3Key: profilePhotos.s3Key,
-            isPrimary: profilePhotos.isPrimary,
-            displayOrder: profilePhotos.displayOrder,
-          })
-          .from(profilePhotos)
-          .where(eq(profilePhotos.profileId, profile.id))
-          .orderBy(asc(profilePhotos.displayOrder)),
+          .select()
+          .from(familyDetails)
+          .where(eq(familyDetails.profileId, profile.id))
+          .limit(1)
+          .then((rows) => this.firstRow(rows)),
+        this.db
+          .select()
+          .from(lifestyleInterests)
+          .where(eq(lifestyleInterests.profileId, profile.id))
+          .limit(1)
+          .then((rows) => this.firstRow(rows)),
+        this.db
+          .select()
+          .from(horoscopes)
+          .where(eq(horoscopes.profileId, profile.id))
+          .limit(1)
+          .then((rows) => this.firstRow(rows)),
+        this.db
+          .select()
+          .from(verifications)
+          .where(eq(verifications.profileId, profile.id))
+          .limit(1)
+          .then((rows) => this.firstRow(rows)),
+        this.db
+          .select()
+          .from(partnerPreferences)
+          .where(eq(partnerPreferences.profileId, profile.id))
+          .limit(1)
+          .then((rows) => this.firstRow(rows)),
       ]);
 
       this.profileViewCache.set(`base:${profileId}`, {
@@ -1155,36 +1365,41 @@ export class ProfilesService {
         horoscopeRow,
         verification,
         partnerPreferences: partnerPrefs,
-        photos,
         setting: null, // fetched fresh on every read; cheap single-row lookup
       } as unknown as FullProfileView);
+    }
+
+    // Photos are never cached: moderation (approve/reject) can change visibility
+    // without touching profiles.*, and SQL/admin paths must take effect immediately.
+    if (profile) {
+      photos = await getApprovedPhotos(this.db, profile.id);
     }
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
     }
 
-    if (viewerUserId) {
-      // Find viewer's profile id (also cached implicitly by the early-return).
-      const [viewerProfile] = await this.db
-        .select({ id: profiles.id })
-        .from(profiles)
-        .where(eq(profiles.userId, viewerUserId))
-        .limit(1);
+    family = this.firstRow(family as any);
+    lifestyle = this.firstRow(lifestyle as any);
+    horoscopeRow = this.firstRow(horoscopeRow as any);
+    verification = this.firstRow(verification as any);
 
-      if (viewerProfile) {
-        const isBlocked = await this.blocksService.isBlocked(viewerProfile.id, profile.id);
-        if (isBlocked) {
-          throw new ForbiddenException('Profile not found or unavailable');
-        }
+    // Viewer context (profile id + partner preferences) for block checks,
+    // view logging, and compatibility scoring — one load, reused below.
+    const viewer = viewerUserId ? await loadViewerContext(this.db, viewerUserId) : null;
+
+    if (viewer) {
+      const isBlocked = await this.blocksService.isBlocked(viewer.profileId, profile.id);
+      if (isBlocked) {
+        throw new ForbiddenException('Profile not found or unavailable');
       }
 
       // Don't log if viewing own profile
-      if (viewerProfile && viewerProfile.id !== profile.id) {
+      if (viewer.profileId !== profile.id) {
         // Use a dynamic import or require for profileViews to avoid changing too many imports at top
         const { profileViews } = require('@astalakshimi/database');
         await this.db.insert(profileViews).values({
-          viewerProfileId: viewerProfile.id,
+          viewerProfileId: viewer.profileId,
           targetProfileId: profile.id,
         }).onConflictDoNothing(); // If we only want unique views per day, we can tweak this, but unique index handles it.
       }
@@ -1205,6 +1420,10 @@ export class ProfilesService {
     );
 
     const isOwnProfile = Boolean(viewerUserId && viewerUserId === profile.userId);
+
+    // Compatibility score for this viewer (null on own profile — the UI hides
+    // the badge rather than fabricating a number). Not part of the base cache.
+    const score = viewer && !isOwnProfile ? scoreCandidate(profile as any, viewer.prefs) : null;
 
     const contactAccess = viewerUserId
       ? await this.entitlementsService.getContactUnlockStatus(
@@ -1275,7 +1494,6 @@ export class ProfilesService {
       family: (familyObj as any) || null,
       lifestyle: (lifestyleObj as any) || null,
       horoscope: horoscopePayload,
-      partnerPreferences: partnerPrefsObj || null,
       // Withhold keys entirely when blurred: the bucket is public, so sending
       // them would let anyone view the photo regardless of the blur flag.
       photos: withholdKey ? [] : photos,
@@ -1287,6 +1505,8 @@ export class ProfilesService {
       contactPhone: visiblePhone,
       hasHoroscope: Boolean(horoscopeRowObj?.horoscopeS3Key),
       contactAccess,
+      matchPercent: score?.percent ?? null,
+      matchReasons: score?.reasons ?? [],
     };
   }
 

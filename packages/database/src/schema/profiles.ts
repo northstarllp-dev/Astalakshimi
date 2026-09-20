@@ -1,7 +1,5 @@
 import { pgTable, uuid, varchar, text, integer, boolean, date, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
-import { educationLevels, specializations } from './educations';
-import { occupations, companies } from './careers';
 
 export const genderEnum = pgEnum('gender', ['Male', 'Female', 'Other']);
 export const maritalStatusEnum = pgEnum('marital_status', ['Never Married', 'Divorced', 'Widowed', 'Awaiting Divorce']);
@@ -28,35 +26,33 @@ export const profiles = pgTable('profiles', {
   childrenLivingWithMe: boolean('children_living_with_me'), // true = Yes, false = No
 
   // Physical Attributes & Bio
-  heightCm: integer('height_cm'), // From scrollable wheel / visual slider
-  weight: varchar('weight', { length: 50 }),
+  heightCm: integer('height_cm'),
+  aboutMe: text('about_me'),
+  weightKg: integer('weight_kg'),
   complexion: varchar('complexion', { length: 50 }),
-  disability: varchar('disability', { length: 100 }),
-  aboutMe: text('about_me'), // Generated via Bio Builder prompts and editable
+  disability: text('disability'),
 
   // Location
   city: varchar('city', { length: 100 }).notNull(),
   state: varchar('state', { length: 100 }).notNull(),
   country: varchar('country', { length: 100 }).default('India').notNull(),
+  citySlug: varchar('city_slug', { length: 120 }),
   willingToRelocate: varchar('willing_to_relocate', { length: 50 }),
 
   // Community & Background
   religion: varchar('religion', { length: 50 }).notNull(),
   caste: varchar('caste', { length: 100 }).notNull(),
+  communitySlug: varchar('community_slug', { length: 120 }),
   subcaste: varchar('subcaste', { length: 100 }),
   gotra: varchar('gotra', { length: 100 }),
   motherTongue: varchar('mother_tongue', { length: 50 }).notNull(),
 
-  // Education & Career Details
-  educationId: integer('education_id').references(() => educationLevels.id),
-  specializationId: integer('specialization_id').references(() => specializations.id),
+  // Education & Career Details (flat — no catalog FKs; reference package is SoT for dropdowns)
   educationLevel: educationLevelEnum('education_level'),
   degree: varchar('degree', { length: 150 }),
   collegeName: varchar('college_name', { length: 200 }),
   employmentStatus: employmentStatusEnum('employment_status'),
-  occupationId: integer('occupation_id').references(() => occupations.id),
   profession: varchar('profession', { length: 150 }),
-  companyId: integer('company_id').references(() => companies.id),
   companyName: varchar('company_name', { length: 150 }),
   companySector: companySectorEnum('company_sector'),
   annualIncome: varchar('annual_income', { length: 50 }),

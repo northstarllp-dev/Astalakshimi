@@ -19,7 +19,3 @@ export * from './messages';
 export * from './chat-sessions';
 export * from './unlocked-contacts';
 export * from './blocked-profiles';
-export * from './locations';
-export * from './educations';
-export * from './careers';
-export * from './communities';

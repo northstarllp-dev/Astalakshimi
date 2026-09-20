@@ -92,6 +92,114 @@ describe('Feature 2: Profiles - ProfilesController (Integration Tests)', () => {
       );
       expect(result).toEqual(expectedProfile);
     });
+
+    it('should forward preference + DOB fields to the service', async () => {
+      const payload = {
+        gender: 'Female' as const,
+        dobDay: '12',
+        dobMonth: '03',
+        dobYear: '1996',
+        prefAgeMin: 24,
+        prefReligions: ['Hindu'],
+      };
+      profilesService.updateMyProfile.mockResolvedValue({
+        profile: { id: 'prof-1' },
+        photos: [],
+        verificationStatus: 'idle',
+      } as any);
+
+      await controller.updateMyProfile(mockUserSession, payload as any);
+
+      expect(profilesService.updateMyProfile).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        payload,
+      );
+    });
+
+    it('should forward maritalStatus + children fields to the service', async () => {
+      const payload = {
+        maritalStatus: 'Divorced' as const,
+        hasChildren: true,
+        childrenCount: 2,
+        childrenLivingWithMe: false,
+      };
+      profilesService.updateMyProfile.mockResolvedValue({
+        profile: { id: 'prof-1', ...payload },
+        photos: [],
+        verificationStatus: 'idle',
+      } as any);
+
+      await controller.updateMyProfile(mockUserSession, payload as any);
+
+      expect(profilesService.updateMyProfile).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        payload,
+      );
+    });
+
+    it('should forward identity basics and round-trip via getMyProfile shape', async () => {
+      const payload = {
+        profileFor: 'Son' as const,
+        fullName: 'Arjun Kumar',
+        gender: 'Male' as const,
+        dobDay: '10',
+        dobMonth: '08',
+        dobYear: '1994',
+      };
+      const expected = {
+        profile: {
+          id: 'prof-1',
+          profileFor: 'Son',
+          fullName: 'Arjun Kumar',
+          gender: 'Male',
+          dob: '1994-08-10',
+          createdBy: 'self',
+        },
+        photos: [],
+        verificationStatus: 'idle',
+      } as unknown as FullProfileView;
+
+      profilesService.updateMyProfile.mockResolvedValue(expected);
+
+      const result = await controller.updateMyProfile(mockUserSession, payload as any);
+
+      expect(profilesService.updateMyProfile).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        payload,
+      );
+      expect(result.profile.profileFor).toBe('Son');
+      expect(result.profile.fullName).toBe('Arjun Kumar');
+      expect(result.profile.gender).toBe('Male');
+      expect(result.profile.dob).toBe('1994-08-10');
+    });
+
+    it('should forward family details fields to the service', async () => {
+      const payload = {
+        familyType: 'Extended' as const,
+        familyValues: 'Traditional' as const,
+        familyStatus: 'Upper middle class',
+        fatherOccupation: 'Retired' as const,
+        motherOccupation: 'Homemaker' as const,
+        brothersCount: 1,
+        sistersCount: 2,
+      };
+      const expected = {
+        profile: { id: 'prof-1' },
+        family: { ...payload },
+        photos: [],
+        verificationStatus: 'idle',
+      } as unknown as FullProfileView;
+
+      profilesService.updateMyProfile.mockResolvedValue(expected);
+
+      const result = await controller.updateMyProfile(mockUserSession, payload as any);
+
+      expect(profilesService.updateMyProfile).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        payload,
+      );
+      expect(result.family).toEqual(expect.objectContaining(payload));
+    });
   });
 
   describe('Photo Endpoints (POST, DELETE, PUT)', () => {
@@ -101,7 +209,11 @@ describe('Feature 2: Profiles - ProfilesController (Integration Tests)', () => {
 
       const result = await controller.addPhoto(mockUserSession, { s3Key: 'photo.jpg' });
 
-      expect(profilesService.addPhoto).toHaveBeenCalledWith(mockUserSession.userId, 'photo.jpg');
+      expect(profilesService.addPhoto).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        'photo.jpg',
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
 
@@ -146,15 +258,54 @@ describe('Feature 2: Profiles - ProfilesController (Integration Tests)', () => {
       );
       expect(result).toEqual(expected);
     });
+  });
 
-    it('should fetch target profile by ID without viewer when not authenticated', async () => {
-      const expected = { profile: { id: 'target-id' } } as unknown as FullProfileView;
-      profilesService.getProfileById.mockResolvedValue(expected);
+  describe('route security metadata', () => {
+    it('requires auth on profile views and allowlists only onboarding routes', async () => {
+      const { Reflector } = await import('@nestjs/core');
+      const { IS_PUBLIC_KEY } = await import(
+        '../../src/common/decorators/public.decorator'
+      );
+      const { ALLOW_INCOMPLETE_KEY } = await import(
+        '../../src/common/decorators/allow-incomplete.decorator'
+      );
+      const reflector = new Reflector();
+      const proto = ProfilesController.prototype as any;
 
-      const result = await controller.getProfileById('target-id', null);
+      // Anonymous browse is removed: every viewer must be authenticated.
+      expect(
+        reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+          proto['getProfileById'],
+          ProfilesController,
+        ]),
+      ).toBeFalsy();
 
-      expect(profilesService.getProfileById).toHaveBeenCalledWith('target-id', undefined);
-      expect(result).toEqual(expected);
+      // Onboarding routes stay reachable for JWT holders without a profile.
+      for (const method of ['completeRegistration', 'getMyProfile']) {
+        expect(
+          reflector.getAllAndOverride<boolean>(ALLOW_INCOMPLETE_KEY, [
+            proto[method],
+            ProfilesController,
+          ]),
+        ).toBe(true);
+      }
+
+      // Everything else needs a finished profile.
+      for (const method of [
+        'updateMyProfile',
+        'addPhoto',
+        'deletePhoto',
+        'reorderPhotos',
+        'getProfileById',
+        'recordVisit',
+      ]) {
+        expect(
+          reflector.getAllAndOverride<boolean>(ALLOW_INCOMPLETE_KEY, [
+            proto[method],
+            ProfilesController,
+          ]),
+        ).toBeFalsy();
+      }
     });
   });
 

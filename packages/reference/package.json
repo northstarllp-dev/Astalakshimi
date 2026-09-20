@@ -1,0 +1,28 @@
+{
+  "name": "@astalakshimi/reference",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./data/*": "./data/*"
+  },
+  "scripts": {
+    "generate": "node scripts/generate-catalogs.mjs",
+    "import:cities": "node scripts/import-geonames-cities.mjs",
+    "build": "pnpm generate && tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prebuild": "node scripts/generate-catalogs.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "typescript": "^5.8.2",
+    "vitest": "^2"
+  }
+}

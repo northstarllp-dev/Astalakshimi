@@ -215,6 +215,7 @@ export function Step6Verify({
     const remaining = MAX_PHOTOS - data.photos.length
     const nextPhotos = [...data.photos]
     const nextKeys = [...(data.photoS3Keys || [])]
+    const nextHashes = [...(data.photoContentHashes || [])]
 
     try {
       for (const file of Array.from(files).slice(0, remaining)) {
@@ -224,17 +225,19 @@ export function Step6Verify({
           continue
         }
         const hash = await hashFile(file)
-        if (photoHashesRef.current.includes(hash)) {
+        if (photoHashesRef.current.includes(hash) || nextHashes.includes(hash)) {
           setError("This photo is already on your profile.")
           continue
         }
         const previewUrl = await readFileAsDataUrl(file)
         let key = `profiles/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
+        let storedHash = hash
 
           try {
             const { s3Key, contentHash } = await apiClient.media.uploadMediaFile(file, "profile_photo")
             key = s3Key
-            photoHashesRef.current.push(contentHash || hash)
+            storedHash = contentHash || hash
+            photoHashesRef.current.push(storedHash)
           } catch (uploadErr) {
             console.warn("[Media] Upload fallback to mock key:", uploadErr)
             photoHashesRef.current.push(hash)
@@ -242,8 +245,13 @@ export function Step6Verify({
 
         nextPhotos.push(previewUrl)
         nextKeys.push(key)
+        nextHashes.push(storedHash)
       }
-      updateData({ photos: nextPhotos, photoS3Keys: nextKeys })
+      updateData({
+        photos: nextPhotos,
+        photoS3Keys: nextKeys,
+        photoContentHashes: nextHashes,
+      })
     } catch (err: any) {
       setError(err.message || "Failed to upload photo. Please try again.")
     } finally {

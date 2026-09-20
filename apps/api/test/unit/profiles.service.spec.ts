@@ -17,6 +17,19 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
   let profilesService: ProfilesService;
   let mockDb: any;
 
+  /** DOB parts for someone born `years` ago (plus optional day offset), zero-padded. */
+  const dobPartsYearsAgo = (years: number, extraDays = 0) => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - years);
+    d.setDate(d.getDate() + extraDays);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return {
+      dobDay: pad(d.getDate()),
+      dobMonth: pad(d.getMonth() + 1),
+      dobYear: String(d.getFullYear()),
+    };
+  };
+
   beforeEach(() => {
     mockDb = {
       select: jest.fn(),
@@ -46,16 +59,6 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       mockDb,
       mockBlocks as any,
       mockEntitlements as any,
-      {
-        getLevelName: jest.fn().mockResolvedValue(null),
-        getSpecializationName: jest.fn().mockResolvedValue(null),
-      } as any,
-      {
-        getOccupationName: jest.fn().mockResolvedValue(null),
-        getCompanyName: jest.fn().mockResolvedValue(null),
-        resolveOccupation: jest.fn().mockResolvedValue(null),
-        resolveCompany: jest.fn().mockResolvedValue(null),
-      } as any,
     );
   });
 
@@ -78,8 +81,10 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
     city: 'Chennai',
     state: 'Tamil Nadu',
     country: 'India',
+    citySlug: 'chennai-tamil-nadu',
     religion: 'Hindu',
-    caste: 'Brahmin - Iyer',
+    caste: 'Brahmin',
+    communitySlug: 'hindu-brahmin',
     subcaste: 'Vadama',
     gotra: 'Kashyapa',
     motherTongue: 'Tamil',
@@ -115,10 +120,13 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
     prefCastes: ['Brahmin - Iyer'],
     prefMotherTongues: ['Tamil'],
     prefLocations: ['Chennai'],
-    photoS3Keys: ['photos/user1_primary.jpg', 'photos/user1_secondary.jpg'],
+    photoS3Keys: [
+      'profiles/11111111-1111-4111-8111-111111111111/photos/22222222-2222-4222-8222-222222222222.jpeg',
+      'profiles/11111111-1111-4111-8111-111111111111/photos/33333333-3333-4333-8333-333333333333.jpeg',
+    ],
     photoPrivacy: 'blurred',
     verificationMethod: 'selfie',
-    selfieS3Key: 'vault/selfie.jpg',
+    selfieS3Key: 'verifications/11111111-1111-4111-8111-111111111111/selfie-44444444-4444-4444-8444-444444444444.jpeg',
   };
 
   describe('completeRegistration', () => {
@@ -131,12 +139,13 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       });
 
       // Insert profile returning new ID
+      const profileValues = jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'new-profile-uuid' }]),
+      });
       mockDb.insert.mockImplementation((table: any) => {
         if (table === profiles) {
           return {
-            values: jest.fn().mockReturnValue({
-              returning: jest.fn().mockResolvedValue([{ id: 'new-profile-uuid' }]),
-            }),
+            values: profileValues,
           };
         }
         return {
@@ -150,14 +159,143 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
         where: jest.fn().mockResolvedValue(undefined),
       });
 
-      const result = await profilesService.completeRegistration('user-1', sampleCompletePayload);
+      const result = await profilesService.completeRegistration(
+        '11111111-1111-4111-8111-111111111111',
+        sampleCompletePayload,
+      );
 
       expect(mockDb.transaction).toHaveBeenCalled();
+      expect(profileValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdBy: 'self',
+          profileFor: 'Myself',
+          fullName: 'Karthik Loganathan',
+          gender: 'Male',
+          dob: '1995-06-15',
+        }),
+      );
       expect(result).toEqual({
         success: true,
         message: 'Profile registration completed successfully',
         profileId: 'new-profile-uuid',
       });
+    });
+
+    it('should persist willingToRelocate on registration when provided', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      });
+
+      const profileValues = jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'new-profile-uuid' }]),
+      });
+      mockDb.insert.mockImplementation((table: any) => {
+        if (table === profiles) return { values: profileValues };
+        return {
+          values: jest.fn().mockReturnValue({
+            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+          }),
+        };
+      });
+      mockDb.delete.mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      await profilesService.completeRegistration('11111111-1111-4111-8111-111111111111', {
+        ...sampleCompletePayload,
+        willingToRelocate: 'Yes',
+      } as any);
+
+      expect(profileValues).toHaveBeenCalledWith(
+        expect.objectContaining({ willingToRelocate: 'Yes' }),
+      );
+    });
+
+    it('should default willingToRelocate to null on registration when omitted', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      });
+
+      const profileValues = jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'new-profile-uuid' }]),
+      });
+      mockDb.insert.mockImplementation((table: any) => {
+        if (table === profiles) return { values: profileValues };
+        return {
+          values: jest.fn().mockReturnValue({
+            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+          }),
+        };
+      });
+      mockDb.delete.mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      await profilesService.completeRegistration(
+        '11111111-1111-4111-8111-111111111111',
+        sampleCompletePayload,
+      );
+
+      expect(profileValues).toHaveBeenCalledWith(
+        expect.objectContaining({ willingToRelocate: null }),
+      );
+    });
+
+    it('should reject invalid profileFor without junk-defaulting to Myself', async () => {
+      await expect(
+        profilesService.completeRegistration('user-1', {
+          ...sampleCompletePayload,
+          profileFor: 'Cousin' as any,
+        }),
+      ).rejects.toThrow(/profileFor/i);
+    });
+
+    it('should reject an impossible calendar date on registration', async () => {
+      await expect(
+        profilesService.completeRegistration('user-1', {
+          ...sampleCompletePayload,
+          dobDay: '30',
+          dobMonth: '02',
+          dobYear: '2000',
+        }),
+      ).rejects.toThrow(/date of birth/i);
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+    });
+
+    it('should keep createdBy=self even if the payload smuggles createdBy=staff', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      });
+
+      const profileValues = jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'new-profile-uuid' }]),
+      });
+      mockDb.insert.mockImplementation((table: any) => {
+        if (table === profiles) return { values: profileValues };
+        return {
+          values: jest.fn().mockReturnValue({
+            onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+          }),
+        };
+      });
+      mockDb.delete.mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      await profilesService.completeRegistration('11111111-1111-4111-8111-111111111111', {
+        ...sampleCompletePayload,
+        createdBy: 'staff',
+      } as any);
+
+      expect(profileValues).toHaveBeenCalledWith(
+        expect.objectContaining({ createdBy: 'self' }),
+      );
     });
 
     it('should update existing profile when profile already exists for user', async () => {
@@ -182,7 +320,10 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
         where: jest.fn().mockResolvedValue(undefined),
       });
 
-      const result = await profilesService.completeRegistration('user-1', sampleCompletePayload);
+      const result = await profilesService.completeRegistration(
+        '11111111-1111-4111-8111-111111111111',
+        sampleCompletePayload,
+      );
 
       expect(result).toEqual({
         success: true,
@@ -199,62 +340,58 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       const mockLifestyle = { id: 'life-1', profileId: 'prof-1', diet: 'Vegetarian' };
       const mockHoroscope = { id: 'horo-1', profileId: 'prof-1', manglik: 'No' };
       const mockVerification = { id: 'ver-1', profileId: 'prof-1', status: 'verified' };
-      const mockPhotos = [{ id: 'p1', s3Key: 'photo1.jpg', isPrimary: true, displayOrder: 0 }];
+      const mockPreferences = { id: 'pref-1', profileId: 'prof-1', prefAgeMin: 24 };
+      const mockPhotos = [
+        {
+          id: 'p1',
+          s3Key: 'profiles/user-1/photos/p1.jpeg',
+          isPrimary: true,
+          displayOrder: 0,
+          status: 'pending',
+        },
+      ];
 
       let selectCall = 0;
       mockDb.select.mockImplementation(() => {
         selectCall++;
         if (selectCall === 1) {
-          // profiles
           return {
             from: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
             limit: jest.fn().mockResolvedValue([mockProfile]),
           };
-        } else if (selectCall === 2) {
-          // family
+        }
+        if (selectCall <= 6) {
+          const rows =
+            selectCall === 2
+              ? [mockFamily]
+              : selectCall === 3
+                ? [mockLifestyle]
+                : selectCall === 4
+                  ? [mockHoroscope]
+                  : selectCall === 5
+                    ? [mockVerification]
+                    : [mockPreferences];
           return {
             from: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([mockFamily]),
-          };
-        } else if (selectCall === 3) {
-          // lifestyle
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([mockLifestyle]),
-          };
-        } else if (selectCall === 4) {
-          // horoscope
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([mockHoroscope]),
-          };
-        } else if (selectCall === 5) {
-          // verification
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([mockVerification]),
-          };
-        } else {
-          // photos
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            orderBy: jest.fn().mockResolvedValue(mockPhotos),
+            limit: jest.fn().mockResolvedValue(rows),
           };
         }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockResolvedValue(mockPhotos),
+        };
       });
 
       const fullProfile = await profilesService.getMyProfile('user-1');
 
-      expect(fullProfile.profile).toEqual(mockProfile);
+      expect(fullProfile.profile).toEqual(expect.objectContaining(mockProfile));
       expect(fullProfile.family).toEqual(mockFamily);
       expect(fullProfile.lifestyle).toEqual(mockLifestyle);
       expect(fullProfile.horoscope).toEqual(mockHoroscope);
+      expect(fullProfile.preferences).toEqual(mockPreferences);
       expect(fullProfile.verificationStatus).toBe('verified');
       expect(fullProfile.photos).toEqual(mockPhotos);
     });
@@ -297,7 +434,12 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
         where: jest.fn().mockResolvedValue(undefined),
       });
 
-      // Mock getMyProfile call at the end of updateMyProfile
+      mockDb.insert.mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+        }),
+      });
+
       jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
         profile: { id: 'prof-1', aboutMe: 'Updated bio' } as any,
         photos: [],
@@ -308,10 +450,637 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
         aboutMe: 'Updated bio',
         diet: 'Vegetarian',
         familyValues: 'Liberal',
+        prefAgeMin: 25,
       });
 
       expect(mockDb.update).toHaveBeenCalled();
+      expect(mockDb.insert).toHaveBeenCalled();
       expect(updated.profile.aboutMe).toBe('Updated bio');
+    });
+
+    it('upserts family_details including familyStatus and sibling counts', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: 'prof-1', maritalStatus: 'Never Married' }]),
+      });
+
+      mockDb.update.mockReturnValue({
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      const valuesMock = jest.fn().mockReturnValue({
+        onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+      });
+      mockDb.insert.mockReturnValue({ values: valuesMock });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1' } as any,
+        family: {
+          familyType: 'Extended',
+          familyValues: 'Traditional',
+          familyStatus: 'Upper middle class',
+          fatherOccupation: 'Retired',
+          motherOccupation: 'Homemaker',
+          brothersCount: 2,
+          sistersCount: 1,
+        } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        familyType: 'Extended',
+        familyValues: 'Traditional',
+        familyStatus: 'Upper middle class',
+        fatherOccupation: 'Retired',
+        motherOccupation: 'Homemaker',
+        brothersCount: 2,
+        sistersCount: 1,
+      });
+
+      expect(valuesMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profileId: 'prof-1',
+          familyType: 'Extended',
+          familyValues: 'Traditional',
+          familyStatus: 'Upper middle class',
+          fatherOccupation: 'Retired',
+          motherOccupation: 'Homemaker',
+          brothersCount: 2,
+          sistersCount: 1,
+        }),
+      );
+    });
+
+    it('upserts horoscope fields and clears optional text/file columns to null', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: 'prof-1', maritalStatus: 'Never Married' }]),
+      });
+
+      mockDb.update.mockReturnValue({
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      const onConflictDoUpdate = jest.fn().mockResolvedValue({});
+      const valuesMock = jest.fn().mockReturnValue({ onConflictDoUpdate });
+      mockDb.insert.mockReturnValue({ values: valuesMock });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1' } as any,
+        horoscope: {
+          birthTime: '10:45 AM',
+          birthPlace: 'Madurai',
+          manglik: 'No',
+          rashi: 'Mesha',
+          nakshatra: 'Ashwini',
+          horoscopeS3Key: 'profiles/u1/horoscopes/a.pdf',
+          horoscopeFileName: 'kundli.pdf',
+          horoscopeFileSizeBytes: 2048,
+        } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        birthTime: '10:45 AM',
+        birthPlace: 'Madurai',
+        manglik: 'No',
+        rashi: 'Mesha',
+        nakshatra: 'Ashwini',
+        horoscopeS3Key: 'profiles/u1/horoscopes/a.pdf',
+        horoscopeFileName: 'kundli.pdf',
+        horoscopeFileSizeBytes: 2048,
+      });
+
+      expect(valuesMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profileId: 'prof-1',
+          birthTime: '10:45 AM',
+          birthPlace: 'Madurai',
+          manglik: 'No',
+          rashi: 'Mesha',
+          nakshatra: 'Ashwini',
+          horoscopeS3Key: 'profiles/u1/horoscopes/a.pdf',
+          horoscopeFileName: 'kundli.pdf',
+          horoscopeFileSizeBytes: 2048,
+        }),
+      );
+
+      valuesMock.mockClear();
+      onConflictDoUpdate.mockClear();
+
+      await profilesService.updateMyProfile('user-1', {
+        birthTime: null,
+        birthPlace: '',
+        rashi: null,
+        nakshatra: '',
+        horoscopeS3Key: null,
+        horoscopeFileName: '',
+        horoscopeFileSizeBytes: 0,
+      });
+
+      expect(onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          set: expect.objectContaining({
+            birthTime: null,
+            birthPlace: null,
+            rashi: null,
+            nakshatra: null,
+            horoscopeS3Key: null,
+            horoscopeFileName: null,
+            horoscopeFileSizeBytes: null,
+          }),
+        }),
+      );
+    });
+
+    it('clears family enum fields to null when PATCH sends null', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: 'prof-1', maritalStatus: 'Never Married' }]),
+      });
+
+      mockDb.update.mockReturnValue({
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      const onConflictDoUpdate = jest.fn().mockResolvedValue({});
+      const valuesMock = jest.fn().mockReturnValue({ onConflictDoUpdate });
+      mockDb.insert.mockReturnValue({ values: valuesMock });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1' } as any,
+        family: null,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        familyStatus: null,
+        familyValues: null,
+        fatherOccupation: null,
+        motherOccupation: null,
+      } as any);
+
+      expect(onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          set: expect.objectContaining({
+            familyStatus: null,
+            familyValues: null,
+            fatherOccupation: null,
+            motherOccupation: null,
+          }),
+        }),
+      );
+    });
+
+    it('clears children when marital status is no longer Divorced/Widowed', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          { id: 'prof-1', maritalStatus: 'Divorced', educationId: null, occupationId: null, companyId: null },
+        ]),
+      });
+
+      const setMock = jest.fn().mockReturnThis();
+      mockDb.update.mockReturnValue({
+        set: setMock,
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      mockDb.insert.mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+        }),
+      });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1', maritalStatus: 'Never Married' } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        maritalStatus: 'Never Married',
+        hasChildren: true,
+        childrenCount: 2,
+        childrenLivingWithMe: true,
+      });
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maritalStatus: 'Never Married',
+          hasChildren: false,
+          childrenCount: 0,
+          childrenLivingWithMe: null,
+        }),
+      );
+    });
+
+    it('persists children when Divorced + hasChildren is complete', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          {
+            id: 'prof-1',
+            maritalStatus: 'Never Married',
+            educationId: null,
+            occupationId: null,
+            companyId: null,
+          },
+        ]),
+      });
+
+      const setMock = jest.fn().mockReturnThis();
+      mockDb.update.mockReturnValue({
+        set: setMock,
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1', maritalStatus: 'Divorced', hasChildren: true } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        maritalStatus: 'Divorced',
+        hasChildren: true,
+        childrenCount: 2,
+        childrenLivingWithMe: true,
+      });
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maritalStatus: 'Divorced',
+          hasChildren: true,
+          childrenCount: 2,
+          childrenLivingWithMe: true,
+        }),
+      );
+    });
+
+    it('rejects incomplete children when stored marital is Divorced', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          { id: 'prof-1', maritalStatus: 'Divorced', educationId: null, occupationId: null, companyId: null },
+        ]),
+      });
+
+      await expect(
+        profilesService.updateMyProfile('user-1', {
+          hasChildren: true,
+          childrenCount: 2,
+        }),
+      ).rejects.toThrow(/children live with you/i);
+    });
+
+    it('rejects invalid maritalStatus on update', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          { id: 'prof-1', maritalStatus: 'Never Married', educationId: null, occupationId: null, companyId: null },
+        ]),
+      });
+
+      await expect(
+        profilesService.updateMyProfile('user-1', {
+          maritalStatus: 'Separated' as any,
+        }),
+      ).rejects.toThrow(/maritalStatus/i);
+    });
+
+    it('persists weightKg and complexion', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: 'prof-1', maritalStatus: 'Never Married' }]),
+      });
+
+      const setMock = jest.fn().mockReturnThis();
+      mockDb.update.mockReturnValue({
+        set: setMock,
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      mockDb.insert.mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+        }),
+      });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1', weightKg: 62, complexion: 'Fair' } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        weightKg: 62,
+        complexion: 'Fair',
+        disability: null,
+      });
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          weightKg: 62,
+          complexion: 'Fair',
+          disability: null,
+        }),
+      );
+    });
+
+    it('coerces empty-string complexion/disability to null (not "")', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: 'prof-1', maritalStatus: 'Never Married' }]),
+      });
+
+      const setMock = jest.fn().mockReturnThis();
+      mockDb.update.mockReturnValue({
+        set: setMock,
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1', complexion: null, disability: null } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        complexion: '' as any,
+        disability: '' as any,
+      });
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          complexion: null,
+          disability: null,
+        }),
+      );
+    });
+
+    it('persists willingToRelocate on profile edit', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: 'prof-1', maritalStatus: 'Never Married' }]),
+      });
+
+      const setMock = jest.fn().mockReturnThis();
+      mockDb.update.mockReturnValue({
+        set: setMock,
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1', willingToRelocate: 'Open to discussion' } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        willingToRelocate: 'Open to discussion',
+      });
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({ willingToRelocate: 'Open to discussion' }),
+      );
+    });
+
+    it('stores free-text subcaste/gotra and clears empty strings to null', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: 'prof-1', maritalStatus: 'Never Married' }]),
+      });
+
+      const setMock = jest.fn().mockReturnThis();
+      mockDb.update.mockReturnValue({
+        set: setMock,
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1', subcaste: null, gotra: null } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        subcaste: 'Vadama',
+        gotra: '',
+      } as any);
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subcaste: 'Vadama',
+          gotra: null,
+        }),
+      );
+    });
+
+    it('updates profileFor, fullName, gender, and dob together', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          {
+            id: 'prof-1',
+            maritalStatus: 'Never Married',
+            gender: 'Female',
+            educationId: null,
+            occupationId: null,
+            companyId: null,
+          },
+        ]),
+      });
+
+      const setMock = jest.fn().mockReturnThis();
+      mockDb.update.mockReturnValue({
+        set: setMock,
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: {
+          id: 'prof-1',
+          profileFor: 'Daughter',
+          fullName: 'Ananya Sharma',
+          gender: 'Female',
+          dob: '1998-06-15',
+        } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', {
+        profileFor: 'Daughter',
+        fullName: 'Ananya Sharma',
+        gender: 'Female',
+        dobDay: '15',
+        dobMonth: '06',
+        dobYear: '1998',
+      });
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profileFor: 'Daughter',
+          fullName: 'Ananya Sharma',
+          gender: 'Female',
+          dob: '1998-06-15',
+        }),
+      );
+    });
+
+    it('rejects partial DOB updates', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          { id: 'prof-1', maritalStatus: 'Never Married', gender: 'Male' },
+        ]),
+      });
+
+      await expect(
+        profilesService.updateMyProfile('user-1', {
+          dobDay: '15',
+          dobMonth: '06',
+        }),
+      ).rejects.toThrow(/day, month, and year/i);
+    });
+
+    it('rejects underage DOB on update using stored gender', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          { id: 'prof-1', maritalStatus: 'Never Married', gender: 'Male' },
+        ]),
+      });
+
+      await expect(
+        profilesService.updateMyProfile('user-1', {
+          dobDay: '01',
+          dobMonth: '01',
+          dobYear: '2010',
+        }),
+      ).rejects.toThrow(/at least 21/i);
+    });
+
+    it('rejects invalid profileFor on update', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          { id: 'prof-1', maritalStatus: 'Never Married', gender: 'Male' },
+        ]),
+      });
+
+      await expect(
+        profilesService.updateMyProfile('user-1', {
+          profileFor: 'Friend' as any,
+        }),
+      ).rejects.toThrow(/profileFor/i);
+    });
+
+    it('accepts another curated profileFor value (Relative) on update', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          {
+            id: 'prof-1',
+            maritalStatus: 'Never Married',
+            gender: 'Female',
+            educationId: null,
+            occupationId: null,
+            companyId: null,
+          },
+        ]),
+      });
+
+      const setMock = jest.fn().mockReturnThis();
+      mockDb.update.mockReturnValue({
+        set: setMock,
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1', profileFor: 'Relative' } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', { profileFor: 'Relative' });
+
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({ profileFor: 'Relative' }),
+      );
+    });
+
+    it('allows gender-only update without touching DOB', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          {
+            id: 'prof-1',
+            maritalStatus: 'Never Married',
+            gender: 'Female',
+            educationId: null,
+            occupationId: null,
+            companyId: null,
+          },
+        ]),
+      });
+
+      const setMock = jest.fn().mockReturnThis();
+      mockDb.update.mockReturnValue({
+        set: setMock,
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
+        profile: { id: 'prof-1', gender: 'Other' } as any,
+        photos: [],
+        verificationStatus: 'idle',
+      });
+
+      await profilesService.updateMyProfile('user-1', { gender: 'Other' });
+
+      expect(setMock).toHaveBeenCalledWith(expect.objectContaining({ gender: 'Other' }));
+      expect(setMock).toHaveBeenCalledWith(expect.not.objectContaining({ dob: expect.anything() }));
+    });
+
+    it('rejects underage DOB for Female using stored gender (boundary)', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([
+          { id: 'prof-1', maritalStatus: 'Never Married', gender: 'Female' },
+        ]),
+      });
+
+      // Birthday tomorrow: still 17 today.
+      const almostEighteen = dobPartsYearsAgo(18, 1);
+      await expect(
+        profilesService.updateMyProfile('user-1', almostEighteen),
+      ).rejects.toThrow(/at least 18/i);
     });
   });
 
@@ -453,16 +1222,23 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
     });
 
     it('should reorder photos in transaction and set first as primary', async () => {
-      mockDb.select.mockReturnValue({
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([{ id: 'prof-1' }]),
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([{ id: 'prof-1' }]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue([{ id: 'photo-2' }, { id: 'photo-1' }]),
+        };
       });
 
-      mockDb.update.mockReturnValue({
-        set: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue(undefined),
-      });
+      mockDb.execute = jest.fn().mockResolvedValue(undefined);
 
       jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
         profile: { id: 'prof-1' } as any,
@@ -473,7 +1249,7 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       await profilesService.reorderPhotos('user-1', ['photo-2', 'photo-1']);
 
       expect(mockDb.transaction).toHaveBeenCalled();
-      expect(mockDb.update).toHaveBeenCalledWith(profilePhotos);
+      expect(mockDb.execute).toHaveBeenCalled();
     });
   });
 
@@ -497,56 +1273,38 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       let selectCall = 0;
       mockDb.select.mockImplementation(() => {
         selectCall++;
+        const resolveLimit = (value: unknown) => ({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue(value),
+            orderBy: jest.fn().mockResolvedValue(value),
+          }),
+        });
+
         if (selectCall === 1) {
-          // target profile
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([targetProfile]),
-          };
-        } else if (selectCall === 2) {
-          // viewer profile
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ id: 'viewer-prof' }]),
-          };
-        } else if (selectCall >= 3 && selectCall <= 6) {
-          // family, lifestyle, horoscope, verifications
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([]),
-          };
-        } else if (selectCall === 7) {
-          // photos
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            orderBy: jest.fn().mockResolvedValue([{ id: 'p1', s3Key: 'key.jpg', isPrimary: true }]),
-          };
-        } else if (selectCall === 8) {
-          // userSettings -> photoBlur: 'always'
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ photoBlur: 'always' }]),
-          };
-        } else if (selectCall === 9) {
-          // viewer profile again for blur logic check
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ id: 'viewer-prof' }]),
-          };
-        } else {
-          // interests connection -> not accepted
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([]),
-          };
+          return resolveLimit([targetProfile]);
         }
+        // Promise.all: family, lifestyle, horoscope, verification, photos
+        if (selectCall >= 2 && selectCall <= 5) {
+          return resolveLimit([]);
+        }
+        if (selectCall === 6) {
+          return resolveLimit([{ id: 'p1', s3Key: 'key.jpg', isPrimary: true, displayOrder: 0 }]);
+        }
+        if (selectCall === 7) {
+          // viewer profile (blocks)
+          return resolveLimit([{ id: 'viewer-prof' }]);
+        }
+        if (selectCall === 8) {
+          // userSettings photoBlur
+          return resolveLimit([{ photoBlur: 'always' }]);
+        }
+        if (selectCall === 9) {
+          // viewer profile for mutual connect
+          return resolveLimit([{ id: 'viewer-prof' }]);
+        }
+        // interests — no accepted connection
+        return resolveLimit([]);
       });
 
       mockDb.insert.mockReturnValue({
@@ -567,50 +1325,34 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       let selectCall = 0;
       mockDb.select.mockImplementation(() => {
         selectCall++;
+        const resolveLimit = (value: unknown) => ({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue(value),
+            orderBy: jest.fn().mockResolvedValue(value),
+          }),
+        });
+
         if (selectCall === 1) {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([targetProfile]),
-          };
-        } else if (selectCall === 2) {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ id: 'viewer-prof' }]),
-          };
-        } else if (selectCall >= 3 && selectCall <= 6) {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([]),
-          };
-        } else if (selectCall === 7) {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            orderBy: jest.fn().mockResolvedValue([{ id: 'p1', s3Key: 'key.jpg', isPrimary: true }]),
-          };
-        } else if (selectCall === 8) {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ photoBlur: 'always' }]),
-          };
-        } else if (selectCall === 9) {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ id: 'viewer-prof' }]),
-          };
-        } else {
-          // Accepted connection exists!
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ id: 'interest-1', status: 'accepted' }]),
-          };
+          return resolveLimit([targetProfile]);
         }
+        if (selectCall >= 2 && selectCall <= 5) {
+          return resolveLimit([]);
+        }
+        if (selectCall === 6) {
+          return resolveLimit([{ id: 'p1', s3Key: 'key.jpg', isPrimary: true, displayOrder: 0 }]);
+        }
+        if (selectCall === 7) {
+          return resolveLimit([{ id: 'viewer-prof' }]);
+        }
+        if (selectCall === 8) {
+          return resolveLimit([{ photoBlur: 'always' }]);
+        }
+        if (selectCall === 9) {
+          return resolveLimit([{ id: 'viewer-prof' }]);
+        }
+        // Accepted connection exists
+        return resolveLimit([{ id: 'interest-1', status: 'accepted' }]);
       });
 
       mockDb.insert.mockReturnValue({

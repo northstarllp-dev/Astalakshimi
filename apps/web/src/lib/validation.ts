@@ -1,4 +1,6 @@
 import { z } from "zod"
+import { parseHeightToCm } from "@/lib/input-units"
+import { maritalAsksChildren, maritalStatusSchema, profileForSchema, genderSchema } from "@astalakshimi/validation"
 
 export const phoneSchema = z
   .string()
@@ -21,7 +23,7 @@ export const heroRegisterSchema = z.object({
 })
 
 export const signupStep1Schema = z.object({
-  profileFor: z.string().min(1, "Choose who this profile is for."),
+  profileFor: profileForSchema,
   phone: phoneSchema,
   terms: z.boolean().refine((value) => value === true, {
     message: "Accept the terms to continue.",
@@ -48,17 +50,52 @@ export const signupStep2Schema = z
       .trim()
       .min(3, "Name must be at least 3 characters.")
       .regex(/^[a-zA-Z\s]+$/, "Name can only contain letters."),
-    gender: z.string().min(1, "Select a gender."),
-    dobDay: z.string().regex(/^\d{2}$/, "Enter a valid day."),
-    dobMonth: z.string().regex(/^\d{2}$/, "Enter a valid month."),
-    dobYear: z.string().regex(/^\d{4}$/, "Enter a valid year."),
-    maritalStatus: z.string().min(1, "Select marital status."),
+    gender: genderSchema,
+    dobDay: z.string().regex(/^(0[1-9]|[12]\d|3[01])$/, "Enter a valid day."),
+    dobMonth: z.string().regex(/^(0[1-9]|1[0-2])$/, "Enter a valid month."),
+    dobYear: z.string().regex(/^(19\d{2}|20\d{2})$/, "Enter a valid year."),
+    maritalStatus: maritalStatusSchema,
+    diet: z.enum(["Vegetarian", "Non-vegetarian", "Eggetarian", "Jain", "Vegan"], {
+      errorMap: () => ({ message: "Select your diet." }),
+    }),
     city: z.string().trim().min(2, "Enter your city."),
+    height: z.string().min(1, "Enter height."),
+    hasChildren: z.boolean().optional(),
+    childrenCount: z.number().int().optional(),
+    childrenLivingWithMe: z.boolean().nullable().optional(),
   })
   .superRefine((value, ctx) => {
     const age = dobAge(value.dobDay, value.dobMonth, value.dobYear, value.gender)
     if (!age.ok) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: age.message, path: ["dobYear"] })
+    }
+    const heightCm = parseHeightToCm(value.height)
+    if (!heightCm) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid height.", path: ["height"] })
+    }
+    if (maritalAsksChildren(value.maritalStatus)) {
+      if (value.hasChildren === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Please say whether there are children.",
+          path: ["hasChildren"],
+        })
+      } else if (value.hasChildren) {
+        if (!value.childrenCount || value.childrenCount < 1) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Enter how many children.",
+            path: ["childrenCount"],
+          })
+        }
+        if (value.childrenLivingWithMe === undefined || value.childrenLivingWithMe === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Please say if the children live with you.",
+            path: ["childrenLivingWithMe"],
+          })
+        }
+      }
     }
   })
 
@@ -77,26 +114,50 @@ export const profileEditSchema = z
     phone: z.string().refine((value) => value.length === 0 || /^[6-9]\d{9}$/.test(value), {
       message: "Enter a valid 10-digit mobile number.",
     }),
-    fullName: z.string().trim().min(1, "Full name is required."),
-    gender: z.string().min(1, "Gender is required."),
-    dobDay: z.string().regex(/^\d{2}$/, "Date of birth is required."),
-    dobMonth: z.string().regex(/^\d{2}$/, "Date of birth is required."),
-    dobYear: z.string().regex(/^\d{4}$/, "Date of birth is required."),
-    maritalStatus: z.string().min(1, "Marital status is required."),
+    fullName: z
+      .string()
+      .trim()
+      .min(3, "Name must be at least 3 characters.")
+      .max(100, "Name is too long.")
+      .regex(/^[a-zA-Z\s]+$/, "Name can only contain letters."),
+    profileFor: profileForSchema,
+    gender: genderSchema,
+    dobDay: z.string().regex(/^(0[1-9]|[12]\d|3[01])$/, "Date of birth is required."),
+    dobMonth: z.string().regex(/^(0[1-9]|1[0-2])$/, "Date of birth is required."),
+    dobYear: z.string().regex(/^(19\d{2}|20\d{2})$/, "Date of birth is required."),
+    maritalStatus: maritalStatusSchema,
+    diet: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+      z.enum(["Vegetarian", "Non-vegetarian", "Eggetarian", "Jain", "Vegan"]).optional(),
+    ),
+    smoking: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+      z.enum(["Never", "Occasionally", "Regularly", "Planning to quit"]).optional(),
+    ),
+    alcohol: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+      z.enum(["Never", "Occasionally", "Regularly", "Planning to quit"]).optional(),
+    ),
+    interests: z.array(z.string().max(60)).max(7, "Select up to 7 interests.").optional(),
     religion: z.string().min(1, "Religion is required."),
     motherTongue: z.string().min(1, "Mother tongue is required."),
     city: z.string().trim().min(2, "City is required."),
-    education: z.string().optional(),
-    otherEducation: z.string().optional(),
+    educationLevel: z.string().optional(),
     degree: z.string().optional(),
-    occupation: z.string().optional(),
-    otherOccupation: z.string().optional(),
+    employmentStatus: z.string().optional(),
     profession: z.string().optional(),
     annualIncome: z.string().optional(),
-    prefReligion: z.array(z.string()).optional(),
-    aboutMe: z.string().max(300, "Keep this under 300 characters."),
-    prefAgeMin: z.number().int().min(18).max(80).optional(),
-    prefAgeMax: z.number().int().min(18).max(80).optional(),
+    prefReligion: z.array(z.string()).min(1, "Select at least one preferred religion."),
+    prefMaritalStatuses: z.array(z.string()).optional(),
+    prefCastes: z.array(z.string()).optional(),
+    prefMotherTongues: z.array(z.string()).optional(),
+    prefMinEducation: z.string().optional(),
+    prefLocations: z.array(z.string()).optional(),
+    aboutMe: z.string().max(1000, "Keep this under 1000 characters."),
+    prefAgeMin: z.number().int().min(18).max(80),
+    prefAgeMax: z.number().int().min(18).max(80),
+    prefHeightMinCm: z.number().int().min(120).max(230).optional(),
+    prefHeightMaxCm: z.number().int().min(120).max(230).optional(),
     brothersCount: z.number().int().min(0).max(5),
     sistersCount: z.number().int().min(0).max(5),
   })
@@ -109,9 +170,47 @@ export const profileEditSchema = z
         path: ["prefAgeMin"],
       })
     }
+    if (
+      value.prefHeightMinCm !== undefined &&
+      value.prefHeightMaxCm !== undefined &&
+      value.prefHeightMinCm > value.prefHeightMaxCm
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Minimum height cannot be above maximum height.",
+        path: ["prefHeightMinCm"],
+      })
+    }
     const age = dobAge(value.dobDay, value.dobMonth, value.dobYear, value.gender)
     if (!age.ok) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: age.message, path: ["dobYear"] })
+    }
+    if (maritalAsksChildren(value.maritalStatus)) {
+      const hasChildren = (value as { hasChildren?: boolean }).hasChildren
+      if (hasChildren === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Please say whether there are children.",
+          path: ["hasChildren"],
+        })
+      } else if (hasChildren) {
+        const count = (value as { childrenCount?: number }).childrenCount
+        if (!count || count < 1) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Enter how many children.",
+            path: ["childrenCount"],
+          })
+        }
+        const living = (value as { childrenLivingWithMe?: boolean | null }).childrenLivingWithMe
+        if (living === undefined || living === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Please say if the children live with you.",
+            path: ["childrenLivingWithMe"],
+          })
+        }
+      }
     }
   })
 
@@ -184,14 +283,14 @@ export const adminRejectSchema = z.object({
 
 export const adminCreateProfileSchema = z
   .object({
-    profileFor: z.string().min(1, "Choose who this profile is for."),
+    profileFor: profileForSchema,
     phone: phoneSchema,
     fullName: z.string().trim().min(3, "Name must be at least 3 characters."),
-    gender: z.string().min(1, "Select gender."),
+    gender: genderSchema,
     dobDay: z.string().regex(/^(0[1-9]|[12]\d|3[01])$/, "Enter a valid day."),
     dobMonth: z.string().regex(/^(0[1-9]|1[0-2])$/, "Enter a valid month."),
     dobYear: z.string().regex(/^(19\d{2}|20\d{2})$/, "Enter a valid year."),
-    maritalStatus: z.string().min(1, "Select marital status."),
+    maritalStatus: maritalStatusSchema,
     city: z.string().trim().min(2, "Enter city."),
     religion: z.string().min(1, "Select religion."),
     caste: z.string().trim().min(2, "Enter caste or community."),

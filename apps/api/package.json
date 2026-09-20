@@ -10,10 +10,12 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "test:e2e": "jest --config ./jest-e2e.json --runInBand"
   },
   "dependencies": {
     "@astalakshimi/database": "workspace:*",
+    "@astalakshimi/reference": "workspace:*",
     "@astalakshimi/types": "workspace:*",
     "@astalakshimi/validation": "workspace:*",
     "@aws-sdk/client-s3": "^3.726.0",

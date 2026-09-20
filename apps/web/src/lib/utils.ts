@@ -18,7 +18,9 @@ export function buildMediaUrl(path: string): string {
   
   const encoded = path.split("/").map(encodeURIComponent).join("/");
 
-  if (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_MOCK_S3_UPLOADS !== "false") {
+  // Explicit local mock only — real uploads (registration/edit) live in S3.
+  // CDN/CloudFront will plug in via NEXT_PUBLIC_CLOUDFRONT_URL when added.
+  if (process.env.NEXT_PUBLIC_MOCK_S3_UPLOADS === "true") {
     return `/api/proxy/media/demo-upload/${encoded}`;
   }
   

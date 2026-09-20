@@ -4,100 +4,49 @@ import * as React from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/profile/searchable-select"
-import { apiClient } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import type { EducationLevelOption, SpecializationOption } from "@astalakshimi/types"
+import { EDUCATION_LEVELS } from "@/lib/profile-store"
 
-export const OTHER_OPTION_VALUE = "__other__"
-
+/**
+ * Education is now flat: an `educationLevel` enum (Bachelors / Masters / ...)
+ * plus a free-text `degree` (degree / specialization / stream). No catalog
+ * FK ids and no backend autocomplete — everything is client-side.
+ *
+ * "Others" reveals a free-text input whose value is stored in `degree`
+ * (with `educationLevel` cleared), so unusual educations are still
+ * representable without a catalog table.
+ */
 type EducationFieldsProps = {
-  educationId?: number | null
-  specializationId?: number | null
-  otherEducation?: string
-  educationStream?: string
-  onEducationChange: (value: {
-    educationId: number | null
-    education: string
-    specializationId: number | null
-    educationStream: string
-    otherEducation: string
-  }) => void
+  educationLevel?: string
+  degree?: string
+  onEducationChange: (value: { educationLevel: string; degree: string }) => void
   educationClassName?: string
-  specializationClassName?: string
+  degreeClassName?: string
   educationMissing?: boolean
   educationError?: string
 }
 
+export const OTHER_OPTION_VALUE = "__other__"
+
 export function EducationFields({
-  educationId,
-  specializationId,
-  otherEducation = "",
-  educationStream = "",
+  educationLevel = "",
+  degree = "",
   onEducationChange,
   educationClassName,
-  specializationClassName,
+  degreeClassName,
   educationMissing,
   educationError,
 }: EducationFieldsProps) {
-  const [levels, setLevels] = React.useState<EducationLevelOption[]>([])
-  const [specializations, setSpecializations] = React.useState<SpecializationOption[]>([])
-  const [loadingSpecs, setLoadingSpecs] = React.useState(false)
-  const [otherSpecSelected, setOtherSpecSelected] = React.useState(false)
-
-  React.useEffect(() => {
-    apiClient.educations.listLevels().then(setLevels).catch(console.error)
-  }, [])
-
-  React.useEffect(() => {
-    if (!educationId) {
-      setSpecializations([])
-      return
-    }
-
-    setLoadingSpecs(true)
-    apiClient.educations
-      .listSpecializations(educationId)
-      .then((items) => setSpecializations(items))
-      .catch(console.error)
-      .finally(() => setLoadingSpecs(false))
-  }, [educationId])
-
-  const isOtherEducation = !educationId && Boolean(otherEducation.trim())
-  const isOtherSpecialization =
-    Boolean(educationId) && !specializationId && (otherSpecSelected || Boolean(educationStream.trim()))
-
-  React.useEffect(() => {
-    if (educationId && !specializationId && educationStream.trim()) {
-      setOtherSpecSelected(true)
-    }
-  }, [educationId, specializationId, educationStream])
+  const isOtherEducation = !educationLevel && Boolean(degree.trim())
 
   const levelOptions = [
-    ...levels.map((level) => ({
-      value: String(level.id),
-      label: level.name,
-    })),
+    ...EDUCATION_LEVELS.map((level) => ({ value: level, label: level })),
     { value: OTHER_OPTION_VALUE, label: "Others" },
   ]
 
-  const specializationOptions = [
-    ...specializations.map((item) => ({
-      value: String(item.id),
-      label: item.name,
-    })),
-    { value: OTHER_OPTION_VALUE, label: "Others" },
-  ]
-
-  const selectedLevel = levels.find((level) => level.id === educationId)
-  const educationSelectValue = educationId
-    ? String(educationId)
+  const educationSelectValue = educationLevel
+    ? educationLevel
     : isOtherEducation
-      ? OTHER_OPTION_VALUE
-      : undefined
-
-  const specializationSelectValue = specializationId
-    ? String(specializationId)
-    : isOtherSpecialization
       ? OTHER_OPTION_VALUE
       : undefined
 
@@ -117,26 +66,10 @@ export function EducationFields({
           value={educationSelectValue}
           onValueChange={(value) => {
             if (value === OTHER_OPTION_VALUE) {
-              onEducationChange({
-                educationId: null,
-                education: "",
-                specializationId: null,
-                educationStream: "",
-                otherEducation: otherEducation || "",
-              })
-              setOtherSpecSelected(false)
+              onEducationChange({ educationLevel: "", degree: degree || "" })
               return
             }
-
-            const next = levels.find((level) => String(level.id) === value)
-            onEducationChange({
-              educationId: next?.id ?? null,
-              education: next?.name ?? "",
-              specializationId: null,
-              educationStream: "",
-              otherEducation: "",
-            })
-            setOtherSpecSelected(false)
+            onEducationChange({ educationLevel: value, degree })
           }}
           options={levelOptions}
           placeholder="Select highest education"
@@ -145,16 +78,8 @@ export function EducationFields({
         />
         {isOtherEducation ? (
           <Input
-            value={otherEducation}
-            onChange={(e) =>
-              onEducationChange({
-                educationId: null,
-                education: e.target.value,
-                specializationId: null,
-                educationStream: "",
-                otherEducation: e.target.value,
-              })
-            }
+            value={degree}
+            onChange={(e) => onEducationChange({ educationLevel: "", degree: e.target.value })}
             placeholder="Enter your highest education"
             className={educationClassName}
             aria-invalid={educationMissing}
@@ -165,61 +90,19 @@ export function EducationFields({
 
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          Specialization (optional)
+          Degree / specialization (optional)
         </Label>
-        <SearchableSelect
-          value={specializationSelectValue}
-          onValueChange={(value) => {
-            if (value === OTHER_OPTION_VALUE) {
-              setOtherSpecSelected(true)
-              onEducationChange({
-                educationId: educationId ?? null,
-                education: selectedLevel?.name ?? "",
-                specializationId: null,
-                educationStream: educationStream || "",
-                otherEducation: "",
-              })
-              return
-            }
-
-            setOtherSpecSelected(false)
-            const next = specializations.find((item) => String(item.id) === value)
+        <Input
+          value={degree}
+          onChange={(e) =>
             onEducationChange({
-              educationId: educationId ?? null,
-              education: selectedLevel?.name ?? "",
-              specializationId: next?.id ?? null,
-              educationStream: next?.name ?? "",
-              otherEducation: "",
+              educationLevel,
+              degree: e.target.value,
             })
-          }}
-          options={specializationOptions}
-          placeholder={
-            !educationId
-              ? "Select education first"
-              : loadingSpecs
-                ? "Loading specializations…"
-                : "Select specialization (optional)"
           }
-          searchPlaceholder="Search specialization…"
-          className={specializationClassName}
-          disabled={!educationId || loadingSpecs}
+          placeholder="e.g. B.Tech Computer Science"
+          className={degreeClassName}
         />
-        {isOtherSpecialization ? (
-          <Input
-            value={educationStream}
-            onChange={(e) =>
-              onEducationChange({
-                educationId: educationId ?? null,
-                education: selectedLevel?.name ?? "",
-                specializationId: null,
-                educationStream: e.target.value,
-                otherEducation: "",
-              })
-            }
-            placeholder="Enter your specialization"
-            className={specializationClassName}
-          />
-        ) : null}
       </div>
     </div>
   )

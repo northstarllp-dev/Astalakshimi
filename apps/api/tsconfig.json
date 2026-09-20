@@ -20,6 +20,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@astalakshimi/database": ["../../packages/database/dist/index"],
+      "@astalakshimi/reference": ["../../packages/reference/dist/index"],
       "@astalakshimi/types": ["../../packages/types/dist/index"],
       "@astalakshimi/validation": ["../../packages/validation/dist/index"]
     }

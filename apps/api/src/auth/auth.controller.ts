@@ -5,6 +5,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { sendOtpSchema, verifyOtpSchema, adminLoginSchema, type SendOtpInput, type VerifyOtpInput, type AdminLoginInput } from '@astalakshimi/validation';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { Public } from '../common/decorators/public.decorator';
+import { AllowIncomplete } from '../common/decorators/allow-incomplete.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
 
@@ -44,14 +45,19 @@ export class AuthController {
     return this.authService.refreshToken(token);
   }
 
+  @AllowIncomplete()
   @UseGuards(JwtAuthGuard)
   @Post('logout')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   async logout(@CurrentUser() user: UserSession) {
     return this.authService.logout(user.userId);
   }
 
+  /** Session probe — hit on every dashboard mount; must not share the OTP-tier 20/min budget. */
+  @AllowIncomplete()
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @Throttle({ default: { limit: 300, ttl: 60_000 } })
   async getMe(@CurrentUser() user: UserSession) {
     return this.authService.getMe(user.userId);
   }

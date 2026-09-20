@@ -33,7 +33,6 @@ function ShortlistPageInner() {
           community: "Community",
           education: "Graduate",
           occupation: "Professional",
-          matchPercent: 90,
           photos: [],
         }
       }

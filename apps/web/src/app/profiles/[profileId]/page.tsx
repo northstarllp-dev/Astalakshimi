@@ -108,30 +108,66 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
     verified: data.verificationStatus === 'verified',
     hasHoroscope: !!data.hasHoroscope || !!data.horoscope?.horoscopeS3Key,
     blurPhoto: data.blurPhoto,
-    matchPercent: 90,
+    matchPercent: data.matchPercent ?? null,
+    matchReasons: data.matchReasons ?? [],
     height: formatHeightFromCm(data.profile.heightCm),
-    education: data.profile.educationLevel,
-    occupation: data.profile.profession,
+    weight: data.profile.weightKg ? `${data.profile.weightKg} kg` : "",
+    complexion: data.profile.complexion ?? "",
+    disability: data.profile.disability ?? "",
+    education: [data.profile.educationLevel, data.profile.degree].filter(Boolean).join(" · "),
+    occupation: [data.profile.employmentStatus, data.profile.profession].filter(Boolean).join(" · "),
     community: data.profile.caste,
+    subcaste: data.profile.subcaste?.trim() || "",
+    gotra: data.profile.gotra?.trim() || "",
+    willingToRelocate: data.profile.willingToRelocate || "",
     about: data.profile.aboutMe || "No details provided.",
     gender: data.profile.gender,
     maritalStatus: data.profile.maritalStatus,
+    hasChildren: Boolean(data.profile.hasChildren),
+    childrenCount: data.profile.childrenCount ?? 0,
+    childrenLivingWithMe:
+      data.profile.childrenLivingWithMe === true
+        ? true
+        : data.profile.childrenLivingWithMe === false
+          ? false
+          : null,
     religion: data.profile.religion,
     motherTongue: data.profile.motherTongue,
-    college: data.profile.collegeName || "Not specified",
-    company: data.profile.companyName || "Not specified",
-    income: data.profile.annualIncome,
+    college: data.profile.collegeName || "",
+    company: [data.profile.companyName, data.profile.companySector].filter(Boolean).join(" · "),
+    income: data.profile.annualIncome || "",
     lifestyle: {
       drinking: data.lifestyle?.alcohol || "Not specified",
       smoking: data.lifestyle?.smoking || "Not specified",
       diet: data.lifestyle?.diet || "Not specified",
+      interests: data.lifestyle?.interests ?? [],
+    },
+    horoscope: {
+      birthTime: data.horoscope?.birthTime || "",
+      birthPlace: data.horoscope?.birthPlace || "",
+      manglik: data.horoscope?.manglik || "",
+      rashi: data.horoscope?.rashi || "",
+      nakshatra: data.horoscope?.nakshatra || "",
     },
     family: {
-      type: data.family?.familyType || "Not specified",
-      values: data.family?.familyValues || "Not specified",
-      father: data.family?.fatherOccupation || "Not specified",
-      mother: data.family?.motherOccupation || "Not specified",
-      siblings: `${(data.family?.brothersCount || 0) + (data.family?.sistersCount || 0)}`,
+      type: data.family?.familyType || "",
+      status: data.family?.familyStatus || "",
+      values: data.family?.familyValues || "",
+      father: data.family?.fatherOccupation || "",
+      mother: data.family?.motherOccupation || "",
+      siblings:
+        data.family?.brothersCount != null || data.family?.sistersCount != null
+          ? [
+              (data.family?.brothersCount || 0) > 0
+                ? `${data.family.brothersCount} brother${data.family.brothersCount === 1 ? "" : "s"}`
+                : null,
+              (data.family?.sistersCount || 0) > 0
+                ? `${data.family.sistersCount} sister${data.family.sistersCount === 1 ? "" : "s"}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(", ") || "Only child"
+          : "",
     },
     planSlug: data.planSlug || data.profile?.planSlug || data.subscription?.planSlug || null,
     preferences: {
@@ -169,9 +205,11 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
               plan={profile.planSlug}
             />
 
-            <span className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-full bg-emerald-500/95 px-2.5 py-1 text-xs font-bold text-white shadow backdrop-blur-xs">
-              <Star className="h-3.5 w-3.5 fill-current" /> {profile.matchPercent}% match
-            </span>
+            {typeof profile.matchPercent === "number" && (
+              <span className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-full bg-emerald-500/95 px-2.5 py-1 text-xs font-bold text-white shadow backdrop-blur-xs">
+                <Star className="h-3.5 w-3.5 fill-current" /> {profile.matchPercent}% match
+              </span>
+            )}
           </div>
         </div>
 
@@ -185,12 +223,14 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
               </span>
               {profile.education && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
-                  <GraduationCap className="h-3.5 w-3.5 text-primary" /> {profile.education.split(" ")[0].trim()}
+                  <GraduationCap className="h-3.5 w-3.5 text-primary" /> {profile.education}
                 </span>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
-                <Briefcase className="h-3.5 w-3.5 text-primary" /> {profile.occupation}
-              </span>
+              {profile.occupation ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
+                  <Briefcase className="h-3.5 w-3.5 text-primary" /> {profile.occupation}
+                </span>
+              ) : null}
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
                 <Users className="h-3.5 w-3.5 text-primary" /> {profile.community}
               </span>
@@ -205,11 +245,21 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
             profileId={profile.id}
             gender={profile.gender}
             maritalStatus={profile.maritalStatus}
+            hasChildren={profile.hasChildren}
+            childrenCount={profile.childrenCount}
+            childrenLivingWithMe={profile.childrenLivingWithMe}
+            height={profile.height}
+            weight={profile.weight}
+            complexion={profile.complexion}
+            disability={profile.disability}
             religion={profile.religion}
             community={profile.community}
+            subcaste={profile.subcaste}
+            gotra={profile.gotra}
             motherTongue={profile.motherTongue}
             city={profile.city}
             state={profile.state}
+            willingToRelocate={profile.willingToRelocate}
             hasHoroscope={profile.hasHoroscope}
             horoscopeFileName={data.horoscope?.horoscopeFileName}
             horoscopeS3Key={data.horoscope?.horoscopeS3Key}
@@ -220,11 +270,11 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
 
           <Section title="Education & career" icon={<Briefcase className="h-4 w-4" />}>
             <dl>
-              <DetailRow label="Education" value={profile.education} />
-              <DetailRow label="College" value={profile.college} />
-              <DetailRow label="Occupation" value={profile.occupation} />
-              <DetailRow label="Company" value={profile.company} />
-              <DetailRow label="Annual income" value={profile.income} />
+              {profile.education ? <DetailRow label="Education" value={profile.education} /> : null}
+              {profile.college ? <DetailRow label="College" value={profile.college} /> : null}
+              {profile.occupation ? <DetailRow label="Occupation" value={profile.occupation} /> : null}
+              {profile.company ? <DetailRow label="Company" value={profile.company} /> : null}
+              {profile.income ? <DetailRow label="Annual income" value={profile.income} /> : null}
             </dl>
           </Section>
 
@@ -233,16 +283,46 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
               <DetailRow label="Diet" value={profile.lifestyle.diet} />
               <DetailRow label="Smoking" value={profile.lifestyle.smoking} />
               <DetailRow label="Drinking" value={profile.lifestyle.drinking} />
+              {profile.lifestyle.interests.length > 0 && (
+                <DetailRow label="Interests" value={profile.lifestyle.interests.join(", ")} />
+              )}
             </dl>
           </Section>
 
+          {(profile.horoscope.birthTime ||
+            profile.horoscope.birthPlace ||
+            profile.horoscope.nakshatra ||
+            profile.horoscope.rashi ||
+            profile.horoscope.manglik) && (
+            <Section title="Horoscope" icon={<Star className="h-4 w-4" />}>
+              <dl>
+                {profile.horoscope.birthTime ? (
+                  <DetailRow label="Birth time" value={profile.horoscope.birthTime} />
+                ) : null}
+                {profile.horoscope.birthPlace ? (
+                  <DetailRow label="Birth place" value={profile.horoscope.birthPlace} />
+                ) : null}
+                {profile.horoscope.nakshatra ? (
+                  <DetailRow label="Star / Nakshatra" value={profile.horoscope.nakshatra} />
+                ) : null}
+                {profile.horoscope.rashi ? (
+                  <DetailRow label="Rashi" value={profile.horoscope.rashi} />
+                ) : null}
+                {profile.horoscope.manglik ? (
+                  <DetailRow label="Manglik" value={profile.horoscope.manglik} />
+                ) : null}
+              </dl>
+            </Section>
+          )}
+
           <Section title="Family" icon={<Users className="h-4 w-4" />}>
             <dl>
-              <DetailRow label="Family type" value={profile.family.type} />
-              <DetailRow label="Family values" value={profile.family.values} />
-              <DetailRow label="Father" value={profile.family.father} />
-              <DetailRow label="Mother" value={profile.family.mother} />
-              <DetailRow label="Siblings" value={profile.family.siblings} />
+              {profile.family.type ? <DetailRow label="Family type" value={profile.family.type} /> : null}
+              {profile.family.status ? <DetailRow label="Family status" value={profile.family.status} /> : null}
+              {profile.family.values ? <DetailRow label="Family values" value={profile.family.values} /> : null}
+              {profile.family.father ? <DetailRow label="Father" value={profile.family.father} /> : null}
+              {profile.family.mother ? <DetailRow label="Mother" value={profile.family.mother} /> : null}
+              {profile.family.siblings ? <DetailRow label="Siblings" value={profile.family.siblings} /> : null}
             </dl>
           </Section>
 
