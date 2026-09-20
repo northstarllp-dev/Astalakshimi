@@ -58,7 +58,7 @@ describe("inferSignupResumeStep", () => {
     const d = { ...emptySignupData(), profileFor: "Myself", phone: "9876543210" }
     expect(inferSignupResumeStep(d)).toBe(2)
   })
-  it("returns 3 after step2 complete", () => {
+  it("returns 4 after identity complete", () => {
     const d: SignupData = {
       ...emptySignupData(),
       profileFor: "Myself",
@@ -72,9 +72,9 @@ describe("inferSignupResumeStep", () => {
       city: "Mumbai",
       height: "5'9\"",
     }
-    expect(inferSignupResumeStep(d)).toBe(3)
+    expect(inferSignupResumeStep(d)).toBe(4)
   })
-  it("returns 4 after step3 complete", () => {
+  it("returns 5 after community complete", () => {
     const d: SignupData = {
       ...emptySignupData(),
       profileFor: "Myself",
@@ -91,7 +91,7 @@ describe("inferSignupResumeStep", () => {
       caste: "Brahmin",
       motherTongue: "Hindi",
     }
-    expect(inferSignupResumeStep(d)).toBe(4)
+    expect(inferSignupResumeStep(d)).toBe(5)
   })
   it("returns 5 when photo + identity ready", () => {
     const d: SignupData = {

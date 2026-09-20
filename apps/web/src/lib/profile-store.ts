@@ -137,12 +137,15 @@ export function sanitizeSignupDraftData(data: SignupData): SignupData {
 
 /** Furthest incomplete step based on filled fields (1–5). */
 export function inferSignupResumeStep(data: SignupData): number {
+  // Registration order: 1 phone, 2 OTP, 3 identity, 4 community, 5 photos.
+  // OTP verification lives in the auth token (not the draft), so step 2 can't
+  // be inferred from data — the register page bumps past it when a token exists.
   const step1Ok =
     Boolean(data.profileFor?.trim()) &&
     /^[6-9]\d{9}$/.test((data.phone || "").replace(/\D/g, ""))
   if (!step1Ok) return 1
 
-  const step2Ok =
+  const identityOk =
     Boolean(data.fullName?.trim()) &&
     Boolean(data.gender) &&
     /^\d{2}$/.test(data.dobDay || "") &&
@@ -151,13 +154,13 @@ export function inferSignupResumeStep(data: SignupData): number {
     Boolean(data.maritalStatus) &&
     Boolean(data.city?.trim()) &&
     Boolean(data.height?.trim())
-  if (!step2Ok) return 2
+  if (!identityOk) return 2
 
-  const step3Ok =
+  const communityOk =
     Boolean(data.religion) &&
     Boolean(data.caste?.trim()) &&
     Boolean(data.motherTongue)
-  if (!step3Ok) return 3
+  if (!communityOk) return 4
 
   const hasPhoto = (data.photos?.length ?? 0) >= 1 || (data.photoS3Keys?.length ?? 0) >= 1
   const identityReady =
@@ -165,7 +168,7 @@ export function inferSignupResumeStep(data: SignupData): number {
     (data.verificationMethod === "govt_id" &&
       Boolean(data.govtIdPhoto || data.govtIdS3Key) &&
       Boolean(data.govtIdType))
-  if (!hasPhoto || !identityReady) return 4
+  if (!hasPhoto || !identityReady) return 5
 
   return 5
 }

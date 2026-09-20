@@ -64,6 +64,7 @@ function SignupPageInner() {
   const [hydrated, setHydrated] = useState(false)
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [data, setData] = useState<SignupData>(emptySignupData)
   const saveProfileMutation = useSaveProfileMutation()
 
@@ -104,7 +105,9 @@ function SignupPageInner() {
             : draft.data.govtIdPhoto || "",
         }
         setData(restored)
-        setStep(draft.step)
+        // OTP is verified iff the auth token is present; skip the phone/OTP
+        // steps when authenticated, otherwise restart at phone entry.
+        setStep(apiClient.getToken() ? Math.max(draft.step, 3) : 1)
       }
     } else if (presetPhone) {
       setData({ ...emptySignupData(), phone: presetPhone })
@@ -165,27 +168,33 @@ function SignupPageInner() {
     if (step > 1) setStep((prev) => prev - 1)
   }
 
-  const finishVerification = async (enteredOtp?: string) => {
-    const otpToUse = enteredOtp || data.otp
-    if (!otpToUse) {
+  // Step 2: verify OTP up front, before any profile details are collected.
+  const verifyOtpAndContinue = async (enteredOtp: string) => {
+    if (!enteredOtp) {
       throw new Error('Enter the OTP sent to your phone.')
     }
-    
-    // First verify OTP and get token
+    setVerifyingOtp(true)
     try {
-      const auth = await apiClient.auth.verifyOtp({ phone: data.phone, otp: otpToUse })
+      const auth = await apiClient.auth.verifyOtp({ phone: data.phone, otp: enteredOtp })
       if (auth.accessToken) {
         apiClient.setToken(auth.accessToken)
       }
+      updateData({ otp: enteredOtp })
+      nextStep()
     } catch (err: any) {
-      throw new Error(err.message || "Invalid OTP. Please check and try again.")
+      throw new Error(err.message || 'Invalid OTP. Please check and try again.')
+    } finally {
+      setVerifyingOtp(false)
     }
+  }
 
+  // Final step: submit the completed profile. OTP was already verified at step 2,
+  // so the auth token is set and complete-registration runs without re-verifying.
+  const submitRegistration = async () => {
     const payload: SignupData = {
       ...data,
-      otp: otpToUse,
       siblings: formatSiblings(data.brothersCount, data.sistersCount),
-      verificationStatus: "pending",
+      verificationStatus: 'pending',
       submittedAt: new Date().toISOString(),
     }
     await saveProfileMutation.mutateAsync(payload)
@@ -254,16 +263,21 @@ function SignupPageInner() {
                     newAccountHint={fromLogin}
                   />
                 )}
-                {step === 2 && <Step2Identity data={data} updateData={updateData} nextStep={nextStep} />}
-                {step === 3 && <Step3Community data={data} updateData={updateData} nextStep={nextStep} />}
-                {step === 4 && (
-                  <Step4Verify data={data} updateData={updateData} onNext={nextStep} />
-                )}
-                {step === 5 && (
+                {step === 2 && (
                   <Step5OTP
                     data={data}
                     updateData={updateData}
-                    onSubmit={finishVerification}
+                    onSubmit={verifyOtpAndContinue}
+                    isSubmitting={verifyingOtp}
+                  />
+                )}
+                {step === 3 && <Step2Identity data={data} updateData={updateData} nextStep={nextStep} />}
+                {step === 4 && <Step3Community data={data} updateData={updateData} nextStep={nextStep} />}
+                {step === 5 && (
+                  <Step4Verify
+                    data={data}
+                    updateData={updateData}
+                    onSubmit={submitRegistration}
                     isSubmitting={saveProfileMutation.isPending}
                   />
                 )}
@@ -980,7 +994,7 @@ function Step5OTP({
 }: {
   data: SignupData
   updateData: (fields: Partial<SignupData>) => void
-  onSubmit: (otp?: string) => Promise<void> | void
+  onSubmit: (otp: string) => Promise<void> | void
   isSubmitting?: boolean
 }) {
   const form = useForm({
@@ -1035,7 +1049,7 @@ function Step5OTP({
     >
       <StepHeading
         title="OTP verification"
-        subtitle={`We've sent a 6-digit code to +91 ${data.phone}. Enter it below to create your profile.`}
+        subtitle={`We've sent a 6-digit code to +91 ${data.phone}. Enter it to continue.`}
       />
 
       <div className="space-y-4">
@@ -1084,14 +1098,14 @@ function Step5OTP({
       </div>
 
       <div className="mt-auto pt-4">
-        <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Creating profile…
-            </>
-          ) : (
-            "Verify & create profile"
-          )}
+          <Button className="w-full" size="lg" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Verifying…
+              </>
+            ) : (
+              "Verify & continue"
+            )}
       </Button>
     </div>
     </form>
