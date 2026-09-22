@@ -423,6 +423,9 @@ describe('Profiles HTTP e2e (validation + routing)', () => {
       motherOccupation: 'Homemaker',
       diet: 'Vegetarian',
       companySector: '',
+      prefAgeMin: 25,
+      prefAgeMax: 33,
+      prefReligions: ['Hindu'],
       photoS3Keys: [
         `profiles/${USER_ID}/photos/22222222-2222-4222-8222-222222222222.jpeg`,
       ],
@@ -660,6 +663,9 @@ describe('Profiles HTTP e2e (validation + routing)', () => {
         fatherOccupation: 'Employed',
         motherOccupation: 'Homemaker',
         diet: 'Vegetarian',
+        prefAgeMin: 25,
+        prefAgeMax: 33,
+        prefReligions: ['Hindu'],
         createdBy: 'staff',
       })
       .expect(201);

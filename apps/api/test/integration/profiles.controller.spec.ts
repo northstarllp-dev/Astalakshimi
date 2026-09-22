@@ -54,6 +54,43 @@ describe('Feature 2: Profiles - ProfilesController (Integration Tests)', () => {
       );
       expect(result).toEqual(expectedResponse);
     });
+
+    it('should forward the full partner-preference set to the service', async () => {
+      const payload = {
+        profileFor: 'Myself',
+        fullName: 'Fathima Rahman',
+        prefAgeMin: 30,
+        prefAgeMax: 40,
+        prefReligions: ['Muslim'],
+        prefMaritalStatuses: ['Never Married', 'Divorced'],
+        prefCastes: ['Sunni'],
+        prefMotherTongues: ['Urdu'],
+        prefMinEducation: 'Masters',
+        prefLocations: ['Hyderabad'],
+      } as unknown as CompleteRegistrationPayload;
+
+      profilesService.completeRegistration.mockResolvedValue({
+        success: true,
+        message: 'Done',
+        profileId: 'prof-1',
+      });
+
+      await controller.completeRegistration(mockUserSession, payload);
+
+      expect(profilesService.completeRegistration).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        expect.objectContaining({
+          prefAgeMin: 30,
+          prefAgeMax: 40,
+          prefReligions: ['Muslim'],
+          prefMaritalStatuses: ['Never Married', 'Divorced'],
+          prefCastes: ['Sunni'],
+          prefMotherTongues: ['Urdu'],
+          prefMinEducation: 'Masters',
+          prefLocations: ['Hyderabad'],
+        }),
+      );
+    });
   });
 
   describe('GET /profiles/me', () => {

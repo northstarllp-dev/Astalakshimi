@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { BlocksService } from '../blocks/blocks.service';
@@ -34,6 +34,7 @@ import { getApprovedPhotos, getOwnerPhotos, computeBlurDecision, isOwnedPhotoKey
 import { LruCache } from '../common/cache/lru-cache';
 import { loadViewerContext } from '../matches/viewer-context';
 import { scoreCandidate } from '../matches/match-scoring';
+import { requiredFieldsComplete } from './required-fields-complete';
 
 @Injectable()
 export class ProfilesService {
@@ -295,7 +296,11 @@ export class ProfilesService {
       manglik,
       rashi: this.emptyToUndef(payload.rashi),
       nakshatra: this.emptyToUndef(payload.nakshatra),
-      prefReligions: payload.prefReligions?.length ? payload.prefReligions : ['Hindu'],
+      // Preferences come from the signup wizard (step 5). Only the optional
+      // fields get a fallback here — prefReligions / prefAgeMin / prefAgeMax are
+      // required by completeRegistrationSchema, so fabricating them would hide
+      // the real matching criteria behind invented defaults.
+      prefReligions: payload.prefReligions ?? [],
       prefCastes: payload.prefCastes ?? [],
       prefMotherTongues: payload.prefMotherTongues ?? [],
       prefMaritalStatuses: payload.prefMaritalStatuses?.length
@@ -712,6 +717,8 @@ export class ProfilesService {
         throw new BadRequestException('govtIdS3Key must be an ID uploaded through your own presigned URL');
       }
 
+      // Store verification docs as `idle` — not yet in the admin review queue.
+      // Member must call submitVerification after required fields are complete.
       await tx
         .insert(verifications)
         .values({
@@ -720,7 +727,7 @@ export class ProfilesService {
           selfieS3Key,
           govtIdType,
           govtIdS3Key,
-          status: 'pending',
+          status: 'idle',
         })
         .onConflictDoUpdate({
           target: verifications.profileId,
@@ -729,7 +736,7 @@ export class ProfilesService {
             selfieS3Key,
             govtIdType,
             govtIdS3Key,
-            status: 'pending',
+            status: 'idle',
             rejectionReason: null,
             reviewedBy: null,
             reviewedAt: null,
@@ -771,6 +778,103 @@ export class ProfilesService {
         profileId,
       };
     });
+  }
+
+  /**
+   * Promote verification from idle/rejected → pending for admin review.
+   * Requires every required profile field to be filled (hard gate).
+   */
+  async submitVerification(userId: string) {
+    const [profile] = await this.db
+      .select()
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .limit(1);
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    const [lifestyle] = await this.db
+      .select()
+      .from(lifestyleInterests)
+      .where(eq(lifestyleInterests.profileId, profile.id))
+      .limit(1);
+
+    const [horoscope] = await this.db
+      .select()
+      .from(horoscopes)
+      .where(eq(horoscopes.profileId, profile.id))
+      .limit(1);
+
+    const photoRows = await this.db
+      .select({ id: profilePhotos.id })
+      .from(profilePhotos)
+      .where(eq(profilePhotos.profileId, profile.id));
+
+    if (
+      !requiredFieldsComplete({
+        profile,
+        lifestyle,
+        horoscope,
+        photoCount: photoRows.length,
+      })
+    ) {
+      throw new BadRequestException('Complete your profile before submitting for verification');
+    }
+
+    const [existing] = await this.db
+      .select()
+      .from(verifications)
+      .where(eq(verifications.profileId, profile.id))
+      .limit(1);
+
+    if (existing?.status === 'verified') {
+      throw new ConflictException('Already verified');
+    }
+
+    if (existing?.status === 'pending') {
+      return {
+        success: true,
+        message: 'Verification is already pending review',
+        status: 'pending' as const,
+      };
+    }
+
+    if (!existing?.selfieS3Key && !existing?.govtIdS3Key) {
+      throw new BadRequestException(
+        'Upload a selfie or government ID before submitting for verification',
+      );
+    }
+
+    const [verification] = existing
+      ? await this.db
+          .update(verifications)
+          .set({
+            status: 'pending',
+            rejectionReason: null,
+            reviewedBy: null,
+            reviewedAt: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(verifications.profileId, profile.id))
+          .returning()
+      : await this.db
+          .insert(verifications)
+          .values({
+            profileId: profile.id,
+            method: 'selfie',
+            status: 'pending',
+          })
+          .returning();
+
+    this.invalidateProfileCache(profile.id);
+
+    return {
+      success: true,
+      message: 'Profile submitted for verification (12-hour SLA)',
+      status: verification.status,
+    };
   }
 
   async updateMyProfile(

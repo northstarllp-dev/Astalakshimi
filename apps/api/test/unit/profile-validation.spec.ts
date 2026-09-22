@@ -961,10 +961,170 @@ describe('Feature 2: Profile - Zod Validation Schemas', () => {
         fatherOccupation: 'Employed',
         motherOccupation: 'Homemaker',
         diet: 'Vegetarian',
+        prefAgeMin: 25,
+        prefAgeMax: 33,
+        prefReligions: ['Hindu'],
         createdBy: 'staff',
       } as any);
       expect(result.success).toBe(true);
       if (result.success) expect((result.data as any).createdBy).toBeUndefined();
+    });
+  });
+
+  describe('completeRegistrationSchema — partner preferences', () => {
+    /** Minimal valid registration; prefs are overridden per test. */
+    const registrationBase = {
+      profileFor: 'Myself',
+      fullName: 'Karthik Loganathan',
+      gender: 'Male',
+      dobDay: '15',
+      dobMonth: '06',
+      dobYear: '1995',
+      maritalStatus: 'Never Married',
+      city: 'Chennai',
+      state: 'Tamil Nadu',
+      religion: 'Hindu',
+      caste: 'Brahmin',
+      motherTongue: 'Tamil',
+      familyValues: 'Moderate',
+      familyType: 'Nuclear',
+      fatherOccupation: 'Employed',
+      motherOccupation: 'Homemaker',
+      diet: 'Vegetarian',
+    };
+
+    it('accepts registration with the member’s real preference set', () => {
+      const result = completeRegistrationSchema.safeParse({
+        ...registrationBase,
+        prefAgeMin: 28,
+        prefAgeMax: 36,
+        prefHeightMinCm: 150,
+        prefHeightMaxCm: 190,
+        prefReligions: ['Jain'],
+        prefMaritalStatuses: ['Never Married', 'Divorced'],
+        prefCastes: ['Agarwal'],
+        prefMotherTongues: ['Hindi'],
+        prefMinEducation: 'Masters',
+        prefLocations: ['Mumbai', 'Pune'],
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // The chosen values survive — nothing is rewritten to defaults.
+        expect(result.data.prefReligions).toEqual(['Jain']);
+        expect(result.data.prefAgeMin).toBe(28);
+        expect(result.data.prefAgeMax).toBe(36);
+        expect(result.data.prefCastes).toEqual(['Agarwal']);
+        expect(result.data.prefMinEducation).toBe('Masters');
+        expect(result.data.prefLocations).toEqual(['Mumbai', 'Pune']);
+      }
+    });
+
+    it('rejects registration with no preferred religion', () => {
+      const result = completeRegistrationSchema.safeParse({
+        ...registrationBase,
+        prefAgeMin: 28,
+        prefAgeMax: 36,
+        prefReligions: [],
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(
+          result.error.issues.some((i) => i.path.includes('prefReligions')),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects registration with prefReligions omitted entirely', () => {
+      const result = completeRegistrationSchema.safeParse({
+        ...registrationBase,
+        prefAgeMin: 28,
+        prefAgeMax: 36,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(
+          result.error.issues.some((i) => i.path.includes('prefReligions')),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects registration without a preferred age range', () => {
+      const result = completeRegistrationSchema.safeParse({
+        ...registrationBase,
+        prefReligions: ['Hindu'],
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const paths = result.error.issues.map((i) => i.path.join('.'));
+        expect(paths).toContain('prefAgeMin');
+        expect(paths).toContain('prefAgeMax');
+      }
+    });
+
+    it('rejects an inverted preferred age range', () => {
+      const result = completeRegistrationSchema.safeParse({
+        ...registrationBase,
+        prefAgeMin: 40,
+        prefAgeMax: 25,
+        prefReligions: ['Hindu'],
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(
+          result.error.issues.some((i) =>
+            i.message.includes('greater than or equal to min age'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('rejects out-of-bounds preferred ages', () => {
+      expect(
+        completeRegistrationSchema.safeParse({
+          ...registrationBase,
+          prefAgeMin: 17,
+          prefAgeMax: 30,
+          prefReligions: ['Hindu'],
+        }).success,
+      ).toBe(false);
+      expect(
+        completeRegistrationSchema.safeParse({
+          ...registrationBase,
+          prefAgeMin: 30,
+          prefAgeMax: 81,
+          prefReligions: ['Hindu'],
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects an inverted preferred height range', () => {
+      const result = completeRegistrationSchema.safeParse({
+        ...registrationBase,
+        prefAgeMin: 28,
+        prefAgeMax: 36,
+        prefReligions: ['Hindu'],
+        prefHeightMinCm: 190,
+        prefHeightMaxCm: 150,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(
+          result.error.issues.some((i) =>
+            i.message.includes('greater than or equal to min height'),
+          ),
+        ).toBe(true);
+      }
+    });
+
+    it('keeps the optional preference fields optional', () => {
+      const result = completeRegistrationSchema.safeParse({
+        ...registrationBase,
+        prefAgeMin: 28,
+        prefAgeMax: 36,
+        prefReligions: ['Hindu'],
+      });
+      expect(result.success).toBe(true);
     });
   });
 });

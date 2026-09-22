@@ -1,11 +1,13 @@
 "use client"
 
 import { RequireFullPortal } from "@/components/layout/require-full-portal"
+import { canInteract, getOnboardingState } from "@/lib/portal-access"
 import { Button } from "@/components/ui/button"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
 import { MatchSnapFeed, MatchSnapSlide } from "@/components/dashboard/match-snap-feed"
 import * as React from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   useAddSavedSearchMutation,
@@ -18,6 +20,7 @@ import {
   useSkipMatchMutation,
   useSkippedQuery,
   useSearchQuery,
+  useTopMatchesPaginatedQuery,
   queryKeys,
 } from "@/hooks/queries"
 import { discoverQuickSchema } from "@/lib/validation"
@@ -27,9 +30,12 @@ import {
   BROWSE_TABS,
   DEFAULT_DISCOVER,
   EMPTY_ADVANCED,
+  DISCOVER_VIEWS,
+  DEFAULT_VIEW,
+  parseDiscoverView,
   type AdvancedFilters,
-  type BrowseTab,
   type DiscoverQuery,
+  type DiscoverView,
 } from "@/lib/discover"
 import { cn } from "@/lib/utils"
 import {
@@ -40,7 +46,9 @@ import {
   Filter,
   Heart,
   Lock,
+  Search,
   SlidersHorizontal,
+  Sparkles,
   X,
 } from "lucide-react"
 import { CityAutocomplete } from "@/components/profile/city-autocomplete"
@@ -49,6 +57,7 @@ import { getCommunities } from "@/lib/community-data"
 
 const HEIGHT_BANDS = ["Up to 5'4\"", "5'5\" – 5'8\"", "5'9\" & above"]
 const EDUCATION_GROUPS = ["B.Tech", "B.E", "MBA", "M.Sc", "Ph.D", "M.Phil", "Post Doctorate", "Others"]
+const MATCHES_PAGE_SIZE = 10
 
 function FilterSection({
   title,
@@ -104,22 +113,268 @@ function toggle(arr: string[], val: string) {
 export default function DashboardPage() {
   return (
     <RequireFullPortal>
-      <DiscoverPage />
+      {/* useSearchParams() requires a Suspense boundary when prerendering. */}
+      <React.Suspense fallback={null}>
+        <DiscoverPage />
+      </React.Suspense>
     </RequireFullPortal>
   )
 }
 
+/** Horizontal sub-tab toggle at the top of Discover (matches vs. search/filter). */
+function DiscoverViewTabs({
+  view,
+  onChange,
+}: {
+  view: DiscoverView
+  onChange: (view: DiscoverView) => void
+}) {
+  return (
+    <nav
+      role="tablist"
+      aria-label="Discover views"
+      className="mb-4 flex shrink-0 gap-1 rounded-2xl border border-border bg-card p-1"
+    >
+      {DISCOVER_VIEWS.map((tab) => {
+        const isActive = view === tab.id
+        const Icon = tab.id === "matches" ? Sparkles : Search
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            id={`discover-tab-${tab.id}`}
+            aria-selected={isActive}
+            aria-controls={`discover-panel-${tab.id}`}
+            onClick={() => onChange(tab.id)}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition",
+              isActive
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">{tab.label}</span>
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
 function DiscoverPage() {
-  const queryClient = useQueryClient()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const view = parseDiscoverView(searchParams.get("view"))
+
   const { data: profile = null } = useProfileQuery()
   const { data: skipped = [] } = useSkippedQuery()
-  const { data: paid = false } = usePaidQuery()
-  const { data: saved = [] } = useSavedSearchesQuery()
   const { data: interests } = useInterestsQuery()
   const { data: shortlist = [] } = useShortlistQuery()
   const skipMutation = useSkipMatchMutation()
   const connectMutation = useSendInterestMutation()
+
+  const onboardingState = getOnboardingState(profile)
+  const interactionsLocked = !canInteract(profile)
+  const firstName = profile?.fullName?.split(" ")[0] || "Member"
+  const interestCount = interests?.pendingCount ?? 0
+  const shortlistCount = shortlist.length
+
+  const handleSkip = (id: string) => {
+    if (interactionsLocked) return
+    skipMutation.mutate(id)
+  }
+  const handleConnect = (id: string) => {
+    if (interactionsLocked) return
+    connectMutation.mutate(id)
+  }
+
+  const setView = (next: DiscoverView) => {
+    router.replace(next === DEFAULT_VIEW ? "/dashboard" : `/dashboard?view=${next}`, { scroll: false })
+  }
+
+  return (
+    <main className="mx-auto flex h-[calc(100dvh-3.5rem)] max-w-7xl flex-col overflow-hidden px-3 pt-4 sm:px-4 md:h-[calc(100dvh-4rem)] md:pt-8">
+      <div className="mb-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Search & browse</p>
+          <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">Discover</h1>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            Namaste, {firstName}. Ranked matches from your partner preferences, or search the full community.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:flex">
+          {[
+            { label: "Interests", value: String(interestCount), href: "/interests" },
+            { label: "Shortlisted", value: String(shortlistCount), href: "/interests?tab=shortlisted" },
+            { label: "Views", value: "21", href: "/notifications" },
+          ].map((stat) => (
+            <Link
+              key={stat.label}
+              href={stat.href}
+              className="flex-1 rounded-xl border border-border bg-card px-2 py-1.5 text-center transition hover:border-primary/30 sm:min-w-[68px] sm:px-3 sm:py-2"
+            >
+              <p className="font-serif text-base font-bold leading-none text-primary sm:text-lg">{stat.value}</p>
+              <p className="mt-1 text-[10px] font-medium text-muted-foreground">{stat.label}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <DiscoverViewTabs view={view} onChange={setView} />
+
+      {interactionsLocked && (
+        <div className="mb-5 shrink-0 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-[#fff8ef] shadow-sm">
+          <div className="flex items-start gap-3 p-3.5 sm:p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
+              <Clock3 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-amber-950">You&apos;re in preview mode</p>
+              <p className="mt-0.5 text-sm text-amber-900/75">
+                {onboardingState === "pending"
+                  ? `Browse and shortlist freely. Send interest and messaging unlock after approval — usually within ${VERIFICATION_SLA_HOURS} hours.`
+                  : onboardingState === "rejected"
+                    ? "Verification was rejected. Re-upload your selfie or ID to unlock interactions."
+                    : onboardingState === "ready_to_submit"
+                      ? "Submit for verification to unlock send interest and messaging. Shortlist stays available."
+                      : "Complete your profile and get verified to unlock send interest and messaging."}
+              </p>
+              {onboardingState === "ready_to_submit" ? (
+                <Link href="/home" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
+                  Submit for verification on Home
+                </Link>
+              ) : onboardingState === "rejected" ? (
+                <Link href="/profile/verify" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
+                  Re-upload verification
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {view === "matches" ? (
+        <TopMatchesPanel
+          interactionsLocked={interactionsLocked}
+          skipped={skipped}
+          onSkip={handleSkip}
+          onConnect={handleConnect}
+        />
+      ) : (
+        <SearchFilterPanel
+          interactionsLocked={interactionsLocked}
+          skipped={skipped}
+          onSkip={handleSkip}
+          onConnect={handleConnect}
+        />
+      )}
+    </main>
+  )
+}
+
+/** "Your Top Matches" — score-ranked, paginated list from partner preferences. */
+function TopMatchesPanel({
+  interactionsLocked,
+  skipped,
+  onSkip,
+  onConnect,
+}: {
+  interactionsLocked: boolean
+  skipped: string[]
+  onSkip: (id: string) => void
+  onConnect: (id: string) => void
+}) {
+  const [page, setPage] = React.useState(1)
+  const { data, isLoading } = useTopMatchesPaginatedQuery({ page, limit: MATCHES_PAGE_SIZE })
+
+  const matches = (data?.matches || []).filter((match) => !skipped.includes(match.id))
+  const totalCount = data?.totalCount || 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / MATCHES_PAGE_SIZE))
+
+  return (
+    <div
+      role="tabpanel"
+      id="discover-panel-matches"
+      aria-labelledby="discover-tab-matches"
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      <div className="shrink-0">
+        <p className="mb-3 text-sm text-muted-foreground">
+          {isLoading ? (
+            <span>Loading your top matches...</span>
+          ) : (
+            <>
+              <span className="font-semibold text-primary">{totalCount}</span> top matches ranked by your partner preferences
+            </>
+          )}
+        </p>
+      </div>
+
+      <MatchSnapFeed className="pb-24 md:pb-2">
+        {matches.map((match, index) => (
+          <MatchSnapSlide key={match.id}>
+            <MatchListCard
+              match={match}
+              featured={index === 0 && page === 1}
+              priority={index === 0}
+              fillViewport
+              className="h-full"
+              interactionsLocked={interactionsLocked}
+              onSkip={onSkip}
+              onConnect={onConnect}
+            />
+          </MatchSnapSlide>
+        ))}
+        {!isLoading && totalCount === 0 && (
+          <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+            <Sparkles className="mx-auto h-8 w-8 text-muted-foreground" />
+            <p className="mt-3 font-semibold">No top matches yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Set your partner preferences, or search and filter the full community.
+            </p>
+            <Link href="/dashboard?view=search" className="mt-4 inline-block">
+              <Button>Search & filter</Button>
+            </Link>
+          </div>
+        )}
+      </MatchSnapFeed>
+
+      {totalPages > 1 && (
+        <div className="mt-3 hidden shrink-0 items-center justify-center gap-4 pb-4 md:flex">
+          <Button variant="outline" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+            Previous
+          </Button>
+          <span className="text-sm font-medium text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+            Next
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** "Search & Filter" — the full browse + filter experience. */
+function SearchFilterPanel({
+  interactionsLocked,
+  skipped,
+  onSkip,
+  onConnect,
+}: {
+  interactionsLocked: boolean
+  skipped: string[]
+  onSkip: (id: string) => void
+  onConnect: (id: string) => void
+}) {
+  const queryClient = useQueryClient()
+  const { data: paid = false } = usePaidQuery()
+  const { data: saved = [] } = useSavedSearchesQuery()
   const saveSearchMutation = useAddSavedSearchMutation()
+
   const [query, setQuery] = React.useState<DiscoverQuery>(DEFAULT_DISCOVER)
   const [page, setPage] = React.useState(1)
   const [moreOpen, setMoreOpen] = React.useState(false)
@@ -127,8 +382,7 @@ function DiscoverPage() {
   const [saveOpen, setSaveOpen] = React.useState(false)
   const [saveLabel, setSaveLabel] = React.useState("")
   const [paywall, setPaywall] = React.useState<string | null>(null)
-  const interestCount = interests?.pendingCount ?? 0
-  const shortlistCount = shortlist.length
+  const [prefsApplied, setPrefsApplied] = React.useState(false)
 
   const activeFilterCount = React.useMemo(() => {
     let count = 0
@@ -148,12 +402,8 @@ function DiscoverPage() {
     return count
   }, [query])
 
-  const firstName = profile?.fullName?.split(" ")[0] || "Member"
-  const pending = profile?.verificationStatus === "pending"
-  const userCity = profile?.city || "Chennai"
-
   const { data: searchResult, isLoading: isSearchLoading } = useSearchQuery({ ...query, page, limit: 10 })
-  const visibleMatches = (searchResult?.profiles || []).filter((profile: any) => !skipped.includes(profile.id))
+  const visibleMatches = (searchResult?.profiles || []).filter((match: any) => !skipped.includes(match.id))
   const totalCount = searchResult?.totalCount || 0
 
   const setQuick = (patch: Partial<DiscoverQuery>) => {
@@ -187,7 +437,6 @@ function DiscoverPage() {
     setPaywall(feature)
   }
 
-  const [prefsApplied, setPrefsApplied] = React.useState(false)
   const applyPreferences = async () => {
     // Stored partner prefs → free Discover filters only (age / city / community).
     // Paid advanced filters are never auto-filled from prefs.
@@ -226,49 +475,7 @@ function DiscoverPage() {
   const stars = STARS
 
   return (
-    <main className="mx-auto flex h-[calc(100dvh-3.5rem)] max-w-7xl flex-col overflow-hidden px-3 pt-4 sm:px-4 md:h-[calc(100dvh-4rem)] md:pt-8">
-      <div className="mb-5 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Search & browse</p>
-          <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">Discover</h1>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Namaste, {firstName}. Apply a filter and results update instantly  no search button.
-          </p>
-        </div>
-        <div className="grid grid-cols-3 gap-2 sm:flex">
-          {[
-            { label: "Interests", value: String(interestCount), href: "/interests" },
-            { label: "Shortlisted", value: String(shortlistCount), href: "/interests?tab=shortlisted" },
-            { label: "Views", value: "21", href: "/notifications" },
-          ].map((stat) => (
-            <Link
-              key={stat.label}
-              href={stat.href}
-              className="flex-1 rounded-xl border border-border bg-card px-2 py-1.5 text-center transition hover:border-primary/30 sm:min-w-[68px] sm:px-3 sm:py-2"
-            >
-              <p className="font-serif text-base font-bold leading-none text-primary sm:text-lg">{stat.value}</p>
-              <p className="mt-1 text-[10px] font-medium text-muted-foreground">{stat.label}</p>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-        {pending && (
-        <div className="mb-5 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-[#fff8ef] shadow-sm">
-          <div className="flex items-start gap-3 p-3.5 sm:p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
-                  <Clock3 className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="font-semibold text-amber-950">Your profile is under review</p>
-                  <p className="mt-0.5 text-sm text-amber-900/75">
-                Photos stay private until approval  usually within {VERIFICATION_SLA_HOURS} hours.
-              </p>
-                  </div>
-                </div>
-              </div>
-      )}
-
+    <>
       {/* Compact Filters Button Bar */}
       <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
@@ -432,64 +639,72 @@ function DiscoverPage() {
         })}
       </div>
 
-      <div className="shrink-0">
-      <p className="mb-3 text-sm text-muted-foreground">
-        {isSearchLoading ? (
-          <span>Loading profiles...</span>
-        ) : (
-          <>
-            <span className="font-semibold text-primary">{totalCount}</span> profiles found
-          </>
-        )}
-      </p>
-      </div>
+      <div
+        role="tabpanel"
+        id="discover-panel-search"
+        aria-labelledby="discover-tab-search"
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <div className="shrink-0">
+          <p className="mb-3 text-sm text-muted-foreground">
+            {isSearchLoading ? (
+              <span>Loading profiles...</span>
+            ) : (
+              <>
+                <span className="font-semibold text-primary">{totalCount}</span> profiles found
+              </>
+            )}
+          </p>
+        </div>
 
-      <MatchSnapFeed className="pb-24 md:pb-2">
-        {visibleMatches.map((match: any, index: any) => (
-          <MatchSnapSlide key={match.id}>
-            <MatchListCard
-              match={match}
-              featured={index === 0 && query.tab === "all"}
-              priority={index === 0}
-              fillViewport
-              className="h-full"
-              onSkip={(id: any) => skipMutation.mutate(id)}
-              onConnect={(id: any) => connectMutation.mutate(id)}
-            />
-          </MatchSnapSlide>
-        ))}
-        {visibleMatches.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
-            <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
-            <p className="mt-3 font-semibold">No profiles for this search</p>
-            <p className="mt-1 text-sm text-muted-foreground">Widen age, city, or community  results update as you adjust.</p>
-            <Button
-              className="mt-4"
-              onClick={() => {
-                queryClient.setQueryData(queryKeys.skipped, [])
-                setQuery(DEFAULT_DISCOVER)
-                setPage(1)
-              }}
-            >
-              Reset search
+        <MatchSnapFeed className="pb-24 md:pb-2">
+          {visibleMatches.map((match: any, index: any) => (
+            <MatchSnapSlide key={match.id}>
+              <MatchListCard
+                match={match}
+                featured={index === 0 && query.tab === "all"}
+                priority={index === 0}
+                fillViewport
+                className="h-full"
+                interactionsLocked={interactionsLocked}
+                onSkip={onSkip}
+                onConnect={onConnect}
+              />
+            </MatchSnapSlide>
+          ))}
+          {visibleMatches.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
+              <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
+              <p className="mt-3 font-semibold">No profiles for this search</p>
+              <p className="mt-1 text-sm text-muted-foreground">Widen age, city, or community  results update as you adjust.</p>
+              <Button
+                className="mt-4"
+                onClick={() => {
+                  queryClient.setQueryData(queryKeys.skipped, [])
+                  setQuery(DEFAULT_DISCOVER)
+                  setPage(1)
+                }}
+              >
+                Reset search
+              </Button>
+            </div>
+          )}
+        </MatchSnapFeed>
+
+        {visibleMatches.length > 0 && totalCount > visibleMatches.length && (
+          <div className="mt-3 hidden shrink-0 items-center justify-center gap-4 pb-4 md:flex">
+            <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+              Previous
+            </Button>
+            <span className="text-sm font-medium text-muted-foreground">
+              Page {page} of {Math.ceil(totalCount / 10)}
+            </span>
+            <Button variant="outline" disabled={page * 10 >= totalCount} onClick={() => setPage(p => p + 1)}>
+              Next
             </Button>
           </div>
         )}
-      </MatchSnapFeed>
-
-      {visibleMatches.length > 0 && totalCount > visibleMatches.length && (
-        <div className="mt-3 hidden shrink-0 items-center justify-center gap-4 pb-4 md:flex">
-          <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-            Previous
-          </Button>
-          <span className="text-sm font-medium text-muted-foreground">
-            Page {page} of {Math.ceil(totalCount / 10)}
-          </span>
-          <Button variant="outline" disabled={page * 10 >= totalCount} onClick={() => setPage(p => p + 1)}>
-            Next
-          </Button>
-        </div>
-      )}
+      </div>
 
       {/* Full Filters Popup Modal */}
       {filterOpen && (
@@ -869,8 +1084,8 @@ function DiscoverPage() {
               </Button>
             </div>
           </div>
-          </div>
+        </div>
       )}
-      </main>
+    </>
   )
 }

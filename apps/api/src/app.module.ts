@@ -26,6 +26,7 @@ import { ContactsModule } from './contacts/contacts.module';
 import { CommonModule } from './common/common.module';
 import { EnrollmentGuard } from './common/guards/enrollment.guard';
 import { ProfileGuard } from './common/guards/profile.guard';
+import { VerificationGuard } from './common/guards/verification.guard';
 import { JwtAuthGuard } from './common/guards/auth.guard';
 
 @Module({
@@ -69,8 +70,11 @@ import { JwtAuthGuard } from './common/guards/auth.guard';
     // @RequireEntitlement() get checked here; everything else is unaffected.
     { provide: APP_GUARD, useClass: EnrollmentGuard },
     // Enrollment gate: authenticated users without a profile can only reach
-    // @AllowIncomplete() onboarding routes (or @Roles staff routes). Runs last.
+    // @AllowIncomplete() onboarding routes (or @Roles staff routes).
     { provide: APP_GUARD, useClass: ProfileGuard },
+    // Verification gate: interaction endpoints require admin-verified status.
+    // Browse / self-service routes opt out with @AllowUnverified().
+    { provide: APP_GUARD, useClass: VerificationGuard },
   ],
 })
 export class AppModule {}

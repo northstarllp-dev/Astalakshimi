@@ -61,3 +61,18 @@ export const BROWSE_TABS: { id: BrowseTab; label: string; paid?: boolean }[] = [
   { id: "active", label: "Recently active", paid: true },
 ]
 
+/** Top-level Discover sub-tabs: score-ranked matches vs. manual search/filter. */
+export type DiscoverView = "matches" | "search"
+
+export const DEFAULT_VIEW: DiscoverView = "matches"
+
+export const DISCOVER_VIEWS: { id: DiscoverView; label: string }[] = [
+  { id: "matches", label: "Your Top Matches" },
+  { id: "search", label: "Search & Filter" },
+]
+
+/** Parse the `?view=` query param, defaulting to the matches tab. */
+export function parseDiscoverView(value: string | null | undefined): DiscoverView {
+  return value === "search" ? "search" : "matches"
+}
+

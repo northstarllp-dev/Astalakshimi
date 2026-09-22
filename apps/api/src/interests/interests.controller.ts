@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { InterestsService } from './interests.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { AllowUnverified } from '../common/decorators/allow-unverified.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -21,6 +22,7 @@ const statusQuerySchema = z.enum(['pending', 'accepted', 'declined', 'withdrawn'
 export class InterestsController {
   constructor(private readonly interestsService: InterestsService) {}
 
+  /** Send interest — requires verified (VerificationGuard). */
   @Post()
   sendInterest(
     @CurrentUser() user: UserSession,
@@ -29,29 +31,34 @@ export class InterestsController {
     return this.interestsService.sendInterest(user.userId, body);
   }
 
+  @AllowUnverified()
   @Get('usage')
   getUsage(@CurrentUser() user: UserSession) {
     return this.interestsService.getUsage(user.userId);
   }
 
+  @AllowUnverified()
   @Get('summary')
   getSummary(@CurrentUser() user: UserSession) {
     return this.interestsService.getSummary(user.userId);
   }
 
+  @AllowUnverified()
   @Get('received')
   getReceivedInterests(
     @CurrentUser() user: UserSession,
-    @Query(new ZodValidationPipe(statusQuerySchema)) status?: z.infer<typeof statusQuerySchema>,
+    @Query('status', new ZodValidationPipe(statusQuerySchema)) status?: z.infer<typeof statusQuerySchema>,
   ) {
     return this.interestsService.getReceivedInterests(user.userId, status);
   }
 
+  @AllowUnverified()
   @Get('sent')
   getSentInterests(@CurrentUser() user: UserSession) {
     return this.interestsService.getSentInterests(user.userId);
   }
 
+  @AllowUnverified()
   @Get('mutual')
   getMutualInterests(@CurrentUser() user: UserSession) {
     return this.interestsService.getMutualInterests(user.userId);
@@ -115,5 +122,3 @@ export class InterestsController {
     return this.interestsService.withdrawByProfileId(user.userId, profileId);
   }
 }
-
-

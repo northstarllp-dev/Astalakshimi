@@ -11,6 +11,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
       const currentCall = callCount;
       return {
         from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
@@ -24,6 +25,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     id: 'match-1',
     userId: 'm-user-1',
     fullName: 'Match 1',
+    gender: 'Female',
     dob: '1996-03-12', // 30 y/o
     heightCm: 168,
     city: 'Chennai',
@@ -37,6 +39,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     profession: null,
     companyName: null,
     annualIncome: null,
+    aboutMe: 'Hello there',
     createdAt: new Date('2026-01-01'),
   };
 
@@ -62,6 +65,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
       [candidate],
       [], // photos
       [], // settings
+      [], // subscriptions
       [], // connections
       [], // verifications
     ]);
@@ -74,11 +78,40 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     expect(result[0].matchReasons).toEqual(expect.any(Array));
   });
 
-  it('caches the result per user (second call does not hit the DB again)', async () => {
+  it('adds display-ready fields matching the search response shape', async () => {
     mockDb.select = mockQueryBuilder([
       [viewer],
       [],
       [candidate],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ]);
+
+    const result = await matchesService.getTopMatches('user-display');
+    expect(result[0]).toMatchObject({
+      gender: 'Female',
+      education: 'Bachelors',
+      occupation: 'Not specified',
+      company: 'Not specified',
+      income: 'Not specified',
+      about: 'Hello there',
+      community: 'Brahmin',
+      height: '168 cm',
+      planSlug: 'free',
+      planName: 'Free',
+      lastActive: 'Online now',
+    });
+  });
+
+  it('caches the scored pool per user (second call skips the pool query, only re-enriches)', async () => {
+    mockDb.select = mockQueryBuilder([
+      [viewer],
+      [],
+      [candidate],
+      [],
       [],
       [],
       [],
@@ -91,7 +124,23 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     const selectAfterFirst = mockDb.select.mock.calls.length;
     const second = await matchesService.getTopMatches('user-4');
     expect(second).toEqual(first);
-    expect(mockDb.select.mock.calls.length).toBe(selectAfterFirst);
+
+    // The pool query + scoring fan-out is cached; only the 5 enrichment
+    // lookups (photos, settings, subscriptions, connections, verifications)
+    // re-run on a cache hit.
+    expect(mockDb.select.mock.calls.length - selectAfterFirst).toBe(5);
+  });
+
+  it('caps the top list at 8 even when more candidates pass', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      ...candidate,
+      id: `match-${i}`,
+      createdAt: new Date(2026, 0, i + 1),
+    }));
+    mockDb.select = mockQueryBuilder([[viewer], [], many, [], [], [], [], []]);
+
+    const result = await matchesService.getTopMatches('user-cap');
+    expect(result).toHaveLength(8);
   });
 
   it('hard-filters candidates outside the saved age window and religion', async () => {
@@ -110,7 +159,16 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     const tooOld = { ...candidate, id: 'old-1', dob: '1970-01-01', createdAt: new Date('2026-01-02') };
     const otherFaith = { ...candidate, id: 'faith-1', religion: 'Christian', createdAt: new Date('2026-01-03') };
 
-    mockDb.select = mockQueryBuilder([[viewer], [prefs], [candidate, tooOld, otherFaith], [], [], [], []]);
+    mockDb.select = mockQueryBuilder([
+      [viewer],
+      [prefs],
+      [candidate, tooOld, otherFaith],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ]);
 
     const result = await matchesService.getTopMatches('user-5');
     expect(result.map((r) => r.id)).toEqual(['match-1']);
@@ -120,7 +178,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     const newer = { ...candidate, id: 'match-newer', fullName: 'Newer', createdAt: new Date('2026-06-01') };
     const older = { ...candidate, id: 'match-older', fullName: 'Older', createdAt: new Date('2025-06-01') };
 
-    mockDb.select = mockQueryBuilder([[viewer], [], [older, newer], [], [], [], []]);
+    mockDb.select = mockQueryBuilder([[viewer], [], [older, newer], [], [], [], [], []]);
 
     const result = await matchesService.getTopMatches('user-6');
     expect(result.map((r) => r.id)).toEqual(['match-newer', 'match-older']);
@@ -136,6 +194,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
       [candidate],
       [],
       mockSettings,
+      [], // subscriptions
       mockConnections,
       [],
     ]);
@@ -143,5 +202,100 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     const result = await matchesService.getTopMatches('user-7');
     expect(result).toHaveLength(1);
     expect(result[0].blurPhoto).toBe(false);
+  });
+});
+
+describe('MatchesService.getPaginatedMatches (score-ranked pagination)', () => {
+  let matchesService: MatchesService;
+  let mockDb: any;
+
+  const mockQueryBuilder = (resolveValues: any[]) => {
+    let callCount = 0;
+    return jest.fn(() => {
+      callCount++;
+      const currentCall = callCount;
+      return {
+        from: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        then: jest.fn((resolve) => resolve(resolveValues[currentCall - 1] || [])),
+      };
+    });
+  };
+
+  const viewer = { id: 'curr-1', gender: 'Male' };
+  const makeCandidate = (i: number) => ({
+    id: `match-${i}`,
+    userId: `m-user-${i}`,
+    fullName: `Match ${i}`,
+    gender: 'Female',
+    dob: '1996-03-12',
+    heightCm: 168,
+    city: 'Chennai',
+    state: 'Tamil Nadu',
+    religion: 'Hindu',
+    caste: 'Brahmin',
+    motherTongue: 'Tamil',
+    maritalStatus: 'Never Married',
+    educationLevel: 'Bachelors',
+    degree: null,
+    profession: null,
+    companyName: null,
+    annualIncome: null,
+    aboutMe: null,
+    createdAt: new Date(2026, 0, i + 1),
+  });
+
+  beforeEach(() => {
+    mockDb = { select: jest.fn() };
+    matchesService = new MatchesService(mockDb);
+  });
+
+  it('returns the requested page slice with the full pool length as totalCount', async () => {
+    const candidates = [makeCandidate(1), makeCandidate(2), makeCandidate(3)];
+    mockDb.select = mockQueryBuilder([[viewer], [], candidates, [], [], [], [], []]);
+
+    const result = await matchesService.getPaginatedMatches('page-user-1', { page: 1, limit: 2 });
+    expect(result.totalCount).toBe(3);
+    expect(result.matches).toHaveLength(2);
+  });
+
+  it('returns the second page slice', async () => {
+    const candidates = [makeCandidate(1), makeCandidate(2), makeCandidate(3)];
+    mockDb.select = mockQueryBuilder([[viewer], [], candidates, [], [], [], [], []]);
+
+    const result = await matchesService.getPaginatedMatches('page-user-2', { page: 2, limit: 2 });
+    expect(result.totalCount).toBe(3);
+    expect(result.matches).toHaveLength(1);
+  });
+
+  it('returns an empty page with totalCount 0 when the pool is empty', async () => {
+    mockDb.select = mockQueryBuilder([[viewer], [], []]);
+
+    const result = await matchesService.getPaginatedMatches('page-user-3', { page: 1, limit: 10 });
+    expect(result).toEqual({ matches: [], totalCount: 0 });
+  });
+
+  it('returns an empty page when the viewer has no profile', async () => {
+    mockDb.select = mockQueryBuilder([[]]);
+
+    const result = await matchesService.getPaginatedMatches('page-user-4', { page: 1, limit: 10 });
+    expect(result).toEqual({ matches: [], totalCount: 0 });
+  });
+
+  it('reuses the cached pool across pages of the same user', async () => {
+    const candidates = [makeCandidate(1), makeCandidate(2), makeCandidate(3)];
+    mockDb.select = mockQueryBuilder([[viewer], [], candidates, [], [], [], [], []]);
+
+    await matchesService.getPaginatedMatches('page-user-5', { page: 1, limit: 2 });
+    const callsAfterFirst = mockDb.select.mock.calls.length;
+    const second = await matchesService.getPaginatedMatches('page-user-5', { page: 2, limit: 2 });
+
+    expect(second.matches).toHaveLength(1);
+    // Only the enrichment queries for page 2 run; the pool query is cached.
+    expect(mockDb.select.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+    expect(mockDb.select.mock.calls.length).toBeLessThan(callsAfterFirst + 8);
   });
 });

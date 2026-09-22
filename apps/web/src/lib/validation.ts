@@ -105,6 +105,59 @@ export const signupStep3Schema = z.object({
   motherTongue: z.string().min(1, "Select a mother tongue."),
 })
 
+// Step 5 — partner preferences. Age range + preferred religion are required
+// (they drive the match engine's hard filters); the rest is optional and
+// pre-filled "same as me" from the community step. The age fields stay
+// structurally optional so an emptied input is representable — presence is
+// enforced in the refine below.
+export const signupStepPreferencesSchema = z
+  .object({
+    prefAgeMin: z.number().int("Enter a whole number.").min(18, "Minimum age is 18.").max(80, "Maximum age is 80.").optional(),
+    prefAgeMax: z.number().int("Enter a whole number.").min(18, "Minimum age is 18.").max(80, "Maximum age is 80.").optional(),
+    prefReligion: z.array(z.string()).min(1, "Select at least one preferred religion."),
+    prefMaritalStatuses: z.array(z.string()).optional(),
+    prefCastes: z.array(z.string()).optional(),
+    prefMotherTongues: z.array(z.string()).optional(),
+    prefMinEducation: z.string().optional(),
+    prefLocations: z.array(z.string()).optional(),
+    prefHeightMinCm: z.number().int().min(120).max(230).optional(),
+    prefHeightMaxCm: z.number().int().min(120).max(230).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.prefAgeMin === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter the minimum age you're looking for.",
+        path: ["prefAgeMin"],
+      })
+    }
+    if (value.prefAgeMax === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter the maximum age you're looking for.",
+        path: ["prefAgeMax"],
+      })
+    }
+    if (value.prefAgeMin !== undefined && value.prefAgeMax !== undefined && value.prefAgeMin > value.prefAgeMax) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Minimum age cannot be above maximum age.",
+        path: ["prefAgeMin"],
+      })
+    }
+    if (
+      value.prefHeightMinCm !== undefined &&
+      value.prefHeightMaxCm !== undefined &&
+      value.prefHeightMinCm > value.prefHeightMaxCm
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Minimum height cannot be above maximum height.",
+        path: ["prefHeightMinCm"],
+      })
+    }
+  })
+
 export const signupStep5Schema = z.object({
   otp: otpSchema,
 })

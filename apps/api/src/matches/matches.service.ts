@@ -1,37 +1,69 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { profiles, userSettings, interests, verifications } from '@astalakshimi/database';
-import { eq, ne, and, inArray, or, desc, gte, lte, sql } from 'drizzle-orm';
+import {
+  profiles,
+  userSettings,
+  interests,
+  verifications,
+  subscriptions,
+  plans,
+} from '@astalakshimi/database';
+import { eq, ne, and, inArray, or, desc, gte, lte, gt, sql } from 'drizzle-orm';
 import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
 import {
   passesHardFilters,
   scoreCandidate,
   type BasicPrefs,
+  type MatchScore,
 } from './match-scoring';
-import { cleanList, dobBoundsForAgeWindow, loadViewerContext } from './viewer-context';
+import { cleanList, dobBoundsForAgeWindow, loadViewerContext, type ViewerContext } from './viewer-context';
 
 const POOL_LIMIT = 200;
 const TOP_N = 8;
 
+type ScoredRow = { profile: any; score: MatchScore };
+type ScoredPool = { viewer: ViewerContext; ranked: ScoredRow[] };
+
 @Injectable()
 export class MatchesService {
-  // Short-lived per-user cache. Absorbs double-tap / refresh / poll loads
-  // without re-running the pool query + scoring fan-out.
-  // Single-instance only; staleness is fine here.
+  // Short-lived per-user cache for the scored candidate pool (viewer context +
+  // ranked rows), shared by the top-N and paginated read paths. Absorbs
+  // double-tap / refresh / poll loads without re-running the pool query +
+  // scoring fan-out. Single-instance only; staleness is fine here.
   private cache = new Map<string, { ts: number; value: unknown }>();
   private readonly cacheTtlMs = 15_000;
 
   constructor(@Inject(DB_CLIENT) private readonly db: Database) {}
 
   async getTopMatches(userId: string) {
+    const pool = await this.getScoredPool(userId);
+    if (!pool) return [];
+    return this.enrichMatches(pool.ranked.slice(0, TOP_N), pool.viewer, userId);
+  }
+
+  async getPaginatedMatches(userId: string, { page, limit }: { page: number; limit: number }) {
+    const pool = await this.getScoredPool(userId);
+    if (!pool) return { matches: [], totalCount: 0 };
+
+    const offset = (page - 1) * limit;
+    const matches = await this.enrichMatches(
+      pool.ranked.slice(offset, offset + limit),
+      pool.viewer,
+      userId,
+    );
+    return { matches, totalCount: pool.ranked.length };
+  }
+
+  private async getScoredPool(userId: string): Promise<ScoredPool | null> {
     const cached = this.cache.get(userId);
     if (cached && Date.now() - cached.ts < this.cacheTtlMs) {
-      return cached.value as ReturnType<MatchesService['computeTopMatches']>;
+      return cached.value as ScoredPool | null;
     }
 
-    const result = await this.computeTopMatches(userId);
+    const result = await this.computeScoredPool(userId);
 
+    // Evict oldest when the cache grows too large (simple LRU-by-insertion)
     if (this.cache.size > 200) {
       const firstKey = this.cache.keys().next().value;
       if (firstKey !== undefined) this.cache.delete(firstKey);
@@ -40,10 +72,10 @@ export class MatchesService {
     return result;
   }
 
-  private async computeTopMatches(userId: string) {
+  private async computeScoredPool(userId: string): Promise<ScoredPool | null> {
     // 1. Fetch current user's profile + partner preferences
     const viewer = await loadViewerContext(this.db, userId);
-    if (!viewer) return [];
+    if (!viewer) return null;
 
     const prefs: BasicPrefs = viewer.prefs;
 
@@ -83,6 +115,7 @@ export class MatchesService {
         id: profiles.id,
         userId: profiles.userId,
         fullName: profiles.fullName,
+        gender: profiles.gender,
         dob: profiles.dob,
         heightCm: profiles.heightCm,
         city: profiles.city,
@@ -96,6 +129,7 @@ export class MatchesService {
         profession: profiles.profession,
         companyName: profiles.companyName,
         annualIncome: profiles.annualIncome,
+        aboutMe: profiles.aboutMe,
         createdAt: profiles.createdAt,
       })
       .from(profiles)
@@ -111,25 +145,39 @@ export class MatchesService {
         (a, b) =>
           b.score.percent - a.score.percent ||
           new Date(b.profile.createdAt).getTime() - new Date(a.profile.createdAt).getTime(),
-      )
-      .slice(0, TOP_N);
+      );
 
-    const topProfiles = ranked.map((r) => r.profile);
-    if (topProfiles.length === 0) return [];
+    return { viewer, ranked };
+  }
 
-    // 4. Fetch their primary photos, user settings, and connection status
-    const profileIds = topProfiles.map((p) => p.id);
-    const userIds = topProfiles.map((p) => p.userId);
+  /** Fetch photos, settings, plans, connections + verification for a set of scored rows. */
+  private async enrichMatches(ranked: ScoredRow[], viewer: ViewerContext, userId: string) {
+    const scoredProfiles = ranked.map((r) => r.profile);
+    if (scoredProfiles.length === 0) return [];
+
+    const profileIds = scoredProfiles.map((p) => p.id);
+    const userIds = scoredProfiles.map((p) => p.userId);
 
     const photos = await getApprovedPrimaryPhotos(this.db, profileIds);
 
     const settings = await this.db
-      .select()
+      .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
       .from(userSettings)
       .where(inArray(userSettings.userId, userIds));
 
-    let connections: any[] = [];
-    connections = await this.db
+    const activeSubs = await this.db
+      .select({ userId: subscriptions.userId, planSlug: plans.slug, planName: plans.name })
+      .from(subscriptions)
+      .innerJoin(plans, eq(subscriptions.planId, plans.id))
+      .where(
+        and(
+          inArray(subscriptions.userId, userIds),
+          eq(subscriptions.status, 'active'),
+          gt(subscriptions.expiresAt, new Date()),
+        ),
+      );
+
+    const connections = await this.db
       .select()
       .from(interests)
       .where(
@@ -146,12 +194,11 @@ export class MatchesService {
       .from(verifications)
       .where(inArray(verifications.profileId, profileIds));
     const verificationByProfile = new Map(verificationRows.map((v) => [v.profileId, v.status]));
-    const scoreByProfile = new Map(ranked.map((r) => [r.profile.id, r.score]));
 
-    // 5. Map photos back to profiles
-    return topProfiles.map((p) => {
+    return ranked.map(({ profile: p, score }) => {
       const primaryPhoto = photos.get(p.id);
       const setting = settings.find((s) => s.userId === p.userId);
+      const userSub = activeSubs.find((s) => s.userId === p.userId);
       const isAccepted = connections.some(
         (c) => c.senderProfileId === p.id || c.receiverProfileId === p.id,
       );
@@ -165,11 +212,11 @@ export class MatchesService {
 
       const verificationStatus = verificationByProfile.get(p.id) ?? 'idle';
       const isVerified = verificationStatus === 'verified';
-      const score = scoreByProfile.get(p.id);
 
       return {
         id: p.id,
         fullName: p.fullName,
+        gender: p.gender,
         age: p.dob ? new Date().getFullYear() - new Date(p.dob).getFullYear() : 25,
         heightCm: p.heightCm,
         city: p.city,
@@ -181,7 +228,6 @@ export class MatchesService {
         educationLevel: p.educationLevel,
         degree: p.degree,
         profession: p.profession,
-        occupation: p.profession,
         companyName: p.companyName,
         annualIncome: p.annualIncome,
         // Key is withheld when blurred — the bucket is public, so sending it
@@ -191,6 +237,18 @@ export class MatchesService {
         isPremium: false,
         isVerified,
         blurPhoto,
+        // Display-ready fields — same shape as GET /search so MatchListCard
+        // renders identically in both Discover panels.
+        planSlug: userSub?.planSlug ?? 'free',
+        planName: userSub?.planName ?? 'Free',
+        education: p.educationLevel || 'Not specified',
+        occupation: p.profession || 'Not specified',
+        company: p.companyName || 'Not specified',
+        income: p.annualIncome || 'Not specified',
+        about: p.aboutMe || '',
+        lastActive: 'Online now',
+        community: p.caste || 'Unknown',
+        height: p.heightCm ? `${p.heightCm} cm` : 'Unknown',
         matchPercent: score?.percent ?? 40,
         matchReasons: score?.reasons ?? [],
       };

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { AllowUnverified } from '../common/decorators/allow-unverified.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -11,11 +12,13 @@ import { sendMessageSchema, type SendMessageInput } from '@astalakshimi/validati
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
+  @AllowUnverified()
   @Get('threads')
   getThreads(@CurrentUser() user: UserSession) {
     return this.chatService.getThreads(user.userId);
   }
 
+  @AllowUnverified()
   @Get(':threadId/messages')
   getMessages(
     @CurrentUser() user: UserSession,
@@ -41,4 +44,3 @@ export class ChatController {
     return this.chatService.markThreadRead(user.userId, threadId);
   }
 }
-

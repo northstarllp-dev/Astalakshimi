@@ -9,6 +9,7 @@ import {
   signupStep2Schema,
   signupStep3Schema,
   signupStep5Schema,
+  signupStepPreferencesSchema,
   profileEditSchema,
   searchFiltersSchema,
   discoverQuickSchema,
@@ -142,6 +143,120 @@ describe("signupStep5Schema", () => {
   it("requires 6-digit otp", () => {
     expect(signupStep5Schema.safeParse({ otp: "123456" }).success).toBe(true)
     expect(signupStep5Schema.safeParse({ otp: "123" }).success).toBe(false)
+  })
+})
+
+describe("signupStepPreferencesSchema", () => {
+  const base = {
+    prefAgeMin: 25,
+    prefAgeMax: 33,
+    prefReligion: ["Hindu"],
+  }
+
+  it("accepts the required minimum (age range + religion)", () => {
+    expect(signupStepPreferencesSchema.safeParse(base).success).toBe(true)
+  })
+
+  it("accepts a full scoring-relevant preference set", () => {
+    const result = signupStepPreferencesSchema.safeParse({
+      ...base,
+      prefHeightMinCm: 150,
+      prefHeightMaxCm: 190,
+      prefMaritalStatuses: ["Never Married", "Divorced"],
+      prefCastes: ["Iyer"],
+      prefMotherTongues: ["Tamil"],
+      prefMinEducation: "Bachelors",
+      prefLocations: ["Chennai", "Bengaluru"],
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.prefCastes).toEqual(["Iyer"])
+      expect(result.data.prefLocations).toEqual(["Chennai", "Bengaluru"])
+    }
+  })
+
+  it("accepts the 'same as me' pre-fill (own religion/caste/tongue/city)", () => {
+    expect(
+      signupStepPreferencesSchema.safeParse({
+        ...base,
+        prefReligion: ["Muslim"],
+        prefCastes: ["Sunni"],
+        prefMotherTongues: ["Urdu"],
+        prefLocations: ["Hyderabad"],
+      }).success,
+    ).toBe(true)
+  })
+
+  it("rejects a missing preferred religion", () => {
+    const result = signupStepPreferencesSchema.safeParse({ ...base, prefReligion: [] })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes("prefReligion"))).toBe(true)
+      expect(result.error.issues.some((i) => i.message.includes("at least one preferred religion"))).toBe(true)
+    }
+  })
+
+  it("rejects a missing minimum age", () => {
+    const result = signupStepPreferencesSchema.safeParse({ ...base, prefAgeMin: undefined })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes("prefAgeMin"))).toBe(true)
+    }
+  })
+
+  it("rejects a missing maximum age", () => {
+    const result = signupStepPreferencesSchema.safeParse({ ...base, prefAgeMax: undefined })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes("prefAgeMax"))).toBe(true)
+    }
+  })
+
+  it("rejects an inverted age range", () => {
+    const result = signupStepPreferencesSchema.safeParse({ ...base, prefAgeMin: 40, prefAgeMax: 30 })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(
+        result.error.issues.some((i) => i.message.includes("cannot be above maximum age")),
+      ).toBe(true)
+    }
+  })
+
+  it("rejects out-of-bounds ages (below 18 / above 80)", () => {
+    expect(signupStepPreferencesSchema.safeParse({ ...base, prefAgeMin: 17 }).success).toBe(false)
+    expect(signupStepPreferencesSchema.safeParse({ ...base, prefAgeMax: 81 }).success).toBe(false)
+  })
+
+  it("rejects a non-integer age", () => {
+    expect(signupStepPreferencesSchema.safeParse({ ...base, prefAgeMin: 25.5 }).success).toBe(false)
+  })
+
+  it("rejects an inverted height range", () => {
+    const result = signupStepPreferencesSchema.safeParse({
+      ...base,
+      prefHeightMinCm: 190,
+      prefHeightMaxCm: 150,
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(
+        result.error.issues.some((i) => i.message.includes("cannot be above maximum height")),
+      ).toBe(true)
+    }
+  })
+
+  it("allows a one-sided height range (the engine scores each end independently)", () => {
+    expect(signupStepPreferencesSchema.safeParse({ ...base, prefHeightMinCm: 150 }).success).toBe(true)
+    expect(signupStepPreferencesSchema.safeParse({ ...base, prefHeightMaxCm: 190 }).success).toBe(true)
+  })
+
+  it("keeps the soft-score fields optional", () => {
+    const result = signupStepPreferencesSchema.safeParse(base)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.prefCastes).toBeUndefined()
+      expect(result.data.prefMinEducation).toBeUndefined()
+    }
   })
 })
 

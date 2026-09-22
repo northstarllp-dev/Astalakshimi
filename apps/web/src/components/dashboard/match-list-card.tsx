@@ -100,6 +100,7 @@ export function MatchListCard({
   className,
   onSkip,
   onConnect,
+  interactionsLocked = false,
 }: {
   match: any
   featured?: boolean
@@ -108,6 +109,8 @@ export function MatchListCard({
   className?: string
   onSkip: (id: string) => void
   onConnect?: (id: string) => void
+  /** Unverified teaser — disable interest / skip / contact unlock; keep shortlist. */
+  interactionsLocked?: boolean
 }) {
   const education =
     (match.education || match.educationLevel || "").split(/\s+/)[0]?.trim() ||
@@ -149,7 +152,7 @@ export function MatchListCard({
   }
 
   const handleConnect = async () => {
-    if (isConnected || isConnecting) return
+    if (interactionsLocked || isConnected || isConnecting) return
     if (onConnect) {
       onConnect(match.id)
       setJustConnected(true)
@@ -280,7 +283,15 @@ export function MatchListCard({
                   <Bookmark className={cn("mr-2 h-4 w-4", isShortlisted && "fill-amber-400 text-amber-400")} />
                   <span>{isShortlisted ? "Remove Shortlist" : "Add to Shortlist"}</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onSkip(match.id)} className="cursor-pointer">
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (interactionsLocked) return
+                    onSkip(match.id)
+                  }}
+                  disabled={interactionsLocked}
+                  className="cursor-pointer"
+                  title={interactionsLocked ? "Verify to interact" : undefined}
+                >
                   <X className="mr-2 h-4 w-4 text-muted-foreground" />
                   <span>Pass Profile</span>
                 </DropdownMenuItem>
@@ -367,9 +378,12 @@ export function MatchListCard({
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
+                  if (interactionsLocked) return
                   setContactDialogOpen(true)
                 }}
-                className="flex flex-col items-center gap-1 group active:scale-95 transition"
+                disabled={interactionsLocked}
+                title={interactionsLocked ? "Verify to unlock contact" : undefined}
+                className="flex flex-col items-center gap-1 group active:scale-95 transition disabled:opacity-50"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg transition-transform group-hover:scale-105">
                   <Phone className="h-5 w-5 text-[#10b981] fill-[#10b981]" />
@@ -387,8 +401,9 @@ export function MatchListCard({
                   e.stopPropagation()
                   handleConnect()
                 }}
-                disabled={isConnecting}
-                className="flex flex-col items-center gap-1 group active:scale-95 transition"
+                disabled={isConnecting || interactionsLocked}
+                title={interactionsLocked ? "Verify to send interest" : undefined}
+                className="flex flex-col items-center gap-1 group active:scale-95 transition disabled:opacity-50"
               >
                 <div
                   className={cn(
@@ -647,7 +662,12 @@ export function MatchListCard({
                 variant="outline"
                 size="sm"
                 className="h-10 rounded-xl px-4 text-xs font-semibold hover:bg-muted text-muted-foreground hover:text-foreground"
-                onClick={() => onSkip(match.id)}
+                disabled={interactionsLocked}
+                title={interactionsLocked ? "Verify to interact" : undefined}
+                onClick={() => {
+                  if (interactionsLocked) return
+                  onSkip(match.id)
+                }}
               >
                 Skip
               </Button>
@@ -664,6 +684,8 @@ export function MatchListCard({
                 profileId={match.id}
                 size="sm"
                 className="h-10 rounded-xl px-5 text-xs font-semibold shadow-xs"
+                disabled={interactionsLocked}
+                title={interactionsLocked ? "Verify to send interest" : undefined}
               />
             </div>
           </div>

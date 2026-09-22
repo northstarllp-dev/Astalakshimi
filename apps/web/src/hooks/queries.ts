@@ -6,7 +6,6 @@ import { formatHeightFromCm, parseHeightToCm, weightToKg, formatWeightFromKg } f
 import { resolveChildrenFields } from "@/lib/identity-fields"
 export const queryKeys = {
   profile: ["profile"] as const,
-  matches: ["matches"] as const,
   paid: ["membership", "paid"] as const,
   subscription: ["membership", "subscription"] as const,
   invoices: ["membership", "invoices"] as const,
@@ -19,6 +18,8 @@ export const queryKeys = {
   savedSearches: ["activity", "saved-searches"] as const,
   activitySummary: ["activity", "summary"] as const,
   topMatches: ["matches", "top"] as const,
+  matchesPaginated: (page: number, limit: number) =>
+    ["matches", "paginated", page, limit] as const,
   search: (query: any) => ["search", query] as const,
   chat: (threadId: string) => ["chat", threadId] as const,
   chatThreads: ["chat", "threads"] as const,
@@ -135,7 +136,8 @@ export function useSaveProfileMutation() {
   return useMutation({
     mutationFn: async (data: SignupData) => {
       // 1. Save to client-side storage for local state caching
-      saveProfile(data)
+      let next: SignupData = { ...data, verificationStatus: data.verificationStatus || "idle" }
+      saveProfile(next)
 
       const blank = (v?: string | null) => {
         if (v == null) return undefined
@@ -200,11 +202,15 @@ export function useSaveProfileMutation() {
         manglik: (blank(data.manglik) as any) || "Don't Know",
         rashi: blank(data.rashi),
         nakshatra: blank(data.star),
-        prefAgeMin: data.prefAgeMin || 24,
-        prefAgeMax: data.prefAgeMax || 32,
-        prefHeightMinCm: data.prefHeightMinCm || 140,
-        prefHeightMaxCm: data.prefHeightMaxCm || 200,
-        prefReligions: data.prefReligion?.length ? data.prefReligion : ["Hindu"],
+        // Partner preferences are collected in the signup wizard (step 5) — send
+        // the member's real choices rather than fabricated defaults the engine
+        // would otherwise match on. Age range + religion are required by the step;
+        // the rest stay optional. Marital status keeps a sensible default.
+        prefAgeMin: data.prefAgeMin,
+        prefAgeMax: data.prefAgeMax,
+        prefHeightMinCm: data.prefHeightMinCm,
+        prefHeightMaxCm: data.prefHeightMaxCm,
+        prefReligions: data.prefReligion || [],
         prefMaritalStatuses: data.prefMaritalStatuses?.length ? data.prefMaritalStatuses : ["Never Married"],
         prefCastes: data.prefCastes || [],
         prefMotherTongues: data.prefMotherTongues || [],
@@ -240,14 +246,22 @@ export function useSaveProfileMutation() {
         apiClient.setToken()
       }
 
-      // 4. Submit complete registration transaction to RDS
+      // 4. Complete registration (verification row starts as idle).
+      //    Then try submitVerification if required fields are already complete.
       if (apiClient.getToken()) {
         await apiClient.profiles.completeRegistration(payload as any)
-        // Unlock dashboard routes in middleware now that a profile exists.
         await apiClient.auth.syncEnrollment()
+
+        try {
+          await apiClient.profiles.submitVerification()
+          next = { ...next, verificationStatus: "pending" }
+        } catch {
+          next = { ...next, verificationStatus: "idle" }
+        }
+        saveProfile(next)
       }
 
-      return data
+      return next
     },
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.profile, data)
@@ -600,6 +614,20 @@ export function useRejectVerificationMutation() {
   })
 }
 
+/** Promote idle/rejected verification → pending for admin review. */
+export function useSubmitVerificationMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.profiles.submitVerification()
+      return res
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile })
+    },
+  })
+}
+
 /** Resubmit selfie/ID after rejection (or first-time verify) → pending. */
 export function useResubmitVerificationMutation() {
   const queryClient = useQueryClient()
@@ -630,14 +658,6 @@ export function useResubmitVerificationMutation() {
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.profile, data)
     },
-  })
-}
-
-export function useMatchesQuery() {
-  return useQuery({
-    queryKey: queryKeys.matches,
-    queryFn: async () => ([] as any[]),
-    staleTime: Infinity,
   })
 }
 
@@ -952,6 +972,19 @@ export function useTopMatchesQuery() {
       if (!apiClient.getToken()) return [];
       return apiClient.matches.getTop();
     },
+  })
+}
+
+/** Paginated, score-ranked matches for the Discover "Your Top Matches" tab. */
+export function useTopMatchesPaginatedQuery(params: { page: number; limit: number }) {
+  return useQuery({
+    queryKey: queryKeys.matchesPaginated(params.page, params.limit),
+    queryFn: async () => {
+      if (!apiClient.getToken()) return { matches: [], totalCount: 0 };
+      return apiClient.matches.getPaginated(params);
+    },
+    // Keep the previous page visible while the next one loads.
+    placeholderData: (previousData) => previousData,
   })
 }
 

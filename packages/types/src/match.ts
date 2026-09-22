@@ -12,10 +12,11 @@ export interface MatchScoreInfo {
   matchReasons?: string[];
 }
 
-/** Item of GET /matches/top (the Home "top matches" feed). */
+/** Item of GET /matches/top and GET /matches (Home feed + Discover matches). */
 export interface TopMatch extends MatchScoreInfo {
   id: string;
   fullName: string;
+  gender?: string | null;
   age: number;
   heightCm?: number | null;
   city?: string | null;
@@ -35,4 +36,21 @@ export interface TopMatch extends MatchScoreInfo {
   isPremium?: boolean;
   isVerified?: boolean;
   blurPhoto?: boolean;
+  // Display-ready fields shared with the search response so MatchListCard
+  // renders the same in both Discover panels.
+  planSlug?: string | null;
+  planName?: string | null;
+  education?: string | null;
+  company?: string | null;
+  income?: string | null;
+  about?: string | null;
+  lastActive?: string | null;
+  community?: string | null;
+  height?: string | null;
+}
+
+/** Response of GET /matches (score-ranked, paginated). */
+export interface PaginatedMatches {
+  matches: TopMatch[];
+  totalCount: number;
 }

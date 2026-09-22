@@ -27,6 +27,7 @@ import {
   MOTHER_TONGUES,
   MARITAL_STATUSES,
   DIETS,
+  EDUCATION_LEVELS,
   FAMILY_TYPES,
   FAMILY_STATUS,
   FAMILY_VALUES,
@@ -34,6 +35,7 @@ import {
   loadSignupDraft,
   saveSignupDraft,
   clearSignupDraft,
+  seedPreferenceDefaults,
   SIGNUP_TOTAL_STEPS,
   type SignupData,
 } from "@/lib/profile-store"
@@ -42,6 +44,8 @@ import { CityAutocomplete } from "@/components/profile/city-autocomplete"
 import { CommunityFields } from "@/components/profile/community-fields"
 import { HeightInput } from "@/components/profile/input-with-unit"
 import { ChildrenFields } from "@/components/profile/children-fields"
+import { MultiSelect } from "@/components/profile/multi-select"
+import { SearchableSelect } from "@/components/profile/searchable-select"
 import { Step4Verify, VerificationSubmitted } from "@/components/signup/step-verify"
 import { useSaveProfileMutation } from "@/hooks/queries"
 import {
@@ -49,7 +53,9 @@ import {
   signupStep2Schema,
   signupStep3Schema,
   signupStep5Schema,
+  signupStepPreferencesSchema,
 } from "@/lib/validation"
+import { getCommunities } from "@astalakshimi/reference"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 
@@ -104,7 +110,10 @@ function SignupPageInner() {
             ? getMediaUrl(draft.data.govtIdS3Key)
             : draft.data.govtIdPhoto || "",
         }
-        setData(restored)
+        // Seed the "same as me" preference pre-fills when resuming into (or
+        // past) the preferences step, so step 5 opens pre-filled and the draft
+        // carries them even if the member changes nothing.
+        setData({ ...restored, ...seedPreferenceDefaults(restored) })
         // OTP is verified iff the auth token is present; skip the phone/OTP
         // steps when authenticated, otherwise restart at phone entry.
         setStep(apiClient.getToken() ? Math.max(draft.step, 3) : 1)
@@ -159,7 +168,15 @@ function SignupPageInner() {
     setData((prev) => ({ ...prev, ...fields }))
   }
 
-  const nextStep = () => setStep((prev) => Math.min(prev + 1, TOTAL_STEPS))
+  const nextStep = () => {
+    const target = Math.min(step + 1, TOTAL_STEPS)
+    // Entering the preferences step: seed the "same as me" pre-fills from the
+    // community answers in the same update, so the step renders pre-filled.
+    if (target === 5) {
+      setData((prev) => ({ ...prev, ...seedPreferenceDefaults(prev) }))
+    }
+    setStep(target)
+  }
   const prevStep = () => {
     if (submitted) {
       setSubmitted(false)
@@ -194,7 +211,7 @@ function SignupPageInner() {
     const payload: SignupData = {
       ...data,
       siblings: formatSiblings(data.brothersCount, data.sistersCount),
-      verificationStatus: 'pending',
+      verificationStatus: 'idle',
       submittedAt: new Date().toISOString(),
     }
     try {
@@ -283,6 +300,9 @@ function SignupPageInner() {
                 {step === 3 && <Step2Identity data={data} updateData={updateData} nextStep={nextStep} />}
                 {step === 4 && <Step3Community data={data} updateData={updateData} nextStep={nextStep} />}
                 {step === 5 && (
+                  <Step6Preferences data={data} updateData={updateData} nextStep={nextStep} />
+                )}
+                {step === 6 && (
                   <Step4Verify
                     data={data}
                     updateData={updateData}
@@ -983,6 +1003,252 @@ function Step3Community({
               {formatSiblings(data.brothersCount, data.sistersCount)}
             </p>
           </div>
+        </div>
+      </div>
+
+      <Button className="w-full" size="lg" type="submit">
+        Continue <ChevronRight className="ml-1 h-5 w-5" />
+      </Button>
+    </form>
+  )
+}
+
+// ─── Step 5: Partner Preferences ─────────────────────────────────────────────
+
+function Step6Preferences({
+  data,
+  updateData,
+  nextStep,
+}: {
+  data: SignupData
+  updateData: (fields: Partial<SignupData>) => void
+  nextStep: () => void
+}) {
+  // Pre-fills are seeded by the wizard before this step renders (see
+  // seedPreferenceDefaults) — the step itself is purely controlled state, so a
+  // member clearing a field can't be overwritten by a late effect.
+  const communityOptions = React.useMemo(() => {
+    try {
+      return Array.from(new Set(getCommunities().map((c) => c.label))).sort((a, b) =>
+        a.localeCompare(b),
+      )
+    } catch {
+      return [] as string[]
+    }
+  }, [])
+
+  const form = useForm({
+    resolver: zodResolver(signupStepPreferencesSchema),
+    values: {
+      prefAgeMin: data.prefAgeMin,
+      prefAgeMax: data.prefAgeMax,
+      prefReligion: data.prefReligion ?? [],
+      prefMaritalStatuses: data.prefMaritalStatuses ?? [],
+      prefCastes: data.prefCastes ?? [],
+      prefMotherTongues: data.prefMotherTongues ?? [],
+      prefMinEducation: data.prefMinEducation ?? "",
+      prefLocations: data.prefLocations ?? [],
+      prefHeightMinCm: data.prefHeightMinCm,
+      prefHeightMaxCm: data.prefHeightMaxCm,
+    },
+    mode: "onTouched",
+  })
+  const errors = form.formState.errors
+
+  const sameAsMe = () => {
+    updateData({
+      ...(data.religion ? { prefReligion: [data.religion] } : {}),
+      ...(data.caste ? { prefCastes: [data.caste] } : {}),
+      ...(data.motherTongue ? { prefMotherTongues: [data.motherTongue] } : {}),
+      ...(data.city ? { prefLocations: [data.city] } : {}),
+    })
+  }
+
+  const onContinue = form.handleSubmit(() => nextStep())
+
+  return (
+    <form className="space-y-8" onSubmit={onContinue}>
+      <StepHeading
+        title="Who are you looking for?"
+        subtitle="These preferences decide which profiles reach you first. You can refine them anytime from your profile."
+      />
+
+      <div className="space-y-5">
+        {/* Age range — required (hard filter) */}
+        <div className="space-y-2">
+          <Label>Preferred age range *</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              type="number"
+              min={18}
+              max={80}
+              inputMode="numeric"
+              aria-label="Preferred minimum age"
+              value={data.prefAgeMin ?? ""}
+              onChange={(e) =>
+                updateData({
+                  prefAgeMin: e.target.value === "" ? undefined : Number(e.target.value),
+                })
+              }
+              placeholder="Min"
+            />
+            <Input
+              type="number"
+              min={18}
+              max={80}
+              inputMode="numeric"
+              aria-label="Preferred maximum age"
+              value={data.prefAgeMax ?? ""}
+              onChange={(e) =>
+                updateData({
+                  prefAgeMax: e.target.value === "" ? undefined : Number(e.target.value),
+                })
+              }
+              placeholder="Max"
+            />
+          </div>
+          {(errors.prefAgeMin || errors.prefAgeMax) && (
+            <p className="text-xs text-destructive">
+              {errors.prefAgeMin?.message || errors.prefAgeMax?.message}
+            </p>
+          )}
+        </div>
+
+        {/* Same as me shortcut */}
+        <button
+          type="button"
+          onClick={sameAsMe}
+          className="tap-target inline-flex items-center gap-2 rounded-full border border-secondary/30 bg-muted/50 px-4 text-xs font-semibold text-primary transition-all hover:border-primary/40 hover:bg-muted"
+        >
+          ✦ Same as me
+        </button>
+
+        {/* Preferred religions — required (hard filter) */}
+        <div className="space-y-2">
+          <Label>Preferred religion *</Label>
+          <MultiSelect
+            values={data.prefReligion ?? []}
+            onValuesChange={(values) => updateData({ prefReligion: values })}
+            options={RELIGIONS}
+            placeholder="Select religions"
+            searchPlaceholder="Search religions…"
+            ariaLabel="Preferred religion"
+          />
+          {errors.prefReligion && (
+            <p className="text-xs text-destructive">{errors.prefReligion.message}</p>
+          )}
+        </div>
+
+        {/* Preferred marital status */}
+        <div className="space-y-2">
+          <Label>Preferred marital status</Label>
+          <MultiSelect
+            values={data.prefMaritalStatuses ?? []}
+            onValuesChange={(values) => updateData({ prefMaritalStatuses: values })}
+            options={[...MARITAL_STATUSES]}
+            placeholder="Any marital status"
+            searchPlaceholder="Search…"
+            ariaLabel="Preferred marital status"
+          />
+        </div>
+
+        {/* Preferred communities */}
+        <div className="space-y-2">
+          <Label>Preferred communities</Label>
+          <MultiSelect
+            values={data.prefCastes ?? []}
+            onValuesChange={(values) => updateData({ prefCastes: values })}
+            options={communityOptions}
+            placeholder="Any community"
+            searchPlaceholder="Search communities…"
+            ariaLabel="Preferred communities"
+          />
+        </div>
+
+        {/* Preferred mother tongues */}
+        <div className="space-y-2">
+          <Label>Preferred mother tongues</Label>
+          <MultiSelect
+            values={data.prefMotherTongues ?? []}
+            onValuesChange={(values) => updateData({ prefMotherTongues: values })}
+            options={MOTHER_TONGUES}
+            placeholder="Any mother tongue"
+            searchPlaceholder="Search languages…"
+            ariaLabel="Preferred mother tongues"
+          />
+        </div>
+
+        {/* Minimum education */}
+        <div className="space-y-2">
+          <Label>Minimum education</Label>
+          <SearchableSelect
+            value={data.prefMinEducation || undefined}
+            onValueChange={(value) => updateData({ prefMinEducation: value })}
+            options={[...EDUCATION_LEVELS]}
+            placeholder="No preference"
+            searchPlaceholder="Search education…"
+            allowCustom={false}
+            ariaLabel="Minimum education"
+          />
+        </div>
+
+        {/* Preferred locations */}
+        <div className="space-y-2">
+          <Label>Preferred locations</Label>
+          <Input
+            value={(data.prefLocations ?? []).join(", ")}
+            onChange={(e) =>
+              updateData({
+                prefLocations: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="e.g. Chennai, Bengaluru"
+            aria-label="Preferred locations"
+          />
+          <p className="text-xs text-muted-foreground">
+            Separate cities with commas. Leave empty to keep it open.
+          </p>
+        </div>
+
+        {/* Height range */}
+        <div className="space-y-2">
+          <Label>Preferred height range (cm)</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              type="number"
+              min={120}
+              max={230}
+              inputMode="numeric"
+              aria-label="Preferred minimum height in centimetres"
+              value={data.prefHeightMinCm ?? ""}
+              onChange={(e) =>
+                updateData({
+                  prefHeightMinCm: e.target.value === "" ? undefined : Number(e.target.value),
+                })
+              }
+              placeholder="Min"
+            />
+            <Input
+              type="number"
+              min={120}
+              max={230}
+              inputMode="numeric"
+              aria-label="Preferred maximum height in centimetres"
+              value={data.prefHeightMaxCm ?? ""}
+              onChange={(e) =>
+                updateData({
+                  prefHeightMaxCm: e.target.value === "" ? undefined : Number(e.target.value),
+                })
+              }
+              placeholder="Max"
+            />
+          </div>
+          {errors.prefHeightMinCm && (
+            <p className="text-xs text-destructive">{errors.prefHeightMinCm.message}</p>
+          )}
         </div>
       </div>
 

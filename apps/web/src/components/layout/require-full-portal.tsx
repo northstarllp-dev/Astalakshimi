@@ -24,5 +24,6 @@ export function RequireFullPortal({ children }: { children: React.ReactNode }) {
     return <CompleteProfileGate section={section} />
   }
 
+  // Profile complete → render Discover teaser (interactionsLocked handled inside page).
   return <>{children}</>
 }

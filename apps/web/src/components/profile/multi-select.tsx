@@ -24,6 +24,9 @@ type MultiSelectProps = {
   searchPlaceholder?: string
   emptyText?: string
   className?: string
+  /** Accessible name for the trigger (the visible text is just a count). */
+  ariaLabel?: string
+  id?: string
 }
 
 function normalizeOptions(options: SelectOption[] | string[]): SelectOption[] {
@@ -40,6 +43,8 @@ export function MultiSelect({
   searchPlaceholder = "Search…",
   emptyText = "No results found.",
   className,
+  ariaLabel,
+  id,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false)
   const items = React.useMemo(() => normalizeOptions(options), [options])
@@ -65,6 +70,8 @@ export function MultiSelect({
           <Button
             type="button"
             variant="outline"
+            id={id}
+            aria-label={ariaLabel}
             className="h-auto min-h-12 w-full justify-between rounded-xl border-[1.5px] border-input bg-card px-4 py-2 font-normal hover:bg-card"
           >
             <span className={cn("truncate text-left", values.length === 0 && "text-muted-foreground")}>

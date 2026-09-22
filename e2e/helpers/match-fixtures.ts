@@ -99,6 +99,18 @@ export async function closeMatchFixtures() {
   }
 }
 
+/**
+ * Shared singleton connection so other fixture modules (e.g. the register
+ * flow) reuse one pooled client instead of opening their own.
+ */
+export function getFixtureDb() {
+  return db();
+}
+
+export async function closeFixtureDb() {
+  await closeMatchFixtures();
+}
+
 /** Insert one complete, searchable candidate profile with a primary photo. */
 async function seedProfile(opts: {
   userId: string;

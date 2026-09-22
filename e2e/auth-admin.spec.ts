@@ -53,7 +53,13 @@ test.describe('member login', () => {
 
     await page.goto('/login');
     await expect(page.getByLabel(/mobile number/i)).toBeVisible({ timeout: 15_000 });
-    await page.getByLabel(/mobile number/i).fill(MEMBER_PHONE);
+    // `fill()` is unreliable on this input — its onChange rewrites
+    // event.target.value (digit sanitisation), which races React's value
+    // tracker and can leave the field empty. Type it and assert it stuck.
+    const phoneInput = page.getByLabel(/mobile number/i);
+    await phoneInput.click();
+    await phoneInput.pressSequentially(MEMBER_PHONE);
+    await expect(phoneInput).toHaveValue(MEMBER_PHONE);
     await page.getByRole('button', { name: /send otp/i }).click();
 
     const otpInput = page.getByRole('textbox', { name: /one-time password/i });
@@ -65,7 +71,11 @@ test.describe('member login', () => {
 
   test('unregistered phone on login is sent to register', async ({ page }) => {
     await page.goto('/login');
-    await page.getByLabel(/mobile number/i).fill('9100000099');
+    // Type rather than fill() — see the note in the login test above.
+    const phone = page.getByLabel(/mobile number/i);
+    await phone.click();
+    await phone.pressSequentially('9100000099');
+    await expect(phone).toHaveValue('9100000099');
     await page.getByRole('button', { name: /send otp/i }).click();
     await expect(page).toHaveURL(/register/, { timeout: 20_000 });
   });
@@ -81,7 +91,10 @@ test.describe('registration', () => {
 
     await page.getByRole('button', { name: /myself/i }).click();
     const phoneInput = page.getByLabel(/mobile|phone/i).or(page.locator('input[name="phone"]')).first();
-    await phoneInput.fill('9100000088');
+    // Type rather than fill() — see the note in the login test above.
+    await phoneInput.click();
+    await phoneInput.pressSequentially('9100000088');
+    await expect(phoneInput).toHaveValue('9100000088');
 
     // Without terms, continue should stay on step 1 (or show validation).
     const continueBtn = page.getByRole('button', { name: /continue/i }).first();

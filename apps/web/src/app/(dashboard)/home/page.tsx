@@ -9,6 +9,9 @@ import { HomeMatchRow } from "@/components/dashboard/home-match-row"
 import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import {
   canAccessFullPortal,
+  canInteract,
+  canShortlist,
+  getOnboardingState,
   getProfileActions,
   getProfileCompletenessStats,
   isProfileComplete,
@@ -18,6 +21,7 @@ import {
   useInterestsQuery,
   usePaidQuery,
   useProfileQuery,
+  useSubmitVerificationMutation,
   useTopMatchesQuery,
 } from "@/hooks/queries"
 import { cn, getMediaUrl } from "@/lib/utils"
@@ -71,16 +75,21 @@ export default function HomePage() {
   const { data: interests } = useInterestsQuery()
   const { data: topMatchesData, isLoading: matchesLoading } = useTopMatchesQuery()
   const { data: activitySummary } = useActivitySummaryQuery()
+  const submitVerification = useSubmitVerificationMutation()
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
   const lookingFor =
     profile?.gender === "Female" ? "grooms" : profile?.gender === "Male" ? "brides" : "matches"
-  const pending = profile?.verificationStatus === "pending"
-  const verified = profile?.verificationStatus === "verified"
-  const rejected = profile?.verificationStatus === "rejected"
+  const onboardingState = getOnboardingState(profile)
+  const pending = onboardingState === "pending"
+  const verified = onboardingState === "verified"
+  const rejected = onboardingState === "rejected"
+  const readyToSubmit = onboardingState === "ready_to_submit"
+  const incomplete = onboardingState === "incomplete"
   const rejectionReason =
     profile?.rejectionReason || "Your verification documents could not be approved."
   const unlocked = canAccessFullPortal(profile)
+  const interactionsLocked = !canInteract(profile)
   const canSeeMore = isProfileComplete(profile)
   const actions = getProfileActions(profile)
   const completenessStats = getProfileCompletenessStats(profile)
@@ -132,13 +141,57 @@ export default function HomePage() {
               </div>
             </div>
 
+            {incomplete ? (
+              <div className="flex items-start gap-3 border border-[#e8d4a8] bg-[#fff8ef] px-3 py-3 sm:px-4">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#8a6a12]" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">Complete your profile</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Fill every required detail, then submit for verification to unlock interests and messaging.
+                  </p>
+                  <Link href="/profile/edit" className="mt-2 inline-block">
+                    <Button size="sm" className="h-8 rounded-md">
+                      Complete profile
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+
+            {readyToSubmit ? (
+              <div className="flex items-start gap-3 border border-primary/20 bg-primary/5 px-3 py-3 sm:px-4">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">Profile complete — submit for verification</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    You can browse matches now. Submit for admin review to unlock send interest and messaging.
+                  </p>
+                  {submitVerification.isError ? (
+                    <p className="mt-1.5 text-sm font-medium text-destructive" role="alert">
+                      {(submitVerification.error as Error)?.message ||
+                        "Couldn't submit for verification. Upload a selfie or government ID first, then try again."}
+                    </p>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    className="mt-2 h-8 rounded-md"
+                    disabled={submitVerification.isPending}
+                    onClick={() => submitVerification.mutate()}
+                  >
+                    {submitVerification.isPending ? "Submitting…" : "Submit for verification"}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
             {pending ? (
               <div className="flex items-start gap-3 border border-[#e8d4a8] bg-[#fff8ef] px-3 py-3 sm:px-4">
                 <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-[#8a6a12]" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground">Verification under review</p>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    Photos stay private until approval — usually within {VERIFICATION_SLA_HOURS} hours.
+                    You can browse and shortlist. Interests and messaging unlock after approval — usually within{" "}
+                    {VERIFICATION_SLA_HOURS} hours.
                   </p>
                 </div>
               </div>
@@ -165,28 +218,28 @@ export default function HomePage() {
                 count={interestCount}
                 href="/interests"
                 locked={!unlocked}
-                lockHint="Complete profile"
+                lockHint={incomplete ? "Complete profile" : "Under review"}
               />
               <InboxTile
                 label="Who viewed you"
                 count={viewers.length}
                 href={paid ? "/notifications" : "/plans"}
                 locked={!unlocked || !paid}
-                lockHint={!paid ? "Premium" : "Complete profile"}
+                lockHint={!paid ? "Premium" : incomplete ? "Complete profile" : "Under review"}
               />
               <InboxTile
                 label="Shortlisted you"
                 count={shortlistedYou.length}
                 href={paid ? "/interests?tab=shortlisted" : "/plans"}
                 locked={!unlocked || !paid}
-                lockHint={!paid ? "Premium" : "Complete profile"}
+                lockHint={!paid ? "Premium" : incomplete ? "Complete profile" : "Under review"}
               />
               <InboxTile
                 label="You viewed"
                 count={youViewed.length}
                 href="/dashboard"
                 locked={!unlocked}
-                lockHint="Complete profile"
+                lockHint={incomplete ? "Complete profile" : "Under review"}
               />
             </section>
 
@@ -196,7 +249,7 @@ export default function HomePage() {
                   <h2 className="font-serif text-lg font-semibold">Your top matches</h2>
                 </div>
                 {canSeeMore ? (
-                  <Link href="/dashboard" className="shrink-0 text-sm font-semibold text-primary hover:underline">
+                  <Link href="/dashboard?view=matches" className="shrink-0 text-sm font-semibold text-primary hover:underline">
                     See all
                   </Link>
                 ) : (
@@ -236,7 +289,11 @@ export default function HomePage() {
                   <ul>
                     {previewMatches.map((match: any) => (
                       <li key={match.id}>
-                        <HomeMatchRow match={match} />
+                        <HomeMatchRow
+                          match={match}
+                          locked={incomplete}
+                          interactionsLocked={interactionsLocked && canShortlist(profile)}
+                        />
                       </li>
                     ))}
                   </ul>

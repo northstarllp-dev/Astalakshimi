@@ -109,6 +109,7 @@ export class MediaController {
     return this.mediaService.confirmHoroscope(user.userId, input);
   }
 
+  @AllowIncomplete()
   @Delete('photos/:id')
   async deletePhoto(
     @CurrentUser() user: UserSession,
