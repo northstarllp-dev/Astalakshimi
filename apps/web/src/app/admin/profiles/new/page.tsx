@@ -156,7 +156,7 @@ export default function AdminCreateProfilePage() {
           childrenCount: values.childrenCount,
           childrenLivingWithMe: values.childrenLivingWithMe,
           height: values.height,
-          diet: values.diet as any,
+          diet: values.diet,
           city: values.city,
           religion: values.religion,
           caste: values.caste,

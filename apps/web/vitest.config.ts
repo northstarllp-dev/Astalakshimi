@@ -5,7 +5,7 @@ import path from "node:path"
 // leaks in (machine/CI), vitest loads react's production build and
 // @testing-library/react throws "React.act is not a function". Force test mode
 // before any react module is resolved (main process + worker env below).
-process.env.NODE_ENV = "test"
+Object.assign(process.env, { NODE_ENV: "test" })
 
 export default defineConfig({
   resolve: {
