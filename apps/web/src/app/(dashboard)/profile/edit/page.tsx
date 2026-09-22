@@ -32,6 +32,7 @@ import { SearchableSelect } from "@/components/profile/searchable-select"
 import { CityAutocomplete } from "@/components/profile/city-autocomplete"
 import { ChildrenFields } from "@/components/profile/children-fields"
 import { getCommunityLabelsForReligion, findCommunityByLabel, getCommunities } from "@/lib/community-data"
+import { CommunityFields } from "@/components/profile/community-fields"
 import {
   emptySignupData,
   type SignupData,
@@ -489,7 +490,7 @@ export default function ProfileEditPage() {
       <EditSection id="community" title="Community details">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Religion" required missing={isMissing("religion")} error={fieldError(errors, "religion")}>
-            <SearchableSelect
+            <Select
               value={data.religion || undefined}
               onValueChange={(v) =>
                 update({
@@ -500,64 +501,52 @@ export default function ProfileEditPage() {
                   gotra: "",
                 })
               }
-              options={RELIGIONS}
-              placeholder="Select religion"
-              searchPlaceholder="Search religion…"
-              className={cn(isMissing("religion") && invalidCls)}
-            />
+            >
+              <SelectTrigger className={cn("w-full bg-card", isMissing("religion") && invalidCls)}>
+                <SelectValue placeholder="Select religion" />
+              </SelectTrigger>
+              <SelectContent>
+                {RELIGIONS.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
 
           <Field label="Mother tongue" required missing={isMissing("motherTongue")} error={fieldError(errors, "motherTongue")}>
-            <SearchableSelect
+            <Select
               value={data.motherTongue || undefined}
               onValueChange={(v) => update({ motherTongue: v })}
-              options={MOTHER_TONGUES}
-              placeholder="Select language"
-              searchPlaceholder="Search language…"
-              className={cn(isMissing("motherTongue") && invalidCls)}
-            />
+            >
+              <SelectTrigger className={cn("w-full bg-card", isMissing("motherTongue") && invalidCls)}>
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent>
+                {MOTHER_TONGUES.map((l) => (
+                  <SelectItem key={l} value={l}>
+                    {l}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
+        </div>
 
+        <div className="mt-4">
           <Field label="Caste / community" required missing={isMissing("caste")} error={fieldError(errors, "caste")}>
-            <SearchableSelect
-              value={data.caste || undefined}
-              onValueChange={(next) => {
-                const match = findCommunityByLabel(next, data.religion)
-                update({
-                  caste: next,
-                  communitySlug: match?.slug ?? "",
-                  subcaste: next === data.caste ? data.subcaste : "",
-                })
-              }}
-              options={getCommunityLabelsForReligion(data.religion)}
-              placeholder={data.religion ? "Select caste / community…" : "Select religion first"}
-              searchPlaceholder="Search caste…"
-              emptyText="No matching community found."
-              disabled={!data.religion}
-              className={cn(isMissing("caste") && invalidCls)}
-              allowCustom={false}
+            <CommunityFields
+              religion={data.religion}
+              caste={data.caste}
+              communitySlug={data.communitySlug}
+              subcaste={data.subcaste}
+              gotra={data.gotra}
+              onChange={(value) => update(value)}
+              casteMissing={isMissing("caste")}
+              casteClassName={invalidCls}
             />
           </Field>
-
-          <Field label="Subcaste (optional)">
-            <Input
-              value={data.subcaste}
-              onChange={(e) => update({ subcaste: e.target.value })}
-              placeholder="Type subcaste if applicable"
-              maxLength={100}
-            />
-          </Field>
-
-          {(data.religion === "Hindu" || data.religion === "Jain") && (
-            <Field label="Gotra (optional)" className="sm:col-span-2">
-              <Input
-                value={data.gotra}
-                onChange={(e) => update({ gotra: e.target.value })}
-                placeholder="Type gotra if applicable"
-                maxLength={100}
-              />
-            </Field>
-          )}
         </div>
       </EditSection>
 
