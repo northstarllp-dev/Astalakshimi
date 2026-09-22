@@ -181,6 +181,68 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       });
     });
 
+    it('persists the member’s chosen preferences instead of the old fabricated defaults', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      });
+
+      const profileValues = jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([{ id: 'new-profile-uuid' }]),
+      });
+      // Capture the values handed to each child-table insert.
+      const insertsByTable = new Map<any, jest.Mock>();
+      mockDb.insert.mockImplementation((table: any) => {
+        if (table === profiles) return { values: profileValues };
+        const values = jest.fn().mockReturnValue({
+          onConflictDoUpdate: jest.fn().mockResolvedValue({}),
+        });
+        insertsByTable.set(table, values);
+        return { values };
+      });
+      mockDb.delete.mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
+      });
+
+      await profilesService.completeRegistration('11111111-1111-4111-8111-111111111111', {
+        ...sampleCompletePayload,
+        prefAgeMin: 30,
+        prefAgeMax: 40,
+        prefHeightMinCm: 155,
+        prefHeightMaxCm: 185,
+        prefReligions: ['Muslim'],
+        prefMaritalStatuses: ['Never Married', 'Divorced'],
+        prefCastes: ['Sunni'],
+        prefMotherTongues: ['Urdu'],
+        prefMinEducation: 'Masters',
+        prefLocations: ['Hyderabad', 'Bengaluru'],
+      });
+
+      const prefValues = insertsByTable.get(partnerPreferences);
+      expect(prefValues).toBeDefined();
+      expect(prefValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prefAgeMin: 30,
+          prefAgeMax: 40,
+          prefHeightMinCm: 155,
+          prefHeightMaxCm: 185,
+          prefReligions: ['Muslim'],
+          prefMaritalStatuses: ['Never Married', 'Divorced'],
+          prefCastes: ['Sunni'],
+          prefMotherTongues: ['Urdu'],
+          prefMinEducation: 'Masters',
+          prefLocations: ['Hyderabad', 'Bengaluru'],
+        }),
+      );
+
+      // Guard against a regression to the hardcoded fallbacks.
+      const written = prefValues!.mock.calls[0][0];
+      expect(written.prefReligions).not.toEqual(['Hindu']);
+      expect(written.prefAgeMin).not.toBe(24);
+      expect(written.prefAgeMax).not.toBe(32);
+    });
+
     it('should persist willingToRelocate on registration when provided', async () => {
       mockDb.select.mockReturnValue({
         from: jest.fn().mockReturnThis(),

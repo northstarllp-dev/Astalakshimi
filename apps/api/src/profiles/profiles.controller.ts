@@ -2,6 +2,7 @@ import { Controller, Post, Get, Patch, Put, Delete, Body, Param, UseGuards } fro
 import { ProfilesService } from './profiles.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { AllowIncomplete } from '../common/decorators/allow-incomplete.decorator';
+import { AllowUnverified } from '../common/decorators/allow-unverified.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
@@ -43,6 +44,13 @@ export class ProfilesController {
     return this.profilesService.getMyProfile(user.userId);
   }
 
+  @AllowIncomplete()
+  @Post('me/submit-verification')
+  async submitVerification(@CurrentUser() user: UserSession) {
+    return this.profilesService.submitVerification(user.userId);
+  }
+
+  @AllowUnverified()
   @Patch('me')
   async updateMyProfile(
     @CurrentUser() user: UserSession,
@@ -51,6 +59,7 @@ export class ProfilesController {
     return this.profilesService.updateMyProfile(user.userId, payload);
   }
 
+  @AllowUnverified()
   @Patch('me/basic')
   async updateBasicDetails(
     @CurrentUser() user: UserSession,
@@ -59,6 +68,7 @@ export class ProfilesController {
     return this.profilesService.updateMyProfile(user.userId, payload);
   }
 
+  @AllowUnverified()
   @Patch('me/education')
   async updateEducationCareer(
     @CurrentUser() user: UserSession,
@@ -67,6 +77,7 @@ export class ProfilesController {
     return this.profilesService.updateMyProfile(user.userId, payload);
   }
 
+  @AllowUnverified()
   @Patch('me/family')
   async updateFamilyDetails(
     @CurrentUser() user: UserSession,
@@ -75,6 +86,7 @@ export class ProfilesController {
     return this.profilesService.updateMyProfile(user.userId, payload);
   }
 
+  @AllowUnverified()
   @Patch('me/lifestyle')
   async updateLifestyleAstrology(
     @CurrentUser() user: UserSession,
@@ -83,6 +95,7 @@ export class ProfilesController {
     return this.profilesService.updateMyProfile(user.userId, payload);
   }
 
+  @AllowUnverified()
   @Patch('me/preferences')
   async updatePartnerPreferences(
     @CurrentUser() user: UserSession,
@@ -91,6 +104,7 @@ export class ProfilesController {
     return this.profilesService.updateMyProfile(user.userId, payload);
   }
 
+  @AllowUnverified()
   @Post('me/photos')
   async addPhoto(
     @CurrentUser() user: UserSession,
@@ -99,6 +113,7 @@ export class ProfilesController {
     return this.profilesService.addPhoto(user.userId, payload.s3Key, payload.contentHash);
   }
 
+  @AllowUnverified()
   @Delete('me/photos/:photoId')
   async deletePhoto(
     @CurrentUser() user: UserSession,
@@ -107,6 +122,7 @@ export class ProfilesController {
     return this.profilesService.deletePhoto(user.userId, photoId);
   }
 
+  @AllowUnverified()
   @Put('me/photos/order')
   async reorderPhotos(
     @CurrentUser() user: UserSession,
@@ -115,6 +131,7 @@ export class ProfilesController {
     return this.profilesService.reorderPhotos(user.userId, payload.photoIds);
   }
 
+  @AllowUnverified()
   @Get(':id')
   async getProfileById(
     @Param('id', UuidValidationPipe) id: string,
@@ -123,6 +140,7 @@ export class ProfilesController {
     return this.profilesService.getProfileById(id, user.userId);
   }
 
+  /** Record visit is an interaction signal — requires verified. */
   @Post(':id/visit')
   async recordVisit(
     @Param('id', UuidValidationPipe) id: string,

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, UseGuards, BadRequestException } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { AllowUnverified } from '../common/decorators/allow-unverified.decorator';
 import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
@@ -10,11 +11,13 @@ import type { UserSession } from '@astalakshimi/types';
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
+  @AllowUnverified()
   @Get('usage')
   getUsage(@CurrentUser() user: UserSession) {
     return this.contactsService.getUsage(user.userId);
   }
 
+  @AllowUnverified()
   @Get('unlocked')
   listUnlocked(@CurrentUser() user: UserSession) {
     return this.contactsService.listUnlocked(user.userId);

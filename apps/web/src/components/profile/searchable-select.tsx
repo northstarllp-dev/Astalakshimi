@@ -29,6 +29,9 @@ type SearchableSelectProps = {
   className?: string
   disabled?: boolean
   allowCustom?: boolean
+  /** Accessible name for the trigger (the visible text is the selection). */
+  ariaLabel?: string
+  id?: string
 }
 
 function normalizeOptions(options: SelectOption[] | string[]): SelectOption[] {
@@ -47,6 +50,8 @@ export function SearchableSelect({
   className,
   disabled,
   allowCustom = true,
+  ariaLabel,
+  id,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
@@ -73,6 +78,8 @@ export function SearchableSelect({
           type="button"
           variant="outline"
           disabled={disabled}
+          id={id}
+          aria-label={ariaLabel}
           className={cn(
             "h-12 w-full justify-between rounded-xl border-[1.5px] border-input bg-card px-4 font-normal text-[0.9375rem] hover:bg-card",
             !selected && !value && "text-muted-foreground",

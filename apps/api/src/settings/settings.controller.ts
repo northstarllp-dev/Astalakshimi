@@ -1,6 +1,7 @@
 import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { AllowUnverified } from '../common/decorators/allow-unverified.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { z } from 'zod';
@@ -28,6 +29,7 @@ const updateSettingsSchema = z
   .strip();
 
 @UseGuards(JwtAuthGuard)
+@AllowUnverified()
 @Controller('users/me/settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}

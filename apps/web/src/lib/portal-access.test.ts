@@ -3,6 +3,10 @@ import {
   PROFILE_COMPLETE_THRESHOLD,
   isProfileComplete,
   canBrowseMatches,
+  canInteract,
+  canShortlist,
+  canSubmitVerification,
+  getOnboardingState,
   isVerified,
   canAccessFullPortal,
   getProfileActions,
@@ -55,12 +59,44 @@ describe("isProfileComplete / canBrowseMatches", () => {
   it("false for empty data", () => {
     expect(isProfileComplete(emptySignupData())).toBe(false)
   })
-  it("true when all required filled", () => {
+  it("true when all required filled (browse does not need verified)", () => {
     expect(isProfileComplete(completeData())).toBe(true)
-    expect(canBrowseMatches(completeData())).toBe(true)
+    expect(canBrowseMatches(completeData({ verificationStatus: "idle" }))).toBe(true)
+    expect(canBrowseMatches(completeData({ verificationStatus: "pending" }))).toBe(true)
   })
   it("false when a required field missing", () => {
     expect(isProfileComplete(completeData({ star: "" }))).toBe(false)
+  })
+})
+
+describe("canInteract / canShortlist / canSubmitVerification", () => {
+  it("canInteract requires verified + complete", () => {
+    expect(canInteract(completeData({ verificationStatus: "pending" }))).toBe(false)
+    expect(canInteract(completeData({ verificationStatus: "idle" }))).toBe(false)
+    expect(canInteract(completeData({ verificationStatus: "verified" }))).toBe(true)
+    expect(canInteract(completeData({ verificationStatus: "verified", star: "" }))).toBe(false)
+  })
+  it("canShortlist only needs complete", () => {
+    expect(canShortlist(completeData({ verificationStatus: "idle" }))).toBe(true)
+    expect(canShortlist(completeData({ star: "" }))).toBe(false)
+  })
+  it("canSubmitVerification when complete and not pending/verified", () => {
+    expect(canSubmitVerification(completeData({ verificationStatus: "idle" }))).toBe(true)
+    expect(canSubmitVerification(completeData({ verificationStatus: "rejected" }))).toBe(true)
+    expect(canSubmitVerification(completeData({ verificationStatus: "pending" }))).toBe(false)
+    expect(canSubmitVerification(completeData({ verificationStatus: "verified" }))).toBe(false)
+    expect(canSubmitVerification(completeData({ verificationStatus: "idle", star: "" }))).toBe(false)
+  })
+})
+
+describe("getOnboardingState", () => {
+  it("maps verification + completeness to states", () => {
+    expect(getOnboardingState(null)).toBe("incomplete")
+    expect(getOnboardingState(completeData({ star: "" }))).toBe("incomplete")
+    expect(getOnboardingState(completeData({ verificationStatus: "idle" }))).toBe("ready_to_submit")
+    expect(getOnboardingState(completeData({ verificationStatus: "pending" }))).toBe("pending")
+    expect(getOnboardingState(completeData({ verificationStatus: "rejected" }))).toBe("rejected")
+    expect(getOnboardingState(completeData({ verificationStatus: "verified" }))).toBe("verified")
   })
 })
 

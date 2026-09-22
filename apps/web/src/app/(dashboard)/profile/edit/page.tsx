@@ -1066,63 +1066,6 @@ export default function ProfileEditPage() {
             className={cn(isMissing("manglik") && invalidCls)}
           />
         </Field>
-        {data.horoscopeName ? (
-          <div className="rounded-xl border border-border bg-muted/30 p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <FileText className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{data.horoscopeName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {data.horoscopeSize ? `${(data.horoscopeSize / 1024 / 1024).toFixed(1)} MB · PDF` : "PDF uploaded"}
-                </p>
-              </div>
-            </div>
-            {pdfPreviewUrl && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button type="button" variant="soft" size="sm">
-                      <Eye className="mr-1.5 h-4 w-4" />
-                      Preview PDF
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-h-[90vh] w-[min(96vw,720px)] max-w-none p-0">
-                    <DialogHeader className="border-b border-border px-4 py-3">
-                      <DialogTitle>{data.horoscopeName}</DialogTitle>
-                    </DialogHeader>
-                    <iframe
-                      src={pdfPreviewUrl}
-                      title={data.horoscopeName}
-                      className="h-[min(70vh,640px)] w-full border-0"
-                    />
-                  </DialogContent>
-                </Dialog>
-                <Link
-                  href={pdfPreviewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-9 items-center rounded-full border-2 border-border bg-card px-4 text-xs font-semibold hover:border-primary/30 hover:text-primary"
-                >
-                  <ExternalLink className="mr-1.5 h-4 w-4" />
-                  Open in new tab
-                </Link>
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No horoscope PDF yet.</p>
-        )}
-
-        <input
-          ref={horoscopeRef}
-          type="file"
-          accept="application/pdf"
-          className="hidden"
-          onChange={(e) => onHoroscopeFile(e.target.files)}
-        />
-
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Birth time" required missing={isMissing("birthTime")} error={fieldError(errors, "birthTime")}>
             <BirthTimeInput
@@ -1140,10 +1083,80 @@ export default function ProfileEditPage() {
             />
           </Field>
         </div>
-        <Button type="button" variant="outline" onClick={() => horoscopeRef.current?.click()}>
-          <Upload className="mr-1.5 h-4 w-4" />
-          {data.horoscopeName ? "Replace horoscope PDF (optional)" : "Upload horoscope PDF (optional)"}
-        </Button>
+
+        <input
+          ref={horoscopeRef}
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={(e) => onHoroscopeFile(e.target.files)}
+        />
+        <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Horoscope PDF · optional
+            </span>
+          </div>
+          {data.horoscopeName ? (
+            <div className="mt-3 space-y-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <p className="min-w-0 flex-1 truncate text-sm font-medium" title={data.horoscopeName}>
+                  {data.horoscopeName}
+                </p>
+                {data.horoscopeSize ? (
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {(data.horoscopeSize / 1024 / 1024).toFixed(1)} MB
+                  </span>
+                ) : null}
+              </div>
+              {pdfPreviewUrl && (
+                <div className="flex flex-wrap gap-2">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button type="button" variant="soft" size="sm">
+                        <Eye className="mr-1.5 h-4 w-4" />
+                        Preview
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-h-[90vh] w-[min(96vw,720px)] max-w-none p-0">
+                      <DialogHeader className="border-b border-border px-4 py-3">
+                        <DialogTitle>{data.horoscopeName}</DialogTitle>
+                      </DialogHeader>
+                      <iframe
+                        src={pdfPreviewUrl}
+                        title={data.horoscopeName}
+                        className="h-[min(70vh,640px)] w-full border-0"
+                      />
+                    </DialogContent>
+                  </Dialog>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={pdfPreviewUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-1.5 h-4 w-4" />
+                      Open
+                    </Link>
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => horoscopeRef.current?.click()}>
+                    <Upload className="mr-1.5 h-4 w-4" />
+                    Replace
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => horoscopeRef.current?.click()}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-5 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              <Upload className="h-4 w-4" />
+              Upload horoscope PDF
+            </button>
+          )}
+        </div>
       </EditSection>
 
       <div className="sticky bottom-20 z-20 flex gap-3 bg-background/90 py-3 backdrop-blur md:static md:bottom-auto md:bg-transparent md:py-0">

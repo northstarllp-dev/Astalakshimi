@@ -3,6 +3,7 @@ import {
   emptySignupData,
   sanitizeSignupDraftData,
   inferSignupResumeStep,
+  seedPreferenceDefaults,
   saveSignupDraft,
   loadSignupDraft,
   clearSignupDraft,
@@ -74,7 +75,7 @@ describe("inferSignupResumeStep", () => {
     }
     expect(inferSignupResumeStep(d)).toBe(4)
   })
-  it("returns 5 after community complete", () => {
+  it("returns 5 after community complete (preferences next)", () => {
     const d: SignupData = {
       ...emptySignupData(),
       profileFor: "Myself",
@@ -93,7 +94,7 @@ describe("inferSignupResumeStep", () => {
     }
     expect(inferSignupResumeStep(d)).toBe(5)
   })
-  it("returns 5 when photo + identity ready", () => {
+  it("returns 5 when community is done but preferences are not set", () => {
     const d: SignupData = {
       ...emptySignupData(),
       profileFor: "Myself",
@@ -109,9 +110,79 @@ describe("inferSignupResumeStep", () => {
       religion: "Hindu",
       caste: "Brahmin",
       motherTongue: "Hindi",
+      // Photos + verification ready, but no preferences yet.
       photos: ["x"],
       verificationMethod: "selfie",
       selfiePhoto: "selfie.jpg",
+    }
+    expect(inferSignupResumeStep(d)).toBe(5)
+  })
+  it("returns 6 once preferences are set but photos are missing", () => {
+    const d: SignupData = {
+      ...emptySignupData(),
+      profileFor: "Myself",
+      phone: "9876543210",
+      fullName: "Test User",
+      gender: "Male",
+      dobDay: "01",
+      dobMonth: "01",
+      dobYear: "2000",
+      maritalStatus: "Never Married",
+      city: "Mumbai",
+      height: "5'9\"",
+      religion: "Hindu",
+      caste: "Brahmin",
+      motherTongue: "Hindi",
+      prefReligion: ["Hindu"],
+      prefAgeMin: 25,
+      prefAgeMax: 33,
+    }
+    expect(inferSignupResumeStep(d)).toBe(6)
+  })
+  it("returns 6 when preferences, photo and identity are all ready", () => {
+    const d: SignupData = {
+      ...emptySignupData(),
+      profileFor: "Myself",
+      phone: "9876543210",
+      fullName: "Test User",
+      gender: "Male",
+      dobDay: "01",
+      dobMonth: "01",
+      dobYear: "2000",
+      maritalStatus: "Never Married",
+      city: "Mumbai",
+      height: "5'9\"",
+      religion: "Hindu",
+      caste: "Brahmin",
+      motherTongue: "Hindi",
+      prefReligion: ["Hindu"],
+      prefAgeMin: 25,
+      prefAgeMax: 33,
+      photos: ["x"],
+      verificationMethod: "selfie",
+      selfiePhoto: "selfie.jpg",
+    }
+    expect(inferSignupResumeStep(d)).toBe(6)
+  })
+  it("does not treat a partial age range as preferences complete", () => {
+    const d: SignupData = {
+      ...emptySignupData(),
+      profileFor: "Myself",
+      phone: "9876543210",
+      fullName: "Test User",
+      gender: "Male",
+      dobDay: "01",
+      dobMonth: "01",
+      dobYear: "2000",
+      maritalStatus: "Never Married",
+      city: "Mumbai",
+      height: "5'9\"",
+      religion: "Hindu",
+      caste: "Brahmin",
+      motherTongue: "Hindi",
+      prefReligion: ["Hindu"],
+      prefAgeMin: 25,
+      // prefAgeMax missing
     }
     expect(inferSignupResumeStep(d)).toBe(5)
   })
@@ -122,7 +193,7 @@ describe("signup draft persistence", () => {
     localStorage.clear()
     sessionStorage.clear()
   })
-  it("saves and loads a draft, clamping step to 1..5", () => {
+  it("saves and loads a draft, clamping step to 1..6", () => {
     const d = { ...emptySignupData(), profileFor: "Myself", phone: "9876543210" }
     saveSignupDraft(d, 99)
     const loaded = loadSignupDraft()
@@ -143,6 +214,104 @@ describe("signup draft persistence", () => {
     saveSignupDraft(d, 1)
     const loaded = loadSignupDraft()
     expect(loaded!.step).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe("seedPreferenceDefaults", () => {
+  /** Fixed "today" so the age window is deterministic. */
+  const REF = new Date("2026-09-20T00:00:00Z")
+
+  const community = {
+    ...emptySignupData(),
+    dobDay: "15",
+    dobMonth: "06",
+    dobYear: "1995", // 31 on REF
+    religion: "Hindu",
+    caste: "Brahmin",
+    motherTongue: "Tamil",
+    city: "Chennai",
+  }
+
+  it("mirrors the member's own community, tongue and city", () => {
+    const seed = seedPreferenceDefaults(community as SignupData, REF)
+    expect(seed.prefReligion).toEqual(["Hindu"])
+    expect(seed.prefCastes).toEqual(["Brahmin"])
+    expect(seed.prefMotherTongues).toEqual(["Tamil"])
+    expect(seed.prefLocations).toEqual(["Chennai"])
+  })
+
+  it("seeds an age window around the member's own age", () => {
+    const seed = seedPreferenceDefaults(community as SignupData, REF)
+    expect(seed.prefAgeMin).toBe(29) // 31 - 2
+    expect(seed.prefAgeMax).toBe(36) // 31 + 5
+  })
+
+  it("defaults marital status and a sensible height range", () => {
+    const seed = seedPreferenceDefaults(community as SignupData, REF)
+    expect(seed.prefMaritalStatuses).toEqual(["Never Married"])
+    expect(seed.prefHeightMinCm).toBe(140)
+    expect(seed.prefHeightMaxCm).toBe(200)
+  })
+
+  it("falls back to the engine age window when the dob is missing", () => {
+    const noDob = { ...emptySignupData(), religion: "Hindu", caste: "Brahmin", motherTongue: "Tamil" }
+    const seed = seedPreferenceDefaults(noDob as SignupData, REF)
+    expect(seed.prefAgeMin).toBe(21)
+    expect(seed.prefAgeMax).toBe(35)
+  })
+
+  it("never overwrites an explicit preference", () => {
+    const chosen = {
+      ...community,
+      prefAgeMin: 40,
+      prefAgeMax: 45,
+      prefReligion: ["Jain"],
+      prefCastes: ["Agarwal"],
+      prefMotherTongues: ["Hindi"],
+      prefLocations: ["Mumbai"],
+      prefMaritalStatuses: ["Divorced"],
+      prefHeightMinCm: 160,
+      prefHeightMaxCm: 180,
+    }
+    const seed = seedPreferenceDefaults(chosen as SignupData, REF)
+    expect(seed.prefAgeMin).toBeUndefined()
+    expect(seed.prefAgeMax).toBeUndefined()
+    expect(seed.prefReligion).toBeUndefined()
+    expect(seed.prefCastes).toBeUndefined()
+    expect(seed.prefMotherTongues).toBeUndefined()
+    expect(seed.prefLocations).toBeUndefined()
+    expect(seed.prefMaritalStatuses).toBeUndefined()
+    expect(seed.prefHeightMinCm).toBeUndefined()
+    expect(seed.prefHeightMaxCm).toBeUndefined()
+  })
+
+  it("still fills the fields the member left empty alongside set ones", () => {
+    const partial = { ...community, prefAgeMin: 30, prefAgeMax: 38 }
+    const seed = seedPreferenceDefaults(partial as SignupData, REF)
+    expect(seed.prefAgeMin).toBeUndefined()
+    expect(seed.prefReligion).toEqual(["Hindu"])
+    expect(seed.prefLocations).toEqual(["Chennai"])
+  })
+
+  it("clamps the seeded window into the 18-80 allowed range", () => {
+    const young = { ...community, dobDay: "15", dobMonth: "06", dobYear: "2006" } // 20
+    const youngSeed = seedPreferenceDefaults(young as SignupData, REF)
+    expect(youngSeed.prefAgeMin).toBe(18)
+    const older = { ...community, dobDay: "15", dobMonth: "06", dobYear: "1960" } // 66
+    const olderSeed = seedPreferenceDefaults(older as SignupData, REF)
+    expect(olderSeed.prefAgeMax).toBe(71)
+  })
+
+  it("does not invent a community preference when the member has none", () => {
+    const bare = { ...emptySignupData() }
+    const seed = seedPreferenceDefaults(bare as SignupData, REF)
+    expect(seed.prefReligion).toBeUndefined()
+    expect(seed.prefCastes).toBeUndefined()
+    expect(seed.prefMotherTongues).toBeUndefined()
+    expect(seed.prefLocations).toBeUndefined()
+    // The age window + defaults are still seeded.
+    expect(seed.prefAgeMin).toBe(21)
+    expect(seed.prefAgeMax).toBe(35)
   })
 })
 

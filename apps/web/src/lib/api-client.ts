@@ -8,6 +8,7 @@ import type {
   PresignedUploadRequest,
   PresignedUploadResponse,
   TopMatch,
+  PaginatedMatches,
 } from '@astalakshimi/types';
 import type { PartnerPreferencesInput } from '@astalakshimi/validation';
 
@@ -208,6 +209,12 @@ class ApiClient {
 
     getMyProfile: () => this.request<FullProfileView>('/profiles/me'),
 
+    submitVerification: () =>
+      this.request<{ success: boolean; message: string; status: string }>(
+        '/profiles/me/submit-verification',
+        { method: 'POST' },
+      ),
+
     updateMyProfile: (data: Partial<CompleteRegistrationPayload>) =>
       this.request<FullProfileView>('/profiles/me', {
         method: 'PATCH',
@@ -286,6 +293,13 @@ class ApiClient {
   // --- Matches APIs ---
   matches = {
     getTop: () => this.request<TopMatch[]>('/matches/top'),
+    getPaginated: (params: { page: number; limit: number }) =>
+      this.request<PaginatedMatches>(
+        `/matches?${new URLSearchParams({
+          page: String(params.page),
+          limit: String(params.limit),
+        }).toString()}`,
+      ),
   };
 
   // --- Activity APIs ---

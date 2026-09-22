@@ -30,13 +30,16 @@ File: [`apps/web/src/app/(auth)/login/page.tsx`](../apps/web/src/app/(auth)/logi
 
 File: [`apps/web/src/app/(auth)/register/page.tsx`](../apps/web/src/app/(auth)/register/page.tsx)
 
-Five steps, progress bar, saves to `sessionStorage` via `saveProfile()`. Kept short so the profile is about **25%** complete after submit:
+Six steps, progress bar, saves to `sessionStorage` via `saveProfile()`. Kept short so the profile is about **25%** complete after submit:
 
 1. Profile for + mobile + terms
 2. Identity  name, gender, DOB, marital status, city
 3. Community  religion, caste, mother tongue, family type/status, **brothers count**, **sisters count**
-4. Photos, selfie or govt ID, optional horoscope PDF  [`step-verify.tsx`](../apps/web/src/components/signup/step-verify.tsx)
-5. OTP
+4. **Partner preferences**  "Who are you looking for?" Age range + preferred religion are required; community, mother tongue, marital status, minimum education, locations and height range are optional. Opens pre-filled "same as me" from the community step (own religion / caste / mother tongue / city, plus an age window around the member's own age) and offers a **Same as me** reset. Collected here — not later — because these drive the match engine's hard filters and soft score.
+5. Photos, selfie or govt ID, optional horoscope PDF  [`step-verify.tsx`](../apps/web/src/components/signup/step-verify.tsx)
+6. OTP
+
+Preferences are seeded into `SignupData` before step 4 renders (see `seedPreferenceDefaults` in [`profile-store.ts`](../apps/web/src/lib/profile-store.ts)) and submitted with the rest of the profile to `POST /profiles/complete-registration`, which upserts the `partner_preferences` row.
 
 After submit: verification pending, then `/home`. Photos stay “private until approval” (12-hour SLA copy). Discover and Interests stay in the nav but show **Complete your profile** until verified **and** the profile is ≥ 80% complete.
 

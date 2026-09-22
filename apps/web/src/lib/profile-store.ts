@@ -99,7 +99,7 @@ export type SignupData = {
 
 export const PROFILE_STORAGE_KEY = "astalakshimi.profile"
 export const SIGNUP_DRAFT_KEY = "astalakshimi.signup_draft"
-export const SIGNUP_TOTAL_STEPS = 5
+export const SIGNUP_TOTAL_STEPS = 6
 
 export type SignupDraft = {
   step: number
@@ -135,9 +135,9 @@ export function sanitizeSignupDraftData(data: SignupData): SignupData {
   }
 }
 
-/** Furthest incomplete step based on filled fields (1–5). */
+/** Furthest incomplete step based on filled fields (1–6). */
 export function inferSignupResumeStep(data: SignupData): number {
-  // Registration order: 1 phone, 2 OTP, 3 identity, 4 community, 5 photos.
+  // Registration order: 1 phone, 2 OTP, 3 identity, 4 community, 5 preferences, 6 photos.
   // OTP verification lives in the auth token (not the draft), so step 2 can't
   // be inferred from data — the register page bumps past it when a token exists.
   const step1Ok =
@@ -162,15 +162,79 @@ export function inferSignupResumeStep(data: SignupData): number {
     Boolean(data.motherTongue)
   if (!communityOk) return 4
 
+  // Preferences gate: the two required fields are a preferred religion and a
+  // complete age range — without them the match engine would run on defaults.
+  const preferencesOk =
+    (data.prefReligion?.length ?? 0) > 0 &&
+    typeof data.prefAgeMin === "number" &&
+    typeof data.prefAgeMax === "number"
+  if (!preferencesOk) return 5
+
   const hasPhoto = (data.photos?.length ?? 0) >= 1 || (data.photoS3Keys?.length ?? 0) >= 1
   const identityReady =
     (data.verificationMethod === "selfie" && Boolean(data.selfiePhoto || data.selfieS3Key)) ||
     (data.verificationMethod === "govt_id" &&
       Boolean(data.govtIdPhoto || data.govtIdS3Key) &&
       Boolean(data.govtIdType))
-  if (!hasPhoto || !identityReady) return 5
+  if (!hasPhoto || !identityReady) return 6
 
-  return 5
+  return 6
+}
+
+/**
+ * Whole-years age for the signup dob, or null when the dob isn't filled yet.
+ */
+export function signupAgeYears(data: SignupData, ref: Date = new Date()): number | null {
+  const { dobDay, dobMonth, dobYear } = data
+  if (!/^\d{4}$/.test(dobYear || "") || !/^\d{2}$/.test(dobMonth || "") || !/^\d{2}$/.test(dobDay || "")) {
+    return null
+  }
+  const dob = new Date(`${dobYear}-${dobMonth}-${dobDay}`)
+  if (Number.isNaN(dob.getTime())) return null
+  let age = ref.getFullYear() - dob.getFullYear()
+  const m = ref.getMonth() - dob.getMonth()
+  if (m < 0 || (m === 0 && ref.getDate() < dob.getDate())) age -= 1
+  return age >= 18 && age <= 100 ? age : null
+}
+
+/** Age window centred on the member's own age; mirrors the match engine's fallback. */
+export function defaultPrefAgeRange(
+  data: SignupData,
+  ref: Date = new Date(),
+): { min: number; max: number } {
+  const own = signupAgeYears(data, ref)
+  if (own === null) return { min: 21, max: 35 }
+  const min = Math.max(18, own - 2)
+  const max = Math.min(80, Math.max(min, own + 5))
+  return { min, max }
+}
+
+/**
+ * "Same as me" pre-fills for the preferences step: mirror the member's own
+ * religion / community / mother tongue / city and seed an age window around
+ * their own age (the most common preferences in this category, so the step is
+ * a few taps rather than eight empty fields).
+ *
+ * Only unset fields are filled — an explicit choice is never overwritten.
+ */
+export function seedPreferenceDefaults(
+  data: SignupData,
+  ref: Date = new Date(),
+): Partial<SignupData> {
+  const ageRange = defaultPrefAgeRange(data, ref)
+  const seed: Partial<SignupData> = {}
+  if (typeof data.prefAgeMin !== "number") seed.prefAgeMin = ageRange.min
+  if (typeof data.prefAgeMax !== "number") seed.prefAgeMax = ageRange.max
+  if (!data.prefReligion?.length && data.religion) seed.prefReligion = [data.religion]
+  if (!data.prefMaritalStatuses?.length) seed.prefMaritalStatuses = ["Never Married"]
+  if (!data.prefCastes?.length && data.caste) seed.prefCastes = [data.caste]
+  if (!data.prefMotherTongues?.length && data.motherTongue) {
+    seed.prefMotherTongues = [data.motherTongue]
+  }
+  if (!data.prefLocations?.length && data.city) seed.prefLocations = [data.city]
+  if (typeof data.prefHeightMinCm !== "number") seed.prefHeightMinCm = 140
+  if (typeof data.prefHeightMaxCm !== "number") seed.prefHeightMaxCm = 200
+  return seed
 }
 
 export function saveSignupDraft(data: SignupData, step: number) {

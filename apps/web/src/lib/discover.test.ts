@@ -4,6 +4,9 @@ import {
   DEFAULT_DISCOVER,
   PAID_TABS,
   BROWSE_TABS,
+  DISCOVER_VIEWS,
+  DEFAULT_VIEW,
+  parseDiscoverView,
 } from "./discover"
 
 describe("discover constants", () => {
@@ -35,5 +38,25 @@ describe("discover constants", () => {
   it("BROWSE_TABS includes all expected tabs", () => {
     const ids = BROWSE_TABS.map((t) => t.id)
     expect(ids).toEqual(["all", "new", "nearby", "premium", "verified", "active"])
+  })
+})
+
+describe("discover sub-tabs", () => {
+  it("DEFAULT_VIEW is the matches tab", () => {
+    expect(DEFAULT_VIEW).toBe("matches")
+  })
+  it("DISCOVER_VIEWS exposes the matches and search tabs", () => {
+    expect(DISCOVER_VIEWS.map((v) => v.id)).toEqual(["matches", "search"])
+    expect(DISCOVER_VIEWS.map((v) => v.label)).toEqual(["Your Top Matches", "Search & Filter"])
+  })
+  it("parseDiscoverView reads the search tab from the query param", () => {
+    expect(parseDiscoverView("search")).toBe("search")
+    expect(parseDiscoverView("matches")).toBe("matches")
+  })
+  it("parseDiscoverView defaults to matches for missing or unknown values", () => {
+    expect(parseDiscoverView(null)).toBe("matches")
+    expect(parseDiscoverView(undefined)).toBe("matches")
+    expect(parseDiscoverView("")).toBe("matches")
+    expect(parseDiscoverView("nonsense")).toBe("matches")
   })
 })

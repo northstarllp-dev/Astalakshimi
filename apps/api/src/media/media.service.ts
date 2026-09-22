@@ -2,10 +2,11 @@ import { createHash } from 'crypto';
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { profiles, profilePhotos, verifications, horoscopes } from '@astalakshimi/database';
+import { profiles, profilePhotos, verifications, horoscopes, lifestyleInterests } from '@astalakshimi/database';
 import { eq, and } from 'drizzle-orm';
 import { S3Provider } from './providers/s3.provider';
 import { isOwnedPhotoKey } from '../common/photo-access';
+import { requiredFieldsComplete } from '../profiles/required-fields-complete';
 import type {
   PresignedUploadInput,
   ConfirmPhotoInput,
@@ -123,7 +124,7 @@ export class MediaService {
 
   async confirmVerification(userId: string, input: ConfirmVerificationInput) {
     const [profile] = await this.db
-      .select({ id: profiles.id })
+      .select()
       .from(profiles)
       .where(eq(profiles.userId, userId))
       .limit(1);
@@ -138,6 +139,34 @@ export class MediaService {
 
     if (input.govtIdS3Key && !isOwnedPhotoKey(input.govtIdS3Key, userId, 'govt_id')) {
       throw new BadRequestException('govtIdS3Key must be an ID uploaded through your own presigned URL');
+    }
+
+    const [lifestyle] = await this.db
+      .select()
+      .from(lifestyleInterests)
+      .where(eq(lifestyleInterests.profileId, profile.id))
+      .limit(1);
+
+    const [horoscope] = await this.db
+      .select()
+      .from(horoscopes)
+      .where(eq(horoscopes.profileId, profile.id))
+      .limit(1);
+
+    const photoRows = await this.db
+      .select({ id: profilePhotos.id })
+      .from(profilePhotos)
+      .where(eq(profilePhotos.profileId, profile.id));
+
+    if (
+      !requiredFieldsComplete({
+        profile,
+        lifestyle,
+        horoscope,
+        photoCount: photoRows.length,
+      })
+    ) {
+      throw new BadRequestException('Complete your profile before submitting for verification');
     }
 
     const [verification] = await this.db

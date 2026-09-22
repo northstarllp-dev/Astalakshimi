@@ -19,9 +19,13 @@ function metaLine(parts: Array<string | null | undefined>) {
 export function HomeMatchRow({
   match,
   locked,
+  interactionsLocked,
 }: {
   match: any
+  /** Incomplete profile — disable interest + shortlist, blur photo. */
   locked?: boolean
+  /** Unverified but complete — disable interest only; shortlist stays on. */
+  interactionsLocked?: boolean
 }) {
   const sendInterest = useSendInterestMutation()
   const { data: shortlistData = [] } = useShortlistQuery()
@@ -31,6 +35,11 @@ export function HomeMatchRow({
   const isShortlisted = shortlistData.some((item: any) =>
     typeof item === "string" ? item === match.id : item.id === match.id || item.profileId === match.id
   )
+
+  const interestDisabled = locked || interactionsLocked || sent || sendInterest.isPending
+  const shortlistDisabled = locked || toggleShortlist.isPending
+  const profileHref = locked ? "/profile/edit" : `/profiles/${match.id}`
+  const interestTitle = interactionsLocked && !locked ? "Verify to send interest" : undefined
 
   const photo = match.photos?.[0]
   const isHidden = match.blurPhoto || !photo
@@ -45,7 +54,7 @@ export function HomeMatchRow({
   return (
     <article className="flex gap-2.5 border-b border-border bg-card p-3 last:border-b-0 sm:gap-4 sm:p-4">
       <Link
-        href={locked ? "/profile/edit" : `/profiles/${match.id}`}
+        href={profileHref}
         className="relative h-[132px] w-[96px] shrink-0 overflow-hidden rounded-md bg-muted sm:h-[168px] sm:w-[128px]"
       >
         {photo && !isHidden ? (
@@ -76,7 +85,7 @@ export function HomeMatchRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <Link
-              href={locked ? "/profile/edit" : `/profiles/${match.id}`}
+              href={profileHref}
               className="font-serif text-base font-semibold leading-tight text-foreground hover:text-primary sm:text-xl"
             >
               {match.fullName}
@@ -98,8 +107,10 @@ export function HomeMatchRow({
           <Button
             size="sm"
             className="h-8 flex-1 rounded-md px-2 text-xs shadow-none sm:h-9 sm:flex-initial sm:px-4 sm:text-sm"
-            disabled={locked || sent || sendInterest.isPending}
+            disabled={interestDisabled}
+            title={interestTitle}
             onClick={() => {
+              if (interestDisabled) return
               sendInterest.mutate(match.id, {
                 onSuccess: () => setSent(true),
               })
@@ -108,16 +119,19 @@ export function HomeMatchRow({
             <Heart className="mr-1 h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{sent ? "Interest sent" : "Send interest"}</span>
           </Button>
-          <Link href={locked ? "/profile/edit" : `/profiles/${match.id}`} className="flex-1 sm:flex-initial">
+          <Link href={profileHref} className="flex-1 sm:flex-initial">
             <Button size="sm" variant="outline" className="h-8 w-full rounded-md border px-2 text-xs sm:h-9 sm:w-auto sm:px-4 sm:text-sm">
               View
             </Button>
           </Link>
           <button
             type="button"
-            disabled={locked || toggleShortlist.isPending}
+            disabled={shortlistDisabled}
             aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
-            onClick={() => toggleShortlist.mutate(match.id)}
+            onClick={() => {
+              if (shortlistDisabled) return
+              toggleShortlist.mutate(match.id)
+            }}
             className={cn(
               "flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition hover:border-primary hover:text-primary sm:h-9 sm:w-9",
               isShortlisted && "border-primary text-primary"

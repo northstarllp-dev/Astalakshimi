@@ -515,12 +515,15 @@ export const completeRegistrationSchema = step2IdentitySchema
         if (v == null || (typeof v === 'string' && v.trim() === '')) return null;
         return typeof v === 'string' ? v.trim() : v;
       }, z.string().max(500).optional().nullable()),
-      prefAgeMin: z.number().int().min(18).max(80).optional(),
-      prefAgeMax: z.number().int().min(18).max(80).optional(),
-      prefHeightMinCm: z.number().int().optional(),
-      prefHeightMaxCm: z.number().int().optional(),
+      // Partner preferences are collected in the signup wizard (step 5). The age
+      // range and preferred religion feed the match engine's hard filters, so a
+      // registration must carry real values instead of service-side defaults.
+      prefAgeMin: z.number().int().min(18).max(80),
+      prefAgeMax: z.number().int().min(18).max(80),
+      prefHeightMinCm: z.number().int().min(120).max(230).optional(),
+      prefHeightMaxCm: z.number().int().min(120).max(230).optional(),
       prefMaritalStatuses: z.array(z.string()).optional(),
-      prefReligions: z.array(z.string()).optional(),
+      prefReligions: z.array(z.string()).min(1, 'Select at least one preferred religion'),
       prefCastes: z.array(z.string()).optional(),
       prefMotherTongues: z.array(z.string()).optional(),
       prefMinEducation: z.string().optional(),
@@ -540,4 +543,26 @@ export const completeRegistrationSchema = step2IdentitySchema
       horoscopeFileName: z.string().optional().nullable().or(z.literal('')),
       horoscopeFileSizeBytes: z.number().optional().nullable(),
     }),
-  );
+  )
+  .superRefine((data, ctx) => {
+    // Partner-preference ranges must be coherent: an inverted window leaves the
+    // match engine with an empty candidate pool, so reject it at registration.
+    if (data.prefAgeMin > data.prefAgeMax) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['prefAgeMax'],
+        message: 'Max age must be greater than or equal to min age',
+      });
+    }
+    if (
+      data.prefHeightMinCm !== undefined &&
+      data.prefHeightMaxCm !== undefined &&
+      data.prefHeightMinCm > data.prefHeightMaxCm
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['prefHeightMaxCm'],
+        message: 'Max height must be greater than or equal to min height',
+      });
+    }
+  });

@@ -13,6 +13,12 @@ import { CompletenessRing } from "@/components/profile/completeness-ring"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
+/**
+ * Rendered by RequireFullPortal only when the profile is incomplete, so this
+ * gate only ever handles the incomplete state. Verification states
+ * (ready_to_submit / pending / rejected / verified) each have their own
+ * banners on Home — they never reach this component.
+ */
 export function CompleteProfileGate({
   section = "this section",
 }: {
@@ -21,7 +27,6 @@ export function CompleteProfileGate({
   const { data: profile = null } = useProfileQuery()
   const completenessStats = getProfileCompletenessStats(profile)
   const completeness = completenessStats.percentage
-  const rejected = profile?.verificationStatus === "rejected"
   const complete = isProfileComplete(profile)
   const nextActions = getProfileActions(profile).filter((a) => !a.done).slice(0, 4)
   const missingRequired = completenessStats.missingRequired.slice(0, 6)
@@ -29,19 +34,15 @@ export function CompleteProfileGate({
     ? "/profile/edit#career"
     : "/profile/edit"
 
-  const reason = rejected
-    ? `Verification was rejected. Re-upload your selfie or ID, then finish your profile to open ${section}.`
-    : !complete
-      ? `Fill every required detail to open ${section}. Specialization and employer are optional.`
-      : `Verification is still pending — ${section} opens after approval.`
-
   return (
     <main className="mx-auto flex max-w-lg flex-col items-center px-4 py-12 text-center sm:py-16">
       <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
         <Lock className="h-5 w-5" />
       </span>
       <h1 className="mt-4 font-serif text-2xl font-bold">Complete your profile</h1>
-      <p className="mt-2 max-w-sm text-sm text-muted-foreground">{reason}</p>
+      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+        {`Fill every required detail to open ${section}. Specialization and employer are optional.`}
+      </p>
 
       <div className="mt-6">
         <CompletenessRing percentage={completeness} size={96} strokeWidth={8} />
@@ -63,7 +64,7 @@ export function CompleteProfileGate({
         </ul>
       )}
 
-      {nextActions.length > 0 && missingRequired.length === 0 && (
+      {nextActions.length > 0 && missingRequired.length === 0 && !complete && (
         <ul className="mt-5 flex flex-wrap justify-center gap-2">
           {nextActions.map((action) => (
             <Link key={action.id} href={action.href}>
@@ -75,10 +76,9 @@ export function CompleteProfileGate({
         </ul>
       )}
 
-      <Link href={rejected ? "/profile/verify" : editHref} className="mt-6">
+      <Link href={editHref} className="mt-6">
         <Button>
-          {rejected ? "Re-upload verification" : "Complete profile"}{" "}
-          <ChevronRight className="ml-1 h-4 w-4" />
+          Complete profile <ChevronRight className="ml-1 h-4 w-4" />
         </Button>
       </Link>
       <Link href="/home" className="mt-3 text-sm font-semibold text-primary hover:underline">

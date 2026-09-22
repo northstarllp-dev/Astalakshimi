@@ -48,12 +48,17 @@ export class AdminService {
       .select({ count: sql<number>`count(*)` })
       .from(verifications)
       .where(eq(verifications.status, 'pending'));
+    const idleVerifications = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(verifications)
+      .where(eq(verifications.status, 'idle'));
 
     return {
       totalUsers: totalUsers[0]?.count || 0,
       totalProfiles: totalProfiles[0]?.count || 0,
       activeSubscriptions: activeSubscriptions[0]?.count || 0,
       pendingVerifications: pendingVerifications[0]?.count || 0,
+      idleVerifications: idleVerifications[0]?.count || 0,
     };
   }
 

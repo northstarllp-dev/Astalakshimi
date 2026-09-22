@@ -15,6 +15,8 @@ type ConnectButtonProps = {
   justSent?: boolean
   isAccepting?: boolean
   isSending?: boolean
+  disabled?: boolean
+  title?: string
   onConnect?: () => void
   onAccept?: () => void
 }
@@ -26,6 +28,8 @@ export function ConnectButton({
   justSent = false,
   isAccepting = false,
   isSending = false,
+  disabled = false,
+  title,
   onConnect,
   onAccept,
 }: ConnectButtonProps) {
@@ -37,6 +41,7 @@ export function ConnectButton({
   const sending = isSending || connectMutation.isPending
 
   const handleConnect = () => {
+    if (disabled) return
     if (onConnect) {
       onConnect()
       return
@@ -94,7 +99,13 @@ export function ConnectButton({
   }
 
   return (
-    <Button size={size} className={className} disabled={sending} onClick={handleConnect}>
+    <Button
+      size={size}
+      className={className}
+      disabled={sending || disabled}
+      title={title}
+      onClick={handleConnect}
+    >
       {sending ? (
         <>
           <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin sm:mr-2 sm:h-4 sm:w-4" />

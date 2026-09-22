@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { ShortlistsService } from './shortlists.service';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
+import { AllowUnverified } from '../common/decorators/allow-unverified.decorator';
 import { UuidValidationPipe } from '../common/pipes/uuid-validation.pipe';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserSession } from '@astalakshimi/types';
@@ -9,6 +10,7 @@ import { shortlistSchema, type ShortlistInput } from '@astalakshimi/validation';
 
 
 @UseGuards(JwtAuthGuard)
+@AllowUnverified()
 @Controller('shortlists')
 export class ShortlistsController {
   constructor(private readonly shortlistsService: ShortlistsService) {}
@@ -40,5 +42,3 @@ export class ShortlistsController {
     return this.shortlistsService.removeShortlist(user.userId, targetProfileId);
   }
 }
-
-

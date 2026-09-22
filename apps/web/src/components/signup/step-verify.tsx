@@ -709,14 +709,14 @@ export function VerificationSubmitted({ onContinue }: { onContinue: () => void }
         <CheckCircle2 className="h-8 w-8" />
       </div>
       <div className="space-y-2">
-        <h1 className="font-serif text-2xl font-bold">We&apos;re reviewing your profile</h1>
+        <h1 className="font-serif text-2xl font-bold">Profile created</h1>
         <p className="text-sm text-muted-foreground">
-          Photos & identity verification take up to {VERIFICATION_SLA_HOURS} hours. In the meantime, you can explore matches
-          and save preferences.
+          Finish any remaining required details, then submit for verification. You can browse matches as a preview;
+          send interest unlocks after admin approval (usually within {VERIFICATION_SLA_HOURS} hours).
         </p>
       </div>
       <Button size="lg" className="w-full" onClick={onContinue}>
-        Go to Dashboard
+        Continue to Home
       </Button>
     </div>
   )
