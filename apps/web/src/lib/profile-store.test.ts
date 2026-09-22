@@ -17,7 +17,7 @@ describe("emptySignupData", () => {
   it("returns a fully-initialized object", () => {
     const d = emptySignupData()
     expect(d.phone).toBe("")
-    expect(d.consentAccepted).toBe(true)
+    expect(d.consentAccepted).toBe(false)
     expect(d.photos).toEqual([])
     expect(d.photoS3Keys).toEqual([])
     expect(d.verificationStatus).toBe("idle")
@@ -72,6 +72,7 @@ describe("inferSignupResumeStep", () => {
       maritalStatus: "Never Married",
       city: "Mumbai",
       height: "5'9\"",
+      diet: "Vegetarian",
     }
     expect(inferSignupResumeStep(d)).toBe(4)
   })
@@ -88,6 +89,7 @@ describe("inferSignupResumeStep", () => {
       maritalStatus: "Never Married",
       city: "Mumbai",
       height: "5'9\"",
+      diet: "Vegetarian",
       religion: "Hindu",
       caste: "Brahmin",
       motherTongue: "Hindi",
@@ -107,6 +109,7 @@ describe("inferSignupResumeStep", () => {
       maritalStatus: "Never Married",
       city: "Mumbai",
       height: "5'9\"",
+      diet: "Vegetarian",
       religion: "Hindu",
       caste: "Brahmin",
       motherTongue: "Hindi",
@@ -130,6 +133,7 @@ describe("inferSignupResumeStep", () => {
       maritalStatus: "Never Married",
       city: "Mumbai",
       height: "5'9\"",
+      diet: "Vegetarian",
       religion: "Hindu",
       caste: "Brahmin",
       motherTongue: "Hindi",
@@ -152,6 +156,7 @@ describe("inferSignupResumeStep", () => {
       maritalStatus: "Never Married",
       city: "Mumbai",
       height: "5'9\"",
+      diet: "Vegetarian",
       religion: "Hindu",
       caste: "Brahmin",
       motherTongue: "Hindi",
@@ -177,6 +182,7 @@ describe("inferSignupResumeStep", () => {
       maritalStatus: "Never Married",
       city: "Mumbai",
       height: "5'9\"",
+      diet: "Vegetarian",
       religion: "Hindu",
       caste: "Brahmin",
       motherTongue: "Hindi",

@@ -109,7 +109,29 @@ describe('MediaService (Unit Tests)', () => {
 
   describe('confirmVerification', () => {
     it('should save verification request', async () => {
-      mockDb.select = mockQueryBuilder([[{ id: 'prof-1' }]]);
+      mockDb.select = mockQueryBuilder([
+        [
+          {
+            id: 'prof-1',
+            profileFor: 'Myself',
+            fullName: 'Test User',
+            gender: 'Male',
+            dob: '2000-01-01',
+            maritalStatus: 'Never Married',
+            city: 'Mumbai',
+            heightCm: 170,
+            religion: 'Hindu',
+            caste: 'Brahmin',
+            motherTongue: 'Hindi',
+            educationLevel: 'Bachelors',
+            employmentStatus: 'Employed',
+            annualIncome: '5-10',
+          },
+        ],
+        [{ diet: 'Vegetarian' }],
+        [{ star: 'Mula', rashi: 'Dhanu', manglik: 'No', birthTime: '01:15', birthPlace: 'Chennai' }],
+        [{ id: 'photo-1' }],
+      ]);
       mockDb.insert = mockQueryBuilder([[{ id: 'ver-1' }]]);
       
       const result = await mediaService.confirmVerification('user-1', { method: 'govt_id' });

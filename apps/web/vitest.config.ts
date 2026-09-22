@@ -1,6 +1,12 @@
 import { defineConfig } from "vitest/config"
 import path from "node:path"
 
+// React 19 only exposes `act` in its development build. When NODE_ENV=production
+// leaks in (machine/CI), vitest loads react's production build and
+// @testing-library/react throws "React.act is not a function". Force test mode
+// before any react module is resolved (main process + worker env below).
+process.env.NODE_ENV = "test"
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -13,6 +19,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    env: { NODE_ENV: "test" },
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     css: false,
