@@ -59,26 +59,30 @@ class ApiClient {
     });
 
     if (response.status === 401) {
-      this.clearToken();
-      if (typeof window !== 'undefined') {
-        const currentPath = window.location.pathname + window.location.search;
-        // Clear httpOnly cookies too — localStorage alone leaves middleware thinking you're logged in.
-        try {
-          await fetch('/api/auth/logout', { method: 'POST' });
-        } catch {
-          /* best-effort */
-        }
-        if (currentPath.startsWith('/admin')) {
-          if (!currentPath.startsWith('/admin/login')) {
-            const callbackUrl = encodeURIComponent(currentPath);
-            window.location.href = `/admin/login?callbackUrl=${callbackUrl}`;
+      const isAuthRoute = endpoint.includes('/auth/admin-login') || endpoint.includes('/auth/login') || endpoint.includes('/auth/verify-otp');
+      
+      if (!isAuthRoute) {
+        this.clearToken();
+        if (typeof window !== 'undefined') {
+          const currentPath = window.location.pathname + window.location.search;
+          // Clear httpOnly cookies too — localStorage alone leaves middleware thinking you're logged in.
+          try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+          } catch {
+            /* best-effort */
           }
-        } else if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
-          const callbackUrl = encodeURIComponent(currentPath);
-          window.location.href = `/login?callbackUrl=${callbackUrl}`;
+          if (currentPath.startsWith('/admin')) {
+            if (!currentPath.startsWith('/admin/login')) {
+              const callbackUrl = encodeURIComponent(currentPath);
+              window.location.href = `/admin/login?callbackUrl=${callbackUrl}`;
+            }
+          } else if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
+            const callbackUrl = encodeURIComponent(currentPath);
+            window.location.href = `/login?callbackUrl=${callbackUrl}`;
+          }
         }
+        throw new Error('Your session has expired. Please log in again.');
       }
-      throw new Error('Your session has expired. Please log in again.');
     }
 
     if (!response.ok) {

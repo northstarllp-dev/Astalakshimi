@@ -153,7 +153,11 @@ export function inferSignupResumeStep(data: SignupData): number {
     /^\d{4}$/.test(data.dobYear || "") &&
     Boolean(data.maritalStatus) &&
     Boolean(data.city?.trim()) &&
-    Boolean(data.height?.trim())
+    Boolean(data.height?.trim()) &&
+    Boolean(data.diet) &&
+    (data.maritalStatus === "Divorced" || data.maritalStatus === "Widowed"
+      ? data.hasChildren === false || (data.hasChildren === true && data.childrenLivingWithMe !== undefined && data.childrenLivingWithMe !== null)
+      : true)
   if (!identityOk) return 2
 
   const communityOk =

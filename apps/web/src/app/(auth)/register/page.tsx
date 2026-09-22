@@ -197,9 +197,18 @@ function SignupPageInner() {
       verificationStatus: 'pending',
       submittedAt: new Date().toISOString(),
     }
-    await saveProfileMutation.mutateAsync(payload)
-    clearSignupDraft()
-    setSubmitted(true)
+    try {
+      await saveProfileMutation.mutateAsync(payload)
+      clearSignupDraft()
+      setSubmitted(true)
+    } catch (err: any) {
+      console.error("Submission failed:", err)
+      // If validation fails (e.g. missing newly required fields), reloading
+      // will run `inferSignupResumeStep` and bump them back to the correct step.
+      if (typeof window !== "undefined") {
+        window.location.reload()
+      }
+    }
   }
 
   if (!hydrated) {

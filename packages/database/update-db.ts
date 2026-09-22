@@ -71,6 +71,36 @@ async function main() {
     console.log('pref_locations updated');
   } catch (e: any) { console.error('Error on pref_locations:', e.message); }
 
+  try {
+    await client`ALTER TABLE family_details ALTER COLUMN family_values DROP NOT NULL;`;
+    await client`ALTER TABLE family_details ALTER COLUMN family_values DROP DEFAULT;`;
+    console.log('family_values updated');
+  } catch (e: any) { console.error('Error on family_values:', e.message); }
+
+  try {
+    await client`ALTER TABLE family_details ALTER COLUMN family_type DROP NOT NULL;`;
+    await client`ALTER TABLE family_details ALTER COLUMN family_type DROP DEFAULT;`;
+    console.log('family_type updated');
+  } catch (e: any) { console.error('Error on family_type:', e.message); }
+
+  try {
+    await client`ALTER TABLE family_details ALTER COLUMN father_occupation DROP NOT NULL;`;
+    await client`ALTER TABLE family_details ALTER COLUMN father_occupation DROP DEFAULT;`;
+    console.log('father_occupation updated');
+  } catch (e: any) { console.error('Error on father_occupation:', e.message); }
+
+  try {
+    await client`ALTER TABLE family_details ALTER COLUMN mother_occupation DROP NOT NULL;`;
+    await client`ALTER TABLE family_details ALTER COLUMN mother_occupation DROP DEFAULT;`;
+    console.log('mother_occupation updated');
+  } catch (e: any) { console.error('Error on mother_occupation:', e.message); }
+
+  try {
+    await client`ALTER TABLE lifestyle_interests ALTER COLUMN diet DROP NOT NULL;`;
+    await client`ALTER TABLE lifestyle_interests ALTER COLUMN diet DROP DEFAULT;`;
+    console.log('diet updated');
+  } catch (e: any) { console.error('Error on diet:', e.message); }
+
   console.log('Done.');
   process.exit(0);
 }
