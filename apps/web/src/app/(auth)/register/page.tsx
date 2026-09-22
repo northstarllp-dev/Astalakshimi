@@ -220,9 +220,11 @@ function SignupPageInner() {
       setSubmitted(true)
     } catch (err: any) {
       console.error("Submission failed:", err)
-      // If validation fails (e.g. missing newly required fields), reloading
-      // will run `inferSignupResumeStep` and bump them back to the correct step.
       if (typeof window !== "undefined") {
+        alert(
+          err.message || 
+          "Your profile is missing newly required details (e.g. diet or children info). We will take you back to fill them out."
+        )
         window.location.reload()
       }
     }
