@@ -344,18 +344,84 @@ export const adminCreateProfileSchema = z
     dobMonth: z.string().regex(/^(0[1-9]|1[0-2])$/, "Enter a valid month."),
     dobYear: z.string().regex(/^(19\d{2}|20\d{2})$/, "Enter a valid year."),
     maritalStatus: maritalStatusSchema,
+    hasChildren: z.boolean().optional(),
+    childrenCount: z.number().int().optional(),
+    childrenLivingWithMe: z.boolean().nullable().optional(),
+    height: z.string().min(1, "Enter height."),
+    diet: z.enum(["Vegetarian", "Non-vegetarian", "Eggetarian", "Jain", "Vegan"]).optional(),
     city: z.string().trim().min(2, "Enter city."),
+    state: z.string().trim().min(2).max(100).optional(),
     religion: z.string().min(1, "Select religion."),
     caste: z.string().trim().min(2, "Enter caste or community."),
     motherTongue: z.string().min(1, "Select mother tongue."),
+    educationLevel: z.string().min(1, "Select education level."),
+    employmentStatus: z.string().min(1, "Select employment status."),
+    annualIncome: z.string().min(1, "Select annual income."),
     brothersCount: z.number().int().min(0).max(5),
     sistersCount: z.number().int().min(0).max(5),
+    aboutMe: z.string().max(1000).optional(),
     planId: z.string().optional(),
+    prefAgeMin: z.number().int().min(18).max(80),
+    prefAgeMax: z.number().int().min(18).max(80),
+    prefHeightMinCm: z.number().int().min(120).max(230).optional(),
+    prefHeightMaxCm: z.number().int().min(120).max(230).optional(),
+    prefMaritalStatuses: z.array(z.string()).min(1, "Select preferred marital statuses."),
+    prefReligions: z.array(z.string()).min(1, "Select preferred religions."),
+    prefCastes: z.array(z.string()).optional(),
+    prefMotherTongues: z.array(z.string()).optional(),
+    prefLocations: z.array(z.string()).optional(),
+    prefAcceptableIncomes: z.array(z.string()).optional(),
   })
   .superRefine((value, ctx) => {
     const age = dobAge(value.dobDay, value.dobMonth, value.dobYear, value.gender)
     if (!age.ok) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: age.message, path: ["dobYear"] })
+    }
+    const heightCm = parseHeightToCm(value.height)
+    if (!heightCm) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter a valid height.", path: ["height"] })
+    }
+    if (maritalAsksChildren(value.maritalStatus)) {
+      if (value.hasChildren === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Please say whether there are children.",
+          path: ["hasChildren"],
+        })
+      } else if (value.hasChildren) {
+        if (!value.childrenCount || value.childrenCount < 1) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Enter how many children.",
+            path: ["childrenCount"],
+          })
+        }
+        if (value.childrenLivingWithMe === undefined || value.childrenLivingWithMe === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Please say if the children live with you.",
+            path: ["childrenLivingWithMe"],
+          })
+        }
+      }
+    }
+    if (value.prefAgeMin !== undefined && value.prefAgeMax !== undefined && value.prefAgeMin > value.prefAgeMax) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Minimum age cannot be above maximum age.",
+        path: ["prefAgeMin"],
+      })
+    }
+    if (
+      value.prefHeightMinCm !== undefined &&
+      value.prefHeightMaxCm !== undefined &&
+      value.prefHeightMinCm > value.prefHeightMaxCm
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Minimum height cannot be above maximum height.",
+        path: ["prefHeightMinCm"],
+      })
     }
   })
 

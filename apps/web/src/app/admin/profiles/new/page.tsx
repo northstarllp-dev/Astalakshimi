@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,10 +21,17 @@ import {
   MOTHER_TONGUES,
   RELIGIONS,
   SIBLING_COUNTS,
+  DIETS,
+  EDUCATION_LEVELS,
+  EMPLOYMENT_STATUSES,
+  INCOME_BANDS,
 } from "@/lib/profile-store"
 import { adminCreateProfileSchema, type AdminCreateProfileValues } from "@/lib/validation"
 import { hashFile } from "@/lib/file-hash"
 import { ArrowLeft, Loader2, Upload, X } from "lucide-react"
+import { MultiSelect } from "@/components/profile/multi-select"
+import { ChildrenFields } from "@/components/profile/children-fields"
+import { maritalAsksChildren } from "@/lib/identity-fields"
 
 const MAX_PHOTOS = 6
 const MAX_IMAGE_MB = 5
@@ -50,13 +57,28 @@ export default function AdminCreateProfilePage() {
       dobMonth: "01",
       dobYear: "1998",
       maritalStatus: "Never Married",
+      height: "160 cm",
+      diet: "Vegetarian",
       city: "",
       religion: "Hindu",
       caste: "",
       motherTongue: "Tamil",
+      educationLevel: "Bachelors",
+      employmentStatus: "Employed",
+      annualIncome: "Prefer not to say",
       brothersCount: 0,
       sistersCount: 0,
       planId: "free",
+      prefAgeMin: 21,
+      prefAgeMax: 35,
+      prefHeightMinCm: 140,
+      prefHeightMaxCm: 200,
+      prefMaritalStatuses: ["Never Married"],
+      prefReligions: ["Hindu"],
+      prefCastes: [],
+      prefMotherTongues: ["Tamil"],
+      prefLocations: [],
+      prefAcceptableIncomes: [],
     },
   })
 
@@ -130,13 +152,31 @@ export default function AdminCreateProfilePage() {
             | "Divorced"
             | "Widowed"
             | "Awaiting Divorce",
+          hasChildren: values.hasChildren,
+          childrenCount: values.childrenCount,
+          childrenLivingWithMe: values.childrenLivingWithMe,
+          height: values.height,
+          diet: values.diet as any,
           city: values.city,
           religion: values.religion,
           caste: values.caste,
           motherTongue: values.motherTongue,
+          educationLevel: values.educationLevel,
+          employmentStatus: values.employmentStatus,
+          annualIncome: values.annualIncome,
           brothersCount: values.brothersCount,
           sistersCount: values.sistersCount,
           planId: values.planId,
+          prefAgeMin: values.prefAgeMin,
+          prefAgeMax: values.prefAgeMax,
+          prefHeightMinCm: values.prefHeightMinCm,
+          prefHeightMaxCm: values.prefHeightMaxCm,
+          prefMaritalStatuses: values.prefMaritalStatuses,
+          prefReligions: values.prefReligions,
+          prefCastes: values.prefCastes,
+          prefMotherTongues: values.prefMotherTongues,
+          prefLocations: values.prefLocations,
+          prefAcceptableIncomes: values.prefAcceptableIncomes,
         },
         photos,
       })
@@ -147,7 +187,7 @@ export default function AdminCreateProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6 pb-20">
       <div className="flex items-center gap-3">
         <Link href="/admin/profiles">
           <Button variant="ghost" size="sm">
@@ -161,118 +201,297 @@ export default function AdminCreateProfilePage() {
       </div>
 
       <form
-        className="space-y-5 rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6"
+        className="space-y-8 rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6"
         onSubmit={form.handleSubmit(onSubmit)}
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Profile for" error={form.formState.errors.profileFor?.message}>
-            <Select value={form.watch("profileFor")} onValueChange={(v) => form.setValue("profileFor", v as AdminCreateProfileValues["profileFor"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {["Myself", "Son", "Daughter", "Brother", "Sister", "Relative", "Friend"].map((v) => (
-                  <SelectItem key={v} value={v}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Mobile" error={form.formState.errors.phone?.message}>
-            <Input {...form.register("phone")} placeholder="10-digit number" inputMode="numeric" />
-          </Field>
-          <Field label="Full name" error={form.formState.errors.fullName?.message}>
-            <Input {...form.register("fullName")} />
-          </Field>
-          <Field label="Gender" error={form.formState.errors.gender?.message}>
-            <Select value={form.watch("gender")} onValueChange={(v) => form.setValue("gender", v as AdminCreateProfileValues["gender"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Female">Female</SelectItem>
-                <SelectItem value="Male">Male</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Date of birth (DD / MM / YYYY)" error={form.formState.errors.dobYear?.message}>
-            <div className="grid grid-cols-3 gap-2">
-              <Input {...form.register("dobDay")} placeholder="DD" />
-              <Input {...form.register("dobMonth")} placeholder="MM" />
-              <Input {...form.register("dobYear")} placeholder="YYYY" />
+        {/* Section 1: Basic & Personal Info */}
+        <div className="space-y-4">
+          <h2 className="font-serif text-xl font-bold">Basic Information</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Profile for" error={form.formState.errors.profileFor?.message}>
+              <Select value={form.watch("profileFor")} onValueChange={(v) => form.setValue("profileFor", v as AdminCreateProfileValues["profileFor"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["Myself", "Son", "Daughter", "Brother", "Sister", "Relative", "Friend"].map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Mobile" error={form.formState.errors.phone?.message}>
+              <Input {...form.register("phone")} placeholder="10-digit number" inputMode="numeric" />
+            </Field>
+            <Field label="Full name" error={form.formState.errors.fullName?.message}>
+              <Input {...form.register("fullName")} />
+            </Field>
+            <Field label="Gender" error={form.formState.errors.gender?.message}>
+              <Select value={form.watch("gender")} onValueChange={(v) => form.setValue("gender", v as AdminCreateProfileValues["gender"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Male">Male</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Date of birth (DD / MM / YYYY)" error={form.formState.errors.dobYear?.message}>
+              <div className="grid grid-cols-3 gap-2">
+                <Input {...form.register("dobDay")} placeholder="DD" />
+                <Input {...form.register("dobMonth")} placeholder="MM" />
+                <Input {...form.register("dobYear")} placeholder="YYYY" />
+              </div>
+            </Field>
+            <Field label="Marital status" error={form.formState.errors.maritalStatus?.message}>
+              <Select value={form.watch("maritalStatus")} onValueChange={(v) => form.setValue("maritalStatus", v as AdminCreateProfileValues["maritalStatus"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MARITAL_STATUSES.map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          {maritalAsksChildren(form.watch("maritalStatus")) && (
+            <div className="mt-4">
+              <Controller
+                control={form.control}
+                name="hasChildren"
+                render={({ field }) => (
+                  <ChildrenFields
+                    maritalStatus={form.watch("maritalStatus")}
+                    hasChildren={field.value}
+                    childrenCount={form.watch("childrenCount")}
+                    childrenLivingWithMe={form.watch("childrenLivingWithMe")}
+                    onChange={(vals) => {
+                      if (vals.hasChildren !== undefined) form.setValue("hasChildren", vals.hasChildren)
+                      if (vals.childrenCount !== undefined) form.setValue("childrenCount", vals.childrenCount)
+                      if (vals.childrenLivingWithMe !== undefined) form.setValue("childrenLivingWithMe", vals.childrenLivingWithMe)
+                    }}
+                    errors={{
+                      hasChildren: form.formState.errors.hasChildren?.message,
+                      childrenCount: form.formState.errors.childrenCount?.message,
+                      childrenLivingWithMe: form.formState.errors.childrenLivingWithMe?.message,
+                    }}
+                  />
+                )}
+              />
             </div>
-          </Field>
-          <Field label="Marital status">
-            <Select value={form.watch("maritalStatus")} onValueChange={(v) => form.setValue("maritalStatus", v as AdminCreateProfileValues["maritalStatus"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MARITAL_STATUSES.map((v) => (
-                  <SelectItem key={v} value={v}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="City" error={form.formState.errors.city?.message}>
-            <Input {...form.register("city")} />
-          </Field>
-          <Field label="Religion">
-            <Select value={form.watch("religion")} onValueChange={(v) => form.setValue("religion", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {RELIGIONS.map((v) => (
-                  <SelectItem key={v} value={v}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Caste / community" error={form.formState.errors.caste?.message}>
-            <Input {...form.register("caste")} />
-          </Field>
-          <Field label="Mother tongue">
-            <Select value={form.watch("motherTongue")} onValueChange={(v) => form.setValue("motherTongue", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MOTHER_TONGUES.map((v) => (
-                  <SelectItem key={v} value={v}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Brothers">
-            <Select
-              value={String(form.watch("brothersCount"))}
-              onValueChange={(v) => form.setValue("brothersCount", Number(v))}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {SIBLING_COUNTS.map((v) => (
-                  <SelectItem key={v} value={String(v)}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Sisters">
-            <Select
-              value={String(form.watch("sistersCount"))}
-              onValueChange={(v) => form.setValue("sistersCount", Number(v))}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {SIBLING_COUNTS.map((v) => (
-                  <SelectItem key={v} value={String(v)}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Plan">
-            <Select value={form.watch("planId") || "free"} onValueChange={(v) => form.setValue("planId", v)}>
-              <SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="free">Free</SelectItem>
-                <SelectItem value="silver">Silver</SelectItem>
-                <SelectItem value="gold">Gold</SelectItem>
-                <SelectItem value="platinum">Platinum</SelectItem>
-                <SelectItem value="diamond">Diamond</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2 pt-2">
+            <Field label="Height" error={form.formState.errors.height?.message}>
+              <Input {...form.register("height")} placeholder="e.g. 5' 6&quot; or 168 cm" />
+            </Field>
+            <Field label="Diet" error={form.formState.errors.diet?.message}>
+              <Select value={form.watch("diet")} onValueChange={(v) => form.setValue("diet", v as AdminCreateProfileValues["diet"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DIETS.map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
         </div>
 
+        <div className="h-px bg-border" />
+
+        {/* Section 2: Community & Location */}
+        <div className="space-y-4">
+          <h2 className="font-serif text-xl font-bold">Community & Location</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="City" error={form.formState.errors.city?.message}>
+              <Input {...form.register("city")} />
+            </Field>
+            <Field label="Religion" error={form.formState.errors.religion?.message}>
+              <Select value={form.watch("religion")} onValueChange={(v) => form.setValue("religion", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {RELIGIONS.map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Caste / community" error={form.formState.errors.caste?.message}>
+              <Input {...form.register("caste")} />
+            </Field>
+            <Field label="Mother tongue" error={form.formState.errors.motherTongue?.message}>
+              <Select value={form.watch("motherTongue")} onValueChange={(v) => form.setValue("motherTongue", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MOTHER_TONGUES.map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+
+        {/* Section 3: Professional & Family */}
+        <div className="space-y-4">
+          <h2 className="font-serif text-xl font-bold">Professional & Family</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Education" error={form.formState.errors.educationLevel?.message}>
+              <Select value={form.watch("educationLevel")} onValueChange={(v) => form.setValue("educationLevel", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EDUCATION_LEVELS.map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Employment" error={form.formState.errors.employmentStatus?.message}>
+              <Select value={form.watch("employmentStatus")} onValueChange={(v) => form.setValue("employmentStatus", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EMPLOYMENT_STATUSES.map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Annual Income" error={form.formState.errors.annualIncome?.message}>
+              <Select value={form.watch("annualIncome")} onValueChange={(v) => form.setValue("annualIncome", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {INCOME_BANDS.map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Brothers">
+              <Select
+                value={String(form.watch("brothersCount"))}
+                onValueChange={(v) => form.setValue("brothersCount", Number(v))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SIBLING_COUNTS.map((v) => (
+                    <SelectItem key={v} value={String(v)}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Sisters">
+              <Select
+                value={String(form.watch("sistersCount"))}
+                onValueChange={(v) => form.setValue("sistersCount", Number(v))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SIBLING_COUNTS.map((v) => (
+                    <SelectItem key={v} value={String(v)}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Plan">
+              <Select value={form.watch("planId") || "free"} onValueChange={(v) => form.setValue("planId", v)}>
+                <SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="silver">Silver</SelectItem>
+                  <SelectItem value="gold">Gold</SelectItem>
+                  <SelectItem value="platinum">Platinum</SelectItem>
+                  <SelectItem value="diamond">Diamond</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+
+        {/* Section 4: Partner Preferences */}
+        <div className="space-y-4">
+          <h2 className="font-serif text-xl font-bold">Partner Preferences</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Min Age" error={form.formState.errors.prefAgeMin?.message}>
+              <Input type="number" {...form.register("prefAgeMin", { valueAsNumber: true })} />
+            </Field>
+            <Field label="Max Age" error={form.formState.errors.prefAgeMax?.message}>
+              <Input type="number" {...form.register("prefAgeMax", { valueAsNumber: true })} />
+            </Field>
+
+            <Field label="Min Height (cm)" error={form.formState.errors.prefHeightMinCm?.message}>
+              <Input type="number" {...form.register("prefHeightMinCm", { valueAsNumber: true })} />
+            </Field>
+            <Field label="Max Height (cm)" error={form.formState.errors.prefHeightMaxCm?.message}>
+              <Input type="number" {...form.register("prefHeightMaxCm", { valueAsNumber: true })} />
+            </Field>
+
+            <Field label="Preferred Marital Statuses" error={form.formState.errors.prefMaritalStatuses?.message}>
+              <Controller
+                control={form.control}
+                name="prefMaritalStatuses"
+                render={({ field }) => (
+                  <MultiSelect
+                    values={field.value || []}
+                    onValuesChange={field.onChange}
+                    options={MARITAL_STATUSES}
+                    placeholder="Select status"
+                  />
+                )}
+              />
+            </Field>
+            <Field label="Preferred Religions" error={form.formState.errors.prefReligions?.message}>
+              <Controller
+                control={form.control}
+                name="prefReligions"
+                render={({ field }) => (
+                  <MultiSelect
+                    values={field.value || []}
+                    onValuesChange={field.onChange}
+                    options={RELIGIONS}
+                    placeholder="Select religion"
+                  />
+                )}
+              />
+            </Field>
+            
+            <Field label="Preferred Mother Tongues" error={form.formState.errors.prefMotherTongues?.message}>
+              <Controller
+                control={form.control}
+                name="prefMotherTongues"
+                render={({ field }) => (
+                  <MultiSelect
+                    values={field.value || []}
+                    onValuesChange={field.onChange}
+                    options={MOTHER_TONGUES}
+                    placeholder="Select mother tongue"
+                  />
+                )}
+              />
+            </Field>
+            
+            <Field label="Preferred Incomes" error={form.formState.errors.prefAcceptableIncomes?.message}>
+              <Controller
+                control={form.control}
+                name="prefAcceptableIncomes"
+                render={({ field }) => (
+                  <MultiSelect
+                    values={field.value || []}
+                    onValuesChange={field.onChange}
+                    options={INCOME_BANDS}
+                    placeholder="Select income"
+                  />
+                )}
+              />
+            </Field>
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+
+        {/* Section 5: Photos */}
         <div className="space-y-3">
           <div>
             <p className="text-sm font-semibold">Profile photos</p>

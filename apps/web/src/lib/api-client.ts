@@ -550,14 +550,33 @@ class ApiClient {
       dobMonth: string
       dobYear: string
       maritalStatus: "Never Married" | "Divorced" | "Widowed" | "Awaiting Divorce"
+      hasChildren?: boolean
+      childrenCount?: number
+      childrenLivingWithMe?: boolean | null
+      height: string
+      diet?: "Vegetarian" | "Non-vegetarian" | "Eggetarian" | "Jain" | "Vegan"
       city: string
       state?: string
       religion: string
       caste: string
       motherTongue: string
+      educationLevel: string
+      employmentStatus: string
+      annualIncome: string
       brothersCount: number
       sistersCount: number
       aboutMe?: string
+      planId?: string
+      prefAgeMin: number
+      prefAgeMax: number
+      prefHeightMinCm?: number
+      prefHeightMaxCm?: number
+      prefMaritalStatuses: string[]
+      prefReligions: string[]
+      prefCastes?: string[]
+      prefMotherTongues?: string[]
+      prefLocations?: string[]
+      prefAcceptableIncomes?: string[]
     }) =>
       this.request<any>('/admin/profiles', {
         method: 'POST',

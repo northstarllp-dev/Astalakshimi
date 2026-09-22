@@ -285,13 +285,31 @@ export function useCreateAdminProfileMutation() {
         dobMonth: string
         dobYear: string
         maritalStatus: "Never Married" | "Divorced" | "Widowed" | "Awaiting Divorce"
+        hasChildren?: boolean
+        childrenCount?: number
+        childrenLivingWithMe?: boolean | null
+        height: string
+        diet?: "Vegetarian" | "Non-vegetarian" | "Eggetarian" | "Jain" | "Vegan"
         city: string
         religion: string
         caste: string
         motherTongue: string
+        educationLevel: string
+        employmentStatus: string
+        annualIncome: string
         brothersCount: number
         sistersCount: number
         planId?: string
+        prefAgeMin: number
+        prefAgeMax: number
+        prefHeightMinCm?: number
+        prefHeightMaxCm?: number
+        prefMaritalStatuses: string[]
+        prefReligions: string[]
+        prefCastes?: string[]
+        prefMotherTongues?: string[]
+        prefLocations?: string[]
+        prefAcceptableIncomes?: string[]
       }
       photos: File[]
     }) => {

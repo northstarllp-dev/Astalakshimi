@@ -486,7 +486,10 @@ export class AdminService {
           gender: input.gender,
           dob: dobStr,
           maritalStatus: input.maritalStatus,
-          heightCm,
+          hasChildren: input.hasChildren,
+          childrenCount: input.childrenCount,
+          childrenLivingWithMe: input.childrenLivingWithMe,
+          heightCm: input.height ? parseInt(input.height, 10) : heightCm, // use the parsed heightCm if available, otherwise just parse it or fall back
           aboutMe: input.aboutMe?.trim() || 'Profile created by staff on behalf of the family.',
           city: input.city.trim(),
           state: input.state?.trim() || 'Tamil Nadu',
@@ -494,11 +497,9 @@ export class AdminService {
           religion: input.religion,
           caste: input.caste.trim(),
           motherTongue: input.motherTongue,
-          educationLevel: 'Bachelors',
-          degree: 'Not specified',
-          employmentStatus: 'Employed',
-          profession: 'Not specified',
-          annualIncome: 'Prefer not to say',
+          educationLevel: input.educationLevel as any,
+          employmentStatus: input.employmentStatus as any,
+          annualIncome: input.annualIncome,
           photoPrivacy: 'visible',
         })
         .returning();
@@ -517,7 +518,7 @@ export class AdminService {
 
       await tx.insert(lifestyleInterests).values({
         profileId: id,
-        diet: 'Vegetarian',
+        diet: input.diet || 'Vegetarian',
         smoking: 'Never',
         alcohol: 'Never',
         interests: [],
@@ -530,10 +531,16 @@ export class AdminService {
 
       await tx.insert(partnerPreferences).values({
         profileId: id,
-        prefReligions: [input.religion],
-        prefCastes: [input.caste.trim()],
-        prefMotherTongues: [input.motherTongue],
-        prefLocations: [input.city.trim()],
+        prefAgeMin: input.prefAgeMin,
+        prefAgeMax: input.prefAgeMax,
+        prefHeightMinCm: input.prefHeightMinCm,
+        prefHeightMaxCm: input.prefHeightMaxCm,
+        prefReligions: input.prefReligions,
+        prefCastes: input.prefCastes || [],
+        prefMotherTongues: input.prefMotherTongues || [],
+        prefLocations: input.prefLocations || [],
+        prefMaritalStatuses: input.prefMaritalStatuses,
+        prefAcceptableIncomes: input.prefAcceptableIncomes || [],
       });
 
       await tx.insert(userSettings).values({ userId }).onConflictDoNothing();
