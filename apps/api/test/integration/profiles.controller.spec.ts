@@ -255,7 +255,11 @@ describe('Feature 2: Profiles - ProfilesController (Integration Tests)', () => {
     });
 
     it('should delete a photo by ID', async () => {
-      profilesService.deletePhoto.mockResolvedValue({ success: true });
+      const expected = {
+        profile: {},
+        photos: [{ id: 'photo-2', s3Key: 'a.jpg', isPrimary: true }],
+      } as unknown as FullProfileView;
+      profilesService.deletePhoto.mockResolvedValue(expected);
 
       const result = await controller.deletePhoto(mockUserSession, 'photo-uuid-1');
 
@@ -263,7 +267,7 @@ describe('Feature 2: Profiles - ProfilesController (Integration Tests)', () => {
         mockUserSession.userId,
         'photo-uuid-1'
       );
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual(expected);
     });
 
     it('should reorder photos according to provided array of IDs', async () => {

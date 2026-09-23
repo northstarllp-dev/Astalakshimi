@@ -6,6 +6,8 @@ import { DEFAULT_PREF_AGE_MAX, DEFAULT_PREF_AGE_MIN, type BasicPrefs } from './m
 export interface ViewerContext {
   profileId: string;
   gender: string | null;
+  city: string | null;
+  state: string | null;
   prefs: BasicPrefs;
 }
 
@@ -20,7 +22,12 @@ export async function loadViewerContext(
   userId: string,
 ): Promise<ViewerContext | null> {
   const [viewer] = await db
-    .select({ id: profiles.id, gender: profiles.gender })
+    .select({
+      id: profiles.id,
+      gender: profiles.gender,
+      city: profiles.city,
+      state: profiles.state,
+    })
     .from(profiles)
     .where(eq(profiles.userId, userId))
     .limit(1);
@@ -36,6 +43,8 @@ export async function loadViewerContext(
   return {
     profileId: viewer.id,
     gender: viewer.gender,
+    city: viewer.city ?? null,
+    state: viewer.state ?? null,
     prefs: {
       prefAgeMin: prefsRow?.prefAgeMin ?? null,
       prefAgeMax: prefsRow?.prefAgeMax ?? null,

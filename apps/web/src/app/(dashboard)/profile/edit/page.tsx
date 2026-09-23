@@ -75,18 +75,18 @@ import {
 } from "@/lib/profile-completeness"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, Camera, Check, ExternalLink, Eye, FileText, GripVertical, Star, Trash2, Upload } from "lucide-react"
+import { ArrowLeft, Camera, Check, ChevronLeft, ChevronRight, ExternalLink, Eye, FileText, GripVertical, Star, Trash2, Upload } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { hashFile } from "@/lib/file-hash"
+import {
+  buildPhotoGridItems,
+  reorderPhotoList,
+  serverPhotoIdsForReorder,
+} from "@/lib/photo-grid"
 
 const ABOUT_MAX = 1000
 const MAX_PHOTOS = 10
-
-type PhotoItem = {
-  id: string
-  url: string
-  canReorder: boolean
-}
 
 function Field({
   label,
@@ -176,6 +176,28 @@ const SAVE_FIELD_SECTION: Record<string, string> = {
   prefReligion: "#preferences",
 }
 
+/**
+ * Edit-profile horizontal tabs. Each tab owns a set of *required* field ids;
+ * the badge on its trigger shows how many of those are still missing.
+ */
+const EDIT_TABS: { id: string; label: string; requiredIds: string[] }[] = [
+  { id: "basics", label: "Basics", requiredIds: ["profileFor", "fullName", "gender", "dob", "maritalStatus", "height", "city"] },
+  { id: "community", label: "Community", requiredIds: ["religion", "caste", "motherTongue"] },
+  { id: "career", label: "Career", requiredIds: ["education", "occupation", "annualIncome"] },
+  { id: "family", label: "Family", requiredIds: [] },
+  { id: "location", label: "Location", requiredIds: [] },
+  { id: "lifestyle", label: "Lifestyle", requiredIds: ["diet"] },
+  { id: "preferences", label: "Preferences", requiredIds: ["prefReligion"] },
+  { id: "photos", label: "Photos", requiredIds: ["photos"] },
+  { id: "horoscope", label: "Horoscope", requiredIds: ["star", "rashi", "manglik", "birthTime", "birthPlace"] },
+]
+
+function missingCountForTab(tabId: string, missingIds: Set<string>): number {
+  const tab = EDIT_TABS.find((t) => t.id === tabId)
+  if (!tab) return 0
+  return tab.requiredIds.filter((id) => missingIds.has(id)).length
+}
+
 export default function ProfileEditPage() {
   const router = useRouter()
   const profileQuery = useProfileQuery()
@@ -206,38 +228,55 @@ export default function ProfileEditPage() {
   const invalidCls = REQUIRED_FIELD_INVALID_CLASS
   const [saved, setSaved] = React.useState(false)
   const [dragIndex, setDragIndex] = React.useState<number | null>(null)
+  const [photoBusy, setPhotoBusy] = React.useState(false)
+  const [replaceIndex, setReplaceIndex] = React.useState<number | null>(null)
+  const [activeTab, setActiveTab] = React.useState("basics")
   const photoHashesRef = React.useRef(new Set<string>())
   const fileRef = React.useRef<HTMLInputElement>(null)
+  const replaceFileRef = React.useRef<HTMLInputElement>(null)
   const horoscopeRef = React.useRef<HTMLInputElement>(null)
 
-  const photoItems = React.useMemo<PhotoItem[]>(() => {
-    if (data.photoObjects?.length) {
-      return data.photoObjects.map((photo: { id?: string; url?: string; s3Key?: string }, index: number) => ({
-        id: photo.id || `obj-${index}`,
-        url: photo.url || photo.s3Key || "",
-        canReorder: Boolean(photo.id),
-      }))
-    }
-    if (data.photos?.length) {
-      return data.photos
-        .filter(Boolean)
-        .map((url: string, index: number) => ({
-          id: `local-${index}`,
-          url,
-          canReorder: false,
-        }))
-    }
-    return []
-  }, [data.photoObjects, data.photos])
+  const photoItems = React.useMemo(
+    () => buildPhotoGridItems({ photoObjects: data.photoObjects, photos: data.photos }),
+    [data.photoObjects, data.photos],
+  )
 
   const pdfPreviewUrl = data.horoscopeS3Key ? getMediaUrl(data.horoscopeS3Key) : null
+
+  const tabFromHash = React.useCallback(() => {
+    if (typeof window === "undefined") return null
+    const id = window.location.hash.replace(/^#/, "")
+    if (!id) return null
+    return EDIT_TABS.some((t) => t.id === id) ? id : null
+  }, [])
+
+  React.useEffect(() => {
+    const fromHash = tabFromHash()
+    if (fromHash) setActiveTab(fromHash)
+  }, [profileQuery.isPending, tabFromHash])
+
+  React.useEffect(() => {
+    const onHash = () => {
+      const fromHash = tabFromHash()
+      if (fromHash) setActiveTab(fromHash)
+    }
+    window.addEventListener("hashchange", onHash)
+    return () => window.removeEventListener("hashchange", onHash)
+  }, [tabFromHash])
 
   React.useEffect(() => {
     const hash = window.location.hash
     if (!hash) return
     const el = document.querySelector(hash)
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [profileQuery.isPending])
+  }, [profileQuery.isPending, activeTab])
+
+  const onTabChange = (value: string) => {
+    setActiveTab(value)
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${value}`)
+    }
+  }
 
   const update = (fields: Partial<SignupData>) => {
     for (const [key, value] of Object.entries(fields)) {
@@ -260,14 +299,18 @@ export default function ProfileEditPage() {
       }
 
       const nextProfile = { ...data, ...(values as SignupData) }
-      const unlockingDiscover =
+      const justCompletedRequired =
         !isProfileComplete(profileQuery.data ?? null) && isProfileComplete(nextProfile)
 
       updateMutation.mutate(delta, {
         onSuccess: (saved) => {
           form.reset(saved)
           setSaved(true)
-          window.setTimeout(() => router.push(unlockingDiscover ? "/dashboard" : "/profile"), 600)
+          // Just finished Layer B → Home so the "submit for verification" CTA is visible.
+          // Otherwise return to My Profile (not Discover, which still locks interactions).
+          const destination =
+            justCompletedRequired || isProfileComplete(saved) ? "/home" : "/profile"
+          window.setTimeout(() => router.push(destination), 600)
         },
         onError: (err) => {
           alert(err instanceof Error ? err.message : "Failed to save profile. Please try again.")
@@ -292,23 +335,74 @@ export default function ProfileEditPage() {
     if (!files) return
     const remaining = MAX_PHOTOS - photoItems.length
     const filesToUpload = Array.from(files).slice(0, remaining)
-
-    for (const file of filesToUpload) {
-      try {
-        const hash = await hashFile(file)
-        if (photoHashesRef.current.has(hash)) {
-          alert("This photo is already on your profile.")
-          continue
+    setPhotoBusy(true)
+    try {
+      for (const file of filesToUpload) {
+        try {
+          const hash = await hashFile(file)
+          if (photoHashesRef.current.has(hash)) {
+            alert("This photo is already on your profile.")
+            continue
+          }
+          const { s3Key, contentHash } = await apiClient.media.uploadMediaFile(file, "profile_photo")
+          const storedHash = contentHash || hash
+          photoHashesRef.current.add(storedHash)
+          await addPhotoMutation.mutateAsync({ s3Key, contentHash: storedHash })
+        } catch (err) {
+          console.error("[Media] Upload failed:", err)
+          const message = err instanceof Error ? err.message : "Failed to upload photo. Please try again."
+          alert(message)
         }
-        const { s3Key, contentHash } = await apiClient.media.uploadMediaFile(file, "profile_photo")
-        const storedHash = contentHash || hash
-        photoHashesRef.current.add(storedHash)
-        await addPhotoMutation.mutateAsync({ s3Key, contentHash: storedHash })
-      } catch (err) {
-        console.error("[Media] Upload failed:", err)
-        const message = err instanceof Error ? err.message : "Failed to upload photo. Please try again."
-        alert(message)
       }
+    } finally {
+      setPhotoBusy(false)
+      if (fileRef.current) fileRef.current.value = ""
+    }
+  }
+
+  const onReplaceFile = async (files: FileList | null) => {
+    const file = files?.[0]
+    const index = replaceIndex
+    setReplaceIndex(null)
+    if (!file || index == null) return
+    const existing = photoItems[index]
+    if (!existing?.canReorder) {
+      alert("Save your profile and reload before replacing this photo.")
+      return
+    }
+    setPhotoBusy(true)
+    try {
+      const hash = await hashFile(file)
+      if (photoHashesRef.current.has(hash)) {
+        alert("This photo is already on your profile.")
+        return
+      }
+      const { s3Key, contentHash } = await apiClient.media.uploadMediaFile(file, "profile_photo")
+      const storedHash = contentHash || hash
+      photoHashesRef.current.add(storedHash)
+      const afterAdd = await addPhotoMutation.mutateAsync({ s3Key, contentHash: storedHash })
+      const afterAddItems = buildPhotoGridItems({
+        photoObjects: afterAdd.photoObjects,
+        photos: afterAdd.photos,
+      })
+      const newPhoto = afterAddItems[afterAddItems.length - 1]
+      if (!newPhoto?.canReorder) return
+
+      // Place the new photo where the old one was, then remove the old id.
+      const withoutOld = afterAddItems.filter((p) => p.id !== existing.id)
+      const withoutNew = withoutOld.filter((p) => p.id !== newPhoto.id)
+      withoutNew.splice(Math.min(index, withoutNew.length), 0, newPhoto)
+      const ids = serverPhotoIdsForReorder(withoutNew)
+      if (ids?.length) {
+        await reorderPhotosMutation.mutateAsync(ids)
+      }
+      await deletePhotoMutation.mutateAsync(existing.id)
+    } catch (err) {
+      console.error("[Media] Replace failed:", err)
+      alert(err instanceof Error ? err.message : "Failed to replace photo.")
+    } finally {
+      setPhotoBusy(false)
+      if (replaceFileRef.current) replaceFileRef.current.value = ""
     }
   }
 
@@ -333,13 +427,21 @@ export default function ProfileEditPage() {
   }
 
   const setPrimary = async (index: number) => {
+    if (index === 0) return
     await reorder(index, 0)
   }
 
   const deletePhoto = async (index: number) => {
     const photo = photoItems[index]
-    if (photo?.canReorder && !photo.id.startsWith("local-")) {
-      await deletePhotoMutation.mutateAsync(photo.id)
+    if (photo?.canReorder) {
+      setPhotoBusy(true)
+      try {
+        await deletePhotoMutation.mutateAsync(photo.id)
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to delete photo.")
+      } finally {
+        setPhotoBusy(false)
+      }
       return
     }
     const nextPhotos = data.photos.filter((_, i) => i !== index)
@@ -349,13 +451,20 @@ export default function ProfileEditPage() {
 
   const reorder = async (from: number, to: number) => {
     if (from === to) return
-    const next = [...photoItems]
-    const [moved] = next.splice(from, 1)
-    next.splice(to, 0, moved)
-
-    const serverIds = next.map((p) => p.id).filter((id) => !id.startsWith("local-") && !id.startsWith("obj-"))
-    if (serverIds.length === next.length && serverIds.length > 0) {
+    const next = reorderPhotoList(photoItems, from, to)
+    const serverIds = serverPhotoIdsForReorder(next)
+    if (!serverIds) {
+      alert("Photos are still syncing. Wait a moment, then try again — or reload the page.")
+      return
+    }
+    setPhotoBusy(true)
+    try {
       await reorderPhotosMutation.mutateAsync(serverIds)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to reorder photos.")
+    } finally {
+      setPhotoBusy(false)
+      setDragIndex(null)
     }
   }
 
@@ -383,15 +492,47 @@ export default function ProfileEditPage() {
         </div>
       </div>
 
-      {!completenessStats.requiredComplete && completenessStats.missingRequired.length > 0 && (
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
-          <p className="text-sm font-semibold text-destructive">Complete required fields to unlock Discover</p>
-          <p className="mt-1 text-xs text-destructive/90">
-            Still needed: {completenessStats.missingRequired.map((field) => field.label).join(", ")}
+      {completenessStats.requiredComplete ? (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+          <p className="text-sm font-semibold text-primary">All required fields done</p>
+          <p className="mt-1 text-xs text-primary/80">
+            Next: go to Home and submit for verification so an admin can approve you.
           </p>
         </div>
-      )}
+      ) : completenessStats.missingRequired.length > 0 ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+          <p className="text-sm font-semibold text-destructive">
+            {completenessStats.missingRequired.length} required field
+            {completenessStats.missingRequired.length === 1 ? "" : "s"} still needed
+          </p>
+          <p className="mt-1 text-xs text-destructive/90">
+            Still needed: {completenessStats.missingRequired.map((field) => field.label).join(", ")}.
+            After these are filled, submit for verification from Home.
+          </p>
+        </div>
+      ) : null}
 
+      <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
+        <TabsList aria-label="Profile sections">
+          {EDIT_TABS.map((tab) => {
+            const missing = missingCountForTab(tab.id, missingIds)
+            return (
+              <TabsTrigger key={tab.id} value={tab.id}>
+                {tab.label}
+                {missing > 0 && (
+                  <span
+                    className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground"
+                    aria-label={`${missing} required field${missing === 1 ? "" : "s"} missing`}
+                  >
+                    {missing}
+                  </span>
+                )}
+              </TabsTrigger>
+            )
+          })}
+        </TabsList>
+
+        <TabsContent value="basics">
       <EditSection id="basics" title="Basic info">
         <Field label="Profile for" required missing={isMissing("profileFor")} error={fieldError(errors, "profileFor")}>
           <SearchableSelect
@@ -486,7 +627,9 @@ export default function ProfileEditPage() {
           onChange={(next) => update(next)}
         />
       </EditSection>
+      </TabsContent>
 
+      <TabsContent value="community">
       <EditSection id="community" title="Community details">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Religion" required missing={isMissing("religion")} error={fieldError(errors, "religion")}>
@@ -549,7 +692,9 @@ export default function ProfileEditPage() {
           </Field>
         </div>
       </EditSection>
+      </TabsContent>
 
+      <TabsContent value="career">
       <EditSection id="career" title="Education & career">
         <EducationFields
           educationLevel={data.educationLevel}
@@ -615,7 +760,9 @@ export default function ProfileEditPage() {
           />
         </Field>
       </EditSection>
+      </TabsContent>
 
+      <TabsContent value="family">
       <EditSection id="family" title="Family details">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Family type">
@@ -699,7 +846,9 @@ export default function ProfileEditPage() {
           {formatSiblings(data.brothersCount, data.sistersCount)}
         </p>
       </EditSection>
+      </TabsContent>
 
+      <TabsContent value="location">
       <EditSection id="location" title="Location">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Current city" required missing={isMissing("city")} error={fieldError(errors, "city")}>
@@ -744,7 +893,9 @@ export default function ProfileEditPage() {
           className="w-full resize-none rounded-xl border-[1.5px] border-input bg-card px-4 py-3 text-sm transition-all placeholder:text-muted-foreground/60 focus-visible:border-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(124,21,53,0.10)]"
         />
       </EditSection>
+      </TabsContent>
 
+      <TabsContent value="lifestyle">
       <EditSection id="lifestyle" title="Lifestyle">
         <p className="text-sm text-muted-foreground">Diet, habits, and interests shown on your profile.</p>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -811,7 +962,9 @@ export default function ProfileEditPage() {
           />
         </Field>
       </EditSection>
+      </TabsContent>
 
+      <TabsContent value="preferences">
       <EditSection id="preferences" title="Partner preferences">
         <p className="text-sm text-muted-foreground">Changes affect your daily match results immediately.</p>
         <div className="grid grid-cols-2 gap-4">
@@ -904,7 +1057,9 @@ export default function ProfileEditPage() {
           />
         </Field>
       </EditSection>
+      </TabsContent>
 
+      <TabsContent value="photos">
       <section
         id="photos"
         className={cn(
@@ -921,8 +1076,11 @@ export default function ProfileEditPage() {
         <p className={cn("text-sm", isMissing("photos") ? "text-destructive" : "text-muted-foreground")}>
           {isMissing("photos")
             ? "At least one profile photo is required to unlock Discover."
-            : "First photo is your primary. Drag to reorder. Primary photo is reviewed by admin within 24 hours."}
+            : "First photo is your primary. Use arrows or Set primary to change order. Drag works on desktop."}
         </p>
+        {photoBusy && (
+          <p className="text-xs font-medium text-muted-foreground">Updating photos…</p>
+        )}
 
         <input
           ref={fileRef}
@@ -930,13 +1088,21 @@ export default function ProfileEditPage() {
           accept="image/*"
           multiple
           className="hidden"
-          onChange={(e) => onFiles(e.target.files)}
+          onChange={(e) => void onFiles(e.target.files)}
+        />
+        <input
+          ref={replaceFileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => void onReplaceFile(e.target.files)}
         />
 
         {photoItems.length === 0 ? (
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
+            disabled={photoBusy}
             className={cn(
               "flex w-full flex-col items-center gap-2 rounded-2xl border border-dashed py-10 text-sm hover:border-primary/40 hover:text-primary",
               isMissing("photos")
@@ -952,46 +1118,75 @@ export default function ProfileEditPage() {
             {photoItems.map((photo, i) => (
               <div
                 key={photo.id}
-                draggable={photo.canReorder}
+                draggable={photo.canReorder && !photoBusy}
                 onDragStart={() => setDragIndex(i)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
-                  if (dragIndex !== null) reorder(dragIndex, i)
-                  setDragIndex(null)
+                  if (dragIndex !== null) void reorder(dragIndex, i)
                 }}
                 className="group relative aspect-[3/4] overflow-hidden rounded-xl border-2 border-border bg-muted"
               >
                 <Image src={getMediaUrl(photo.url)} alt={`Photo ${i + 1}`} fill className="object-cover" sizes="120px" />
                 {i === 0 && (
-                  <span className="absolute left-1 top-1 rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold text-secondary-foreground">
+                  <span className="absolute left-1 top-1 z-10 rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold text-secondary-foreground">
                     <Star className="mr-0.5 inline h-2.5 w-2.5 fill-current" />Primary
                   </span>
                 )}
-                <div className="absolute inset-0 flex flex-col justify-between bg-black/0 opacity-0 transition-opacity group-hover:bg-black/40 group-hover:opacity-100">
-                  <div className="flex justify-end p-1">
+                <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1 bg-gradient-to-t from-black/70 to-transparent p-1.5 pt-6">
+                  <div className="flex items-center justify-between gap-0.5">
                     <button
                       type="button"
-                      onClick={() => deletePhoto(i)}
-                      className="rounded-full bg-black/60 p-1 text-white"
+                      disabled={!photo.canReorder || photoBusy || i === 0}
+                      onClick={() => void reorder(i, i - 1)}
+                      className="rounded-full bg-black/55 p-1 text-white disabled:opacity-30"
+                      aria-label="Move photo earlier"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!photo.canReorder || photoBusy || i === photoItems.length - 1}
+                      onClick={() => void reorder(i, i + 1)}
+                      className="rounded-full bg-black/55 p-1 text-white disabled:opacity-30"
+                      aria-label="Move photo later"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={photoBusy}
+                      onClick={() => {
+                        setReplaceIndex(i)
+                        replaceFileRef.current?.click()
+                      }}
+                      className="rounded-full bg-black/55 p-1 text-white disabled:opacity-30"
+                      aria-label="Replace photo"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={photoBusy}
+                      onClick={() => void deletePhoto(i)}
+                      className="rounded-full bg-black/55 p-1 text-white disabled:opacity-30"
                       aria-label="Delete photo"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  {i !== 0 && (
-                    <div className="flex justify-center p-1">
-                      <button
-                        type="button"
-                        onClick={() => setPrimary(i)}
-                        className="rounded-full bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground"
-                      >
-                        Set primary
-                      </button>
-                    </div>
+                  {i !== 0 && photo.canReorder && (
+                    <button
+                      type="button"
+                      disabled={photoBusy}
+                      onClick={() => void setPrimary(i)}
+                      className="w-full rounded-full bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground disabled:opacity-50"
+                    >
+                      Set primary
+                    </button>
                   )}
                 </div>
                 {photo.canReorder && (
-                  <span className="absolute bottom-1 left-1 cursor-grab rounded bg-black/40 px-1 text-white opacity-0 group-hover:opacity-100">
+                  <span className="absolute right-1 top-1 z-10 hidden cursor-grab rounded bg-black/40 px-1 text-white sm:inline-flex">
                     <GripVertical className="h-3 w-3" />
                   </span>
                 )}
@@ -1000,8 +1195,9 @@ export default function ProfileEditPage() {
             {photoItems.length < MAX_PHOTOS && (
               <button
                 type="button"
+                disabled={photoBusy}
                 onClick={() => fileRef.current?.click()}
-                className="flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
+                className="flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-primary disabled:opacity-50"
               >
                 <Upload className="h-6 w-6" />
                 <span className="sr-only">Add photo</span>
@@ -1021,7 +1217,9 @@ export default function ProfileEditPage() {
           </Select>
         </Field>
       </section>
+      </TabsContent>
 
+      <TabsContent value="horoscope">
       <EditSection id="horoscope" title="Horoscope details">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Star / nakshatra" required missing={isMissing("star")} error={fieldError(errors, "star")}>
@@ -1147,6 +1345,8 @@ export default function ProfileEditPage() {
           )}
         </div>
       </EditSection>
+      </TabsContent>
+      </Tabs>
 
       <div className="sticky bottom-20 z-20 flex gap-3 bg-background/90 py-3 backdrop-blur md:static md:bottom-auto md:bg-transparent md:py-0">
         <Button variant="outline" className="flex-1" onClick={() => router.push("/profile")}>

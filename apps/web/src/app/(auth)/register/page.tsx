@@ -351,7 +351,10 @@ function Step1AccountCreation({
   const [loading, setLoading] = useState(false)
   const form = useForm({
     resolver: zodResolver(signupStep1Schema) as any,
-    defaultValues: { profileFor: data.profileFor, phone: data.phone, terms: false },
+    // Consent is wizard state, not just form state: restore the member's
+    // earlier choice when they come back (OTP step, reload), instead of
+    // silently unchecking the box they already ticked.
+    defaultValues: { profileFor: data.profileFor, phone: data.phone, terms: data.consentAccepted === true },
     mode: "onChange",
   })
   const profileFor = form.watch("profileFor")
@@ -373,7 +376,7 @@ function Step1AccountCreation({
   const router = useRouter()
   const onStep1Submit = async (values: any) => {
     setLoading(true)
-    updateData({ profileFor: values.profileFor, phone: values.phone })
+    updateData({ profileFor: values.profileFor, phone: values.phone, consentAccepted: true })
     try {
       await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true, type: "register" })
       nextStep()

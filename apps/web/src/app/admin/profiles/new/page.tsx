@@ -25,6 +25,8 @@ import {
   EDUCATION_LEVELS,
   EMPLOYMENT_STATUSES,
   INCOME_BANDS,
+  STARS,
+  RASHIS,
 } from "@/lib/profile-store"
 import { adminCreateProfileSchema, type AdminCreateProfileValues } from "@/lib/validation"
 import { hashFile } from "@/lib/file-hash"
@@ -66,6 +68,11 @@ export default function AdminCreateProfilePage() {
       educationLevel: "Bachelors",
       employmentStatus: "Employed",
       annualIncome: "Prefer not to say",
+      nakshatra: "",
+      rashi: "",
+      manglik: "Don't Know",
+      birthTime: "",
+      birthPlace: "",
       brothersCount: 0,
       sistersCount: 0,
       planId: "free",
@@ -164,6 +171,11 @@ export default function AdminCreateProfilePage() {
           educationLevel: values.educationLevel,
           employmentStatus: values.employmentStatus,
           annualIncome: values.annualIncome,
+          nakshatra: values.nakshatra,
+          rashi: values.rashi,
+          manglik: values.manglik,
+          birthTime: values.birthTime,
+          birthPlace: values.birthPlace,
           brothersCount: values.brothersCount,
           sistersCount: values.sistersCount,
           planId: values.planId,
@@ -327,6 +339,57 @@ export default function AdminCreateProfilePage() {
                   ))}
                 </SelectContent>
               </Select>
+            </Field>
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+
+        {/* Section 3b: Horoscope (Layer-B required) */}
+        <div className="space-y-4">
+          <h2 className="font-serif text-xl font-bold">Horoscope</h2>
+          <p className="text-sm text-muted-foreground">
+            Required so the profile can appear in Discover and be auto-verified.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Star / nakshatra" error={form.formState.errors.nakshatra?.message}>
+              <Select value={form.watch("nakshatra") || undefined} onValueChange={(v) => form.setValue("nakshatra", v)}>
+                <SelectTrigger><SelectValue placeholder="Select star" /></SelectTrigger>
+                <SelectContent>
+                  {STARS.map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Rashi" error={form.formState.errors.rashi?.message}>
+              <Select value={form.watch("rashi") || undefined} onValueChange={(v) => form.setValue("rashi", v)}>
+                <SelectTrigger><SelectValue placeholder="Select rashi" /></SelectTrigger>
+                <SelectContent>
+                  {RASHIS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Manglik" error={form.formState.errors.manglik?.message}>
+              <Select
+                value={form.watch("manglik")}
+                onValueChange={(v) => form.setValue("manglik", v as AdminCreateProfileValues["manglik"])}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(["Yes", "No", "Don't Know", "Both"] as const).map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Birth time" error={form.formState.errors.birthTime?.message}>
+              <Input {...form.register("birthTime")} placeholder="e.g. 10:45 AM" />
+            </Field>
+            <Field label="Birth place" error={form.formState.errors.birthPlace?.message}>
+              <Input {...form.register("birthPlace")} placeholder="City of birth" />
             </Field>
           </div>
         </div>

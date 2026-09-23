@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { BadgeCheck, ChevronLeft, ChevronRight, FileText, MapPin, ShieldCheck, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, FileText, MapPin, X } from "lucide-react"
 import { cn, getMediaUrl } from "@/lib/utils"
 import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
 import { LockedPhoto } from "@/components/profile/locked-photo"
@@ -14,28 +14,14 @@ type ProfileGalleryProps = {
   state: string
   lastActive: string
   photos: string[]
-  photoVerified?: boolean
-  verified?: boolean
   hasHoroscope?: boolean
   blurPhoto?: boolean
   plan?: string | null
 }
 
-type BadgeKey = "photo" | "screened" | "horoscope"
-
-const BADGE_POPUPS: Record<BadgeKey, { title: string; body: string }> = {
-  photo: {
-    title: "Photo verified",
-    body: "This member’s photos were reviewed by our team. The pictures match the profile and were approved within our 12-hour review window.",
-  },
-  screened: {
-    title: "Profile screened",
-    body: "This profile has been screened for authenticity  identity checks and basic details were reviewed before it went live.",
-  },
-  horoscope: {
-    title: "Horoscope available",
-    body: "A horoscope (jathagam) PDF is attached to this profile. You can request a match comparison after both families connect.",
-  },
+const HOROSCOPE_POPUP = {
+  title: "Horoscope available",
+  body: "A horoscope (jathagam) PDF is attached to this profile. You can request a match comparison after both families connect.",
 }
 
 export function ProfileGallery({
@@ -45,15 +31,13 @@ export function ProfileGallery({
   state,
   lastActive,
   photos,
-  photoVerified,
-  verified,
   hasHoroscope,
   blurPhoto,
   plan,
 }: ProfileGalleryProps) {
   const [activeIndex, setActiveIndex] = React.useState(0)
   const [lightboxOpen, setLightboxOpen] = React.useState(false)
-  const [badgePopup, setBadgePopup] = React.useState<BadgeKey | null>(null)
+  const [horoscopePopupOpen, setHoroscopePopupOpen] = React.useState(false)
   const hero = photos[activeIndex] ?? photos[0]
   const extra = photos.slice(1)
   const hasMany = photos.length > 1
@@ -77,8 +61,8 @@ export function ProfileGallery({
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (badgePopup) {
-          setBadgePopup(null)
+        if (horoscopePopupOpen) {
+          setHoroscopePopupOpen(false)
           return
         }
         if (lightboxOpen) closeLightbox()
@@ -88,8 +72,7 @@ export function ProfileGallery({
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [lightboxOpen, badgePopup, hasMany, photos.length])
-
+  }, [lightboxOpen, horoscopePopupOpen, hasMany, photos.length])
   return (
     <>
       <div className="flex h-full flex-col">
@@ -148,36 +131,12 @@ export function ProfileGallery({
 
           <div className="absolute left-2.5 right-2.5 top-2.5 z-20 flex flex-wrap items-center gap-1.5">
             <PlanCrownBadge plan={plan} />
-            {photoVerified && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setBadgePopup("photo")
-                }}
-                className="inline-flex items-center gap-1 rounded-full bg-[#fffbf4] px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm ring-1 ring-secondary/35"
-              >
-                <BadgeCheck className="h-3.5 w-3.5 text-secondary" /> Photo verified
-              </button>
-            )}
-            {verified && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setBadgePopup("screened")
-                }}
-                className="inline-flex items-center gap-1 rounded-full bg-[#fffbf4] px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm ring-1 ring-secondary/35"
-              >
-                <ShieldCheck className="h-3.5 w-3.5 text-secondary" /> Profile screened
-              </button>
-            )}
             {hasHoroscope && (
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  setBadgePopup("horoscope")
+                  setHoroscopePopupOpen(true)
                 }}
                 className="inline-flex items-center gap-1 rounded-full bg-[#fffbf4] px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm ring-1 ring-secondary/35"
               >
@@ -228,10 +187,10 @@ export function ProfileGallery({
         </div>
       </div>
 
-      {badgePopup && (
+      {horoscopePopupOpen && (
         <div
           className="fixed inset-0 z-[110] flex items-end justify-center bg-black/50 p-4 sm:items-center"
-          onClick={() => setBadgePopup(null)}
+          onClick={() => setHoroscopePopupOpen(false)}
           role="dialog"
           aria-modal="true"
           aria-labelledby="badge-popup-title"
@@ -242,18 +201,18 @@ export function ProfileGallery({
           >
             <div className="flex items-start justify-between gap-3">
               <h2 id="badge-popup-title" className="font-serif text-xl font-bold text-primary">
-                {BADGE_POPUPS[badgePopup].title}
+                {HOROSCOPE_POPUP.title}
               </h2>
               <button
                 type="button"
-                onClick={() => setBadgePopup(null)}
+                onClick={() => setHoroscopePopupOpen(false)}
                 className="tap-target inline-flex items-center justify-center rounded-full border border-border bg-card"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <p className="mt-3 text-sm leading-relaxed text-foreground/85">{BADGE_POPUPS[badgePopup].body}</p>
+            <p className="mt-3 text-sm leading-relaxed text-foreground/85">{HOROSCOPE_POPUP.body}</p>
           </div>
         </div>
       )}

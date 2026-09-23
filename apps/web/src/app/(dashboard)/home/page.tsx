@@ -6,7 +6,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { HomeMatchRow } from "@/components/dashboard/home-match-row"
-import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
+import { VERIFICATION_SLA_HOURS, getPrimaryPhotoSrc } from "@/lib/profile-store"
 import {
   canAccessFullPortal,
   canInteract,
@@ -78,6 +78,7 @@ export default function HomePage() {
   const submitVerification = useSubmitVerificationMutation()
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
+  const primaryPhotoSrc = getPrimaryPhotoSrc(profile)
   const lookingFor =
     profile?.gender === "Female" ? "grooms" : profile?.gender === "Male" ? "brides" : "matches"
   const onboardingState = getOnboardingState(profile)
@@ -119,10 +120,10 @@ export default function HomePage() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
           <div className="min-w-0 space-y-4">
             <div className="flex items-center gap-3">
-              {profile?.photos?.[0] ? (
+              {primaryPhotoSrc ? (
                 <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border">
                   <Image
-                    src={getMediaUrl(profile.photos[0])}
+                    src={getMediaUrl(primaryPhotoSrc)}
                     alt=""
                     fill
                     className={cn("object-cover object-[center_18%]", pending && "blur-[2px]")}

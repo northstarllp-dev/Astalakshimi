@@ -8,3 +8,4 @@ export * from './interests';
 export * from './shortlists';
 export * from './chat';
 export * from './admin';
+export * from './required-fields-complete';

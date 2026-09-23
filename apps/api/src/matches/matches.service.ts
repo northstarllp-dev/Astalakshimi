@@ -94,6 +94,16 @@ export class MatchesService {
     conditions.push(lte(profiles.dob, dobUpper));
     conditions.push(gte(profiles.dob, dobLower));
 
+    // Discover-ready candidates need Layer-B completeness + a primary photo.
+    conditions.push(eq(profiles.requiredComplete, true));
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM profile_photos
+        WHERE profile_photos.profile_id = profiles.id
+          AND profile_photos.is_primary = true
+      )`,
+    );
+
     const religions = cleanList(prefs.prefReligions);
     if (religions.length > 0) conditions.push(inArray(profiles.religion, religions));
 

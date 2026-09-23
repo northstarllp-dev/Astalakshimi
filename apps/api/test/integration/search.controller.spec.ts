@@ -71,5 +71,40 @@ describe('Feature 6: Search & Filtering - SearchController (Integration Tests)',
       );
       expect(result).toEqual(expectedResponse);
     });
+
+    it('forwards browse tab without default age band (unfiltered Discover search)', async () => {
+      const mockQuery = { tab: 'all', page: 1, limit: 10 };
+      const expectedResponse = {
+        totalCount: 4,
+        profiles: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }],
+      };
+
+      searchService.searchProfiles.mockResolvedValue(expectedResponse as any);
+
+      const result = await controller.searchProfiles(mockUserSession, mockQuery as any);
+
+      expect(searchService.searchProfiles).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        mockQuery,
+      );
+      expect((mockQuery as any).ageMin).toBeUndefined();
+      expect((mockQuery as any).ageMax).toBeUndefined();
+      expect(result.totalCount).toBe(4);
+    });
+
+    it('forwards the verified browse tab to the service', async () => {
+      const mockQuery = { tab: 'verified', page: 1, limit: 10 };
+      searchService.searchProfiles.mockResolvedValue({
+        totalCount: 1,
+        profiles: [{ id: 'verified-1' }],
+      } as any);
+
+      await controller.searchProfiles(mockUserSession, mockQuery as any);
+
+      expect(searchService.searchProfiles).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        expect.objectContaining({ tab: 'verified' }),
+      );
+    });
   });
 });

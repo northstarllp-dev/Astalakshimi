@@ -143,8 +143,9 @@ export class ShortlistsService {
           community: p.caste || 'Unknown',
           educationLevel: p.educationLevel || 'Graduate',
           profession: p.profession || 'Professional',
-          photo: primaryPhoto || null,
-          photos: primaryPhoto ? [primaryPhoto] : [],
+          // Always expose the S3 key string — never the photo row object.
+          photo: visibleKey,
+          photos: visibleKey ? [visibleKey] : [],
         },
       };
     });

@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { cn, getMediaUrl } from "@/lib/utils"
 import { useSendInterestMutation, useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
-import { BadgeCheck, Bookmark, Heart } from "lucide-react"
+import { Bookmark, Heart } from "lucide-react"
 import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
 import { LockedPhoto } from "@/components/profile/locked-photo"
 
@@ -68,12 +68,6 @@ export function HomeMatchRow({
         ) : (
           <LockedPhoto compact src={photo} label="Photo hidden" />
         )}
-        {match.isVerified || match.photoVerified ? (
-          <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-[#fffbf4]/95 px-1 py-0.5 text-[9px] font-semibold text-foreground shadow-xs sm:text-[10px]">
-            <BadgeCheck className="h-3 w-3 text-primary" />
-            Verified
-          </span>
-        ) : null}
         {typeof match.matchPercent === "number" ? (
           <span className="absolute right-1.5 top-1.5 inline-flex items-center rounded-full bg-emerald-500/95 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-xs sm:text-[10px]">
             {match.matchPercent}%

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { phoneRegex } from './auth';
-import { genderSchema, maritalStatusSchema } from './profile';
+import { genderSchema, maritalStatusSchema, manglikStatusSchema, dietSchema } from './profile';
 
 export const adminCreateProfileSchema = z.object({
   profileFor: z.string().min(1, 'Choose who this profile is for.'),
@@ -20,7 +20,7 @@ export const adminCreateProfileSchema = z.object({
   childrenCount: z.number().int().optional(),
   childrenLivingWithMe: z.boolean().nullable().optional(),
   height: z.string().min(1, 'Enter height.'),
-  diet: z.enum(['Vegetarian', 'Non-vegetarian', 'Eggetarian', 'Jain', 'Vegan']).optional(),
+  diet: dietSchema,
   city: z.string().trim().min(2, 'Enter city.').max(100),
   state: z.string().trim().min(2).max(100).optional(),
   religion: z.string().min(1, 'Select religion.'),
@@ -29,6 +29,12 @@ export const adminCreateProfileSchema = z.object({
   educationLevel: z.string().min(1, 'Select education level.'),
   employmentStatus: z.string().min(1, 'Select employment status.'),
   annualIncome: z.string().min(1, 'Select annual income.'),
+  // Horoscope — required for Layer-B completeness / staff auto-verify
+  nakshatra: z.string().trim().min(1, 'Select star / nakshatra.'),
+  rashi: z.string().trim().min(1, 'Select rashi.'),
+  manglik: manglikStatusSchema,
+  birthTime: z.string().trim().min(1, 'Enter birth time.'),
+  birthPlace: z.string().trim().min(1, 'Enter birth place.'),
   brothersCount: z.number().int().min(0).max(5),
   sistersCount: z.number().int().min(0).max(5),
   aboutMe: z.string().max(1000).optional(),

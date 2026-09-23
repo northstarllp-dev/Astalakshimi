@@ -27,7 +27,7 @@ export interface BasicPrefs {
 }
 
 export interface MatchCandidate {
-  dob?: string | null;
+  dob?: string | Date | null;
   heightCm?: number | null;
   maritalStatus?: string | null;
   religion?: string | null;
@@ -76,14 +76,33 @@ function normList(values?: string[] | null): string[] {
   return values.map((v) => String(v).trim().toLowerCase()).filter(Boolean);
 }
 
-/** Whole-years age for a YYYY-MM-DD dob, or null when unparseable. */
-export function candidateAge(dob?: string | null, ref: Date = new Date()): number | null {
-  if (!dob || typeof dob !== 'string') return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dob.trim());
-  if (!m) return null;
-  const year = Number(m[1]);
-  const month = Number(m[2]) - 1;
-  const day = Number(m[3]);
+/** Whole-years age for a YYYY-MM-DD dob (or Date), or null when unparseable. */
+export function candidateAge(
+  dob?: string | Date | null,
+  ref: Date = new Date(),
+): number | null {
+  if (dob == null) return null;
+
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (dob instanceof Date) {
+    if (Number.isNaN(dob.getTime())) return null;
+    // Use UTC calendar parts — Postgres `date` columns arrive as UTC midnight.
+    year = dob.getUTCFullYear();
+    month = dob.getUTCMonth();
+    day = dob.getUTCDate();
+  } else if (typeof dob === 'string') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dob.trim());
+    if (!m) return null;
+    year = Number(m[1]);
+    month = Number(m[2]) - 1;
+    day = Number(m[3]);
+  } else {
+    return null;
+  }
+
   const date = new Date(year, month, day);
   if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
     return null;

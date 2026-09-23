@@ -22,6 +22,8 @@ export type AdvancedFilters = {
 export type DiscoverQuery = {
   ageMin: number
   ageMax: number
+  /** When false, age is UI-only and not sent to the API (show all ages). */
+  ageFilterEnabled: boolean
   city: string
   community: string
   tab: BrowseTab
@@ -41,13 +43,35 @@ export const EMPTY_ADVANCED: AdvancedFilters = {
   relocate: "",
 }
 
+/** Slider defaults when the age filter is inactive (not applied to search). */
+export const DEFAULT_AGE_MIN = 21
+export const DEFAULT_AGE_MAX = 40
+
 export const DEFAULT_DISCOVER: DiscoverQuery = {
-  ageMin: 21,
-  ageMax: 40,
+  ageMin: DEFAULT_AGE_MIN,
+  ageMax: DEFAULT_AGE_MAX,
+  ageFilterEnabled: false,
   city: "",
   community: "",
   tab: "all",
   advanced: EMPTY_ADVANCED,
+}
+
+/** Build the search API payload — omit unset filters so the API returns the full opposite-gender pool. */
+export function toSearchApiParams(query: DiscoverQuery & { page?: number; limit?: number }) {
+  const params: Record<string, unknown> = {
+    tab: query.tab || "all",
+    page: query.page ?? 1,
+    limit: query.limit ?? 10,
+  }
+  if (query.ageFilterEnabled) {
+    params.ageMin = query.ageMin
+    params.ageMax = query.ageMax
+  }
+  if (query.city) params.city = query.city
+  if (query.community) params.community = query.community
+  if (query.advanced) params.advanced = query.advanced
+  return params
 }
 
 export const PAID_TABS: BrowseTab[] = ["premium", "active"]

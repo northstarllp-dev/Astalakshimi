@@ -28,11 +28,18 @@ describe('match-scoring (basic matrimony matching)', () => {
       expect(candidateAge('1996-09-21', REF)).toBe(29);
     });
 
+    it('accepts Date objects from Postgres date columns', () => {
+      // UTC midnight for 1996-09-20 → age 30 at REF
+      expect(candidateAge(new Date(Date.UTC(1996, 8, 20)), REF)).toBe(30);
+      expect(candidateAge(new Date(Date.UTC(1996, 8, 21)), REF)).toBe(29);
+    });
+
     it('returns null for missing or invalid dob', () => {
       expect(candidateAge(null, REF)).toBeNull();
       expect(candidateAge('', REF)).toBeNull();
       expect(candidateAge('not-a-date', REF)).toBeNull();
       expect(candidateAge('1996-13-40', REF)).toBeNull();
+      expect(candidateAge(new Date('invalid'), REF)).toBeNull();
     });
   });
 
@@ -166,6 +173,17 @@ describe('match-scoring (basic matrimony matching)', () => {
       // Full prefs earn 40 + 60 = 100 → capped at 98; without height 40 + 54 = 94.
       expect(scoreCandidate(BASE_CANDIDATE, prefs, REF).percent).toBe(98);
       expect(scoreCandidate({ ...BASE_CANDIDATE, heightCm: null }, prefs, REF).percent).toBe(94);
+    });
+
+    it('scores a Date dob the same as a YYYY-MM-DD string', () => {
+      const fromString = scoreCandidate(BASE_CANDIDATE, prefs, REF);
+      const fromDate = scoreCandidate(
+        { ...BASE_CANDIDATE, dob: new Date(Date.UTC(1996, 8, 20)) },
+        prefs,
+        REF,
+      );
+      expect(fromDate.percent).toBe(fromString.percent);
+      expect(fromDate.reasons).toEqual(fromString.reasons);
     });
   });
 });

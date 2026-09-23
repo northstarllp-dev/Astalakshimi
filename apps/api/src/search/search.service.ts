@@ -2,7 +2,7 @@ import { Injectable, Inject, ForbiddenException, BadRequestException } from '@ne
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans, verifications } from '@astalakshimi/database';
-import { eq, and, ne, inArray, gte, lte, or, desc, sql, isNotNull, gt } from 'drizzle-orm';
+import { eq, and, ne, inArray, gte, lte, or, desc, sql, gt } from 'drizzle-orm';
 import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
 import { loadViewerContext } from '../matches/viewer-context';
 import { scoreCandidate } from '../matches/match-scoring';
@@ -83,9 +83,38 @@ export class SearchService {
     if (filters.community) {
       conditions.push(eq(profiles.caste, filters.community));
     }
-    // profile completeness requirement (roughly >= 80%)
-    conditions.push(isNotNull(profiles.aboutMe));
+    // Must have at least a primary photo AND Layer-B required fields filled
+    // (denormalized as profiles.required_complete) to appear in Discover.
     conditions.push(sql`EXISTS (SELECT 1 FROM profile_photos WHERE profile_photos.profile_id = profiles.id AND profile_photos.is_primary = true)`);
+    conditions.push(eq(profiles.requiredComplete, true));
+
+    const tab = String(filters.tab || 'all');
+    if (tab === 'nearby' && viewer?.city) {
+      const nearby = [eq(profiles.city, viewer.city)];
+      if (viewer.state) nearby.push(eq(profiles.state, viewer.state));
+      conditions.push(or(...nearby));
+    }
+    if (tab === 'verified') {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM verifications
+        WHERE verifications.profile_id = profiles.id
+          AND verifications.status = 'verified'
+      )`);
+    }
+    if (tab === 'premium') {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM subscriptions
+        INNER JOIN plans ON plans.id = subscriptions.plan_id
+        WHERE subscriptions.user_id = profiles.user_id
+          AND subscriptions.status = 'active'
+          AND subscriptions.expires_at > NOW()
+          AND plans.slug <> 'free'
+      )`);
+    }
+    if (tab === 'active') {
+      // Profiles touched in the last 30 days (updated_at). Falls back to created_at.
+      conditions.push(sql`COALESCE(profiles.updated_at, profiles.created_at) > NOW() - INTERVAL '30 days'`);
+    }
     
     // advanced filters (paid entitlement). The Discover client always sends
     // its advanced object, even when every filter is empty — only enforce the
@@ -136,7 +165,7 @@ export class SearchService {
     const limit = parseInt(filters.limit || '10', 10);
     const offset = (page - 1) * limit;
 
-    const isScoreRanked = filters.tab !== 'new';
+    const isScoreRanked = tab !== 'new';
 
     const selectFields = {
       id: profiles.id,

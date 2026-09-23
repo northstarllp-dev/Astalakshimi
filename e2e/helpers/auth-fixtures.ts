@@ -23,13 +23,16 @@ export const MEMBER_PHONE = '9100000081';
 export const MEMBER_NAME = 'E2E Login Member';
 export const PENDING_PHONE = '9100000082';
 export const PENDING_NAME = 'E2E Pending Review';
+/** Complete profile + idle verification — ready for Submit for verification. */
+export const READY_PHONE = '9100000083';
+export const READY_NAME = 'E2E Ready Submit';
 export const ADMIN_EMAIL = 'admin@astalakshimi.in';
 export const ADMIN_PASSWORD = 'Admin@2026';
 export const ADMIN_PHONE = '9999999999';
 /** Fixed OTP used by login e2e after stubbing send-otp. */
 export const E2E_OTP = '424242';
 
-const ALL_MEMBER_PHONES = [MEMBER_PHONE, PENDING_PHONE];
+const ALL_MEMBER_PHONES = [MEMBER_PHONE, PENDING_PHONE, READY_PHONE];
 
 let sql: ReturnType<typeof postgres> | null = null;
 
@@ -67,8 +70,8 @@ export function mintAccessToken(user: { id: string; phone: string; role: string 
 
 export async function cleanupAuthFixtures() {
   const dbi = db();
-  await dbi`DELETE FROM otp_attempts WHERE phone IN (${MEMBER_PHONE}, ${PENDING_PHONE})`;
-  await dbi`DELETE FROM users WHERE phone IN (${MEMBER_PHONE}, ${PENDING_PHONE})`;
+  await dbi`DELETE FROM otp_attempts WHERE phone IN (${MEMBER_PHONE}, ${PENDING_PHONE}, ${READY_PHONE})`;
+  await dbi`DELETE FROM users WHERE phone IN (${MEMBER_PHONE}, ${PENDING_PHONE}, ${READY_PHONE})`;
 }
 
 export async function closeAuthFixtures() {
@@ -102,7 +105,11 @@ export async function seedOtp(phone: string, otp = E2E_OTP) {
   `;
 }
 
-async function seedCompleteMember(phone: string, fullName: string, opts?: { pendingReview?: boolean }) {
+async function seedCompleteMember(
+  phone: string,
+  fullName: string,
+  opts?: { pendingReview?: boolean; verificationStatus?: 'idle' | 'pending' | 'verified' },
+) {
   const dbi = db();
   const [user] = await dbi`
     INSERT INTO users (phone, is_phone_verified, consent_accepted, consent_timestamp, role, status)
@@ -154,11 +161,13 @@ async function seedCompleteMember(phone: string, fullName: string, opts?: { pend
 
   const photoId = randomUUID();
   const s3Key = `profiles/${user.id}/photos/${photoId}.jpeg`;
+  const verificationStatus =
+    opts?.verificationStatus ?? (opts?.pendingReview ? 'pending' : 'verified');
   await dbi`
     INSERT INTO profile_photos (id, profile_id, s3_key, is_primary, display_order, status)
     VALUES (
       ${photoId}, ${profile.id}, ${s3Key}, true, 0,
-      ${opts?.pendingReview ? 'pending' : 'approved'}
+      ${verificationStatus === 'verified' ? 'approved' : 'pending'}
     )
   `;
 
@@ -166,7 +175,7 @@ async function seedCompleteMember(phone: string, fullName: string, opts?: { pend
     INSERT INTO verifications (profile_id, method, status, selfie_s3_key)
     VALUES (
       ${profile.id}, 'selfie',
-      ${opts?.pendingReview ? 'pending' : 'verified'},
+      ${verificationStatus},
       ${`verifications/${user.id}/selfie-${randomUUID()}.jpeg`}
     )
   `;
@@ -192,6 +201,17 @@ export async function seedPendingReviewMember() {
   await dbi`DELETE FROM users WHERE phone = ${PENDING_PHONE}`;
   const pending = await seedCompleteMember(PENDING_PHONE, PENDING_NAME, { pendingReview: true });
   return pending;
+}
+
+/** Fully complete profile, selfie on file, verification idle — Home CTA should submit. */
+export async function seedReadyToSubmitMember() {
+  const dbi = db();
+  await dbi`DELETE FROM users WHERE phone = ${READY_PHONE}`;
+  const ready = await seedCompleteMember(READY_PHONE, READY_NAME, { verificationStatus: 'idle' });
+  return {
+    ...ready,
+    token: mintAccessToken(ready.user),
+  };
 }
 
 export async function getVerificationStatus(profileId: string) {

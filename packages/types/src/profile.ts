@@ -59,6 +59,8 @@ export interface Profile {
   companySector?: CompanySector | null;
   annualIncome?: string | null;
   photoPrivacy: PhotoPrivacy;
+  /** Layer-B discoverability flag — true when every required Discover field is filled. */
+  requiredComplete?: boolean;
   createdAt: string;
   updatedAt: string;
 }

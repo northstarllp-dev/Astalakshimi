@@ -13,7 +13,7 @@ import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { users, profiles, otpAttempts } from '@astalakshimi/database';
 import { eq, desc, and, gte, sql } from 'drizzle-orm';
-import type { SendOtpInput, VerifyOtpInput } from '@astalakshimi/validation';
+import type { SendOtpInput, VerifyOtpInput, CheckPhoneInput } from '@astalakshimi/validation';
 import type { AuthResponse, User } from '@astalakshimi/types';
 import { SmsService } from './sms.service';
 
@@ -83,6 +83,20 @@ export class AuthService {
     return {
       message: `OTP sent successfully to ${formattedPhone}`,
     };
+  }
+
+  /**
+   * Pre-OTP phone lookup so the login page can route new/incomplete members
+   * to registration BEFORE any SMS is sent. Read-only: no OTP row, no user
+   * row, no SMS. Same normalization as sendOtp so both agree on identity.
+   */
+  async checkPhone(input: CheckPhoneInput): Promise<{ exists: boolean; hasProfile: boolean }> {
+    const formattedPhone = input.phone.replace(/\s+/g, '');
+    const [existingUser] = await this.db.select().from(users).where(eq(users.phone, formattedPhone)).limit(1);
+    if (!existingUser) {
+      return { exists: false, hasProfile: false };
+    }
+    return { exists: true, hasProfile: await this.userHasProfile(existingUser.id) };
   }
 
   async verifyOtp(input: VerifyOtpInput): Promise<AuthResponse> {

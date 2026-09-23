@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   sendOtpSchema,
   verifyOtpSchema,
+  checkPhoneSchema,
   adminLoginSchema,
 } from "./auth"
 import {
@@ -45,6 +46,15 @@ describe("auth.verifyOtpSchema", () => {
     expect(verifyOtpSchema.safeParse({ phone: "9876543210", otp: "12345" }).success).toBe(false)
     expect(verifyOtpSchema.safeParse({ phone: "9876543210", otp: "1234567" }).success).toBe(false)
     expect(verifyOtpSchema.safeParse({ phone: "9876543210", otp: "abcdef" }).success).toBe(false)
+  })
+})
+
+describe("auth.checkPhoneSchema", () => {
+  it("accepts a valid phone with no other fields", () => {
+    expect(checkPhoneSchema.safeParse({ phone: "9876543210" }).success).toBe(true)
+  })
+  it("rejects invalid phone", () => {
+    expect(checkPhoneSchema.safeParse({ phone: "123" }).success).toBe(false)
   })
 })
 

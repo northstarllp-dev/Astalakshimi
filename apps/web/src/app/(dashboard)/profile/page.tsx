@@ -10,7 +10,7 @@ import { displayHeight } from "@/lib/input-units"
 import { maritalAsksChildren } from "@/lib/identity-fields"
 import { getMediaUrl } from "@/lib/utils"
 import { useProfileQuery } from "@/hooks/queries"
-import { emptySignupData, VERIFICATION_SLA_HOURS, formatSiblings } from "@/lib/profile-store"
+import { emptySignupData, VERIFICATION_SLA_HOURS, formatSiblings, getPrimaryPhotoSrc } from "@/lib/profile-store"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
 import { getProfileCompletenessStats, getRequiredFieldEditHash } from "@/lib/portal-access"
 import { apiClient } from "@/lib/api-client"
@@ -46,6 +46,7 @@ export default function MyProfilePage() {
   const [activeTab, setActiveTab] = React.useState("basics")
 
   const data = profile ?? emptySignupData()
+  const primaryPhoto = getPrimaryPhotoSrc(data)
   const completenessStats = getProfileCompletenessStats(data)
   const completeness = completenessStats.percentage
   const pending = data.verificationStatus === "pending"
@@ -126,9 +127,9 @@ export default function MyProfilePage() {
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div className="flex items-end gap-4">
               <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-card bg-muted shadow-md sm:h-28 sm:w-28">
-                {data.photos[0] ? (
+                {primaryPhoto ? (
                   <Image
-                    src={getMediaUrl(data.photos[0])}
+                    src={getMediaUrl(primaryPhoto)}
                     alt={data.fullName}
                     fill
                     className={`object-cover ${pending ? "blur-[2px]" : ""}`}
@@ -186,10 +187,12 @@ export default function MyProfilePage() {
                 <p className="mt-0.5 text-xs text-muted-foreground leading-tight">
                   {completenessStats.filled} of {completenessStats.total} details filled.
                   {completenessStats.requiredComplete
-                    ? completeness >= 90
-                      ? " Excellent — your profile stands out to families."
-                      : " Required details are in. Discover is unlocked — add more to stand out."
-                    : " Fill required details to unlock Discover. Specialization and employer are optional."}
+                    ? verified
+                      ? completeness >= 90
+                        ? " Excellent — your profile stands out to families."
+                        : " Required details are in. You can browse and interact."
+                      : " Required details are in. Submit for verification from Home to unlock interests and messaging."
+                    : " Fill required details, then submit for verification from Home. Specialization and employer are optional."}
                 </p>
                 {!completenessStats.requiredComplete && completenessStats.missingRequired.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">

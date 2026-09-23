@@ -330,8 +330,13 @@ export function Step6Verify({
   const removePhoto = (index: number) => {
     const nextPhotos = data.photos.filter((_, i) => i !== index)
     const nextKeys = (data.photoS3Keys || []).filter((_, i) => i !== index)
+    const nextHashes = (data.photoContentHashes || []).filter((_, i) => i !== index)
     photoHashesRef.current = photoHashesRef.current.filter((_, i) => i !== index)
-    updateData({ photos: nextPhotos, photoS3Keys: nextKeys })
+    updateData({
+      photos: nextPhotos,
+      photoS3Keys: nextKeys,
+      photoContentHashes: nextHashes,
+    })
   }
 
   const identityReady =
@@ -688,7 +693,7 @@ export function Step6Verify({
               <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Submitting profile…
             </>
           ) : (
-            "Submit for verification"
+            "Create profile"
           )}
         </Button>
         <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[11px] text-muted-foreground">

@@ -19,6 +19,7 @@ import {
 import { formatAdminDate, isSlaBreached } from "@/lib/admin-store"
 import { adminRejectSchema, type AdminRejectValues } from "@/lib/validation"
 import { cn } from "@/lib/utils"
+import { MediaLightbox, PdfLightboxTile } from "@/components/admin/media-lightbox"
 import {
   AlertTriangle,
   ArrowLeft,
@@ -108,36 +109,50 @@ export default function AdminProfileReviewPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <ReviewPane title="Photos" icon={Check}>
-          <div className="grid grid-cols-2 gap-2">
-            {profile.photos.map((photo: { id: string; url: string; status: string }) => (
-              <div key={photo.id} className="relative aspect-[3/4] overflow-hidden rounded-xl border border-border">
-                <Image src={photo.url} alt="" fill className="object-cover" sizes="200px" />
-                <span
-                  className={cn(
-                    "absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                    photo.status === "approved" && "bg-emerald-600 text-white",
-                    photo.status === "pending" && "bg-amber-500 text-white",
-                    photo.status === "rejected" && "bg-destructive text-white"
-                  )}
+          {profile.photos.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No photos uploaded.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {profile.photos.map((photo: { id: string; url: string; status: string }, index: number) => (
+                <MediaLightbox
+                  key={photo.id}
+                  src={photo.url}
+                  alt={`${profile.fullName} photo ${index + 1}`}
                 >
-                  {photo.status}
-                </span>
-              </div>
-            ))}
-          </div>
+                  <div className="relative aspect-[3/4] w-full">
+                    <Image src={photo.url} alt="" fill className="object-cover" sizes="200px" />
+                    <span
+                      className={cn(
+                        "absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                        photo.status === "approved" && "bg-emerald-600 text-white",
+                        photo.status === "pending" && "bg-amber-500 text-white",
+                        photo.status === "rejected" && "bg-destructive text-white"
+                      )}
+                    >
+                      {photo.status}
+                    </span>
+                  </div>
+                </MediaLightbox>
+              ))}
+            </div>
+          )}
         </ReviewPane>
 
         <ReviewPane title="Govt ID / Selfie" icon={IdCard}>
           {profile.verificationMethod === "selfie" && profile.selfiePhoto ? (
-            <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border">
-              <Image src={profile.selfiePhoto} alt="Selfie verification" fill className="object-cover" sizes="300px" />
-            </div>
+            <MediaLightbox src={profile.selfiePhoto} alt="Selfie verification">
+              <div className="relative aspect-[4/3] w-full">
+                <Image src={profile.selfiePhoto} alt="Selfie verification" fill className="object-cover" sizes="300px" />
+              </div>
+            </MediaLightbox>
           ) : profile.govtIdPhoto ? (
             <>
               <p className="mb-2 text-sm font-medium">{profile.govtIdType || "Government ID"}</p>
-              <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-border">
-                <Image src={profile.govtIdPhoto} alt="Government ID" fill className="object-cover" sizes="300px" />
-              </div>
+              <MediaLightbox src={profile.govtIdPhoto} alt={profile.govtIdType || "Government ID"}>
+                <div className="relative aspect-[4/3] w-full">
+                  <Image src={profile.govtIdPhoto} alt="Government ID" fill className="object-cover" sizes="300px" />
+                </div>
+              </MediaLightbox>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">No verification document uploaded.</p>
@@ -147,10 +162,14 @@ export default function AdminProfileReviewPage() {
         <ReviewPane title="Horoscope" icon={FileText}>
           {profile.horoscopeName ? (
             <div className="space-y-3 text-sm">
-              <div className="rounded-xl border border-border bg-muted/30 p-3">
-                <p className="font-semibold">{profile.horoscopeName}</p>
-                <p className="text-muted-foreground">PDF on file (demo)</p>
-              </div>
+              {profile.horoscopeUrl ? (
+                <PdfLightboxTile src={profile.horoscopeUrl} name={profile.horoscopeName} />
+              ) : (
+                <div className="rounded-xl border border-border bg-muted/30 p-3">
+                  <p className="font-semibold">{profile.horoscopeName}</p>
+                  <p className="text-muted-foreground">PDF on file</p>
+                </div>
+              )}
               <dl className="grid grid-cols-2 gap-2">
                 <Detail label="Birth time" value={profile.birthTime || ""} />
                 <Detail label="Birth place" value={profile.birthPlace || ""} />

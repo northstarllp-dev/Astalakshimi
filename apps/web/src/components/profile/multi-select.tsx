@@ -14,6 +14,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useBelowViewportScroll } from "@/components/profile/use-below-viewport-scroll"
 import type { SelectOption } from "@/components/profile/searchable-select"
 
 type MultiSelectProps = {
@@ -47,6 +48,7 @@ export function MultiSelect({
   id,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false)
+  const { contentRef, handleOpenChange } = useBelowViewportScroll()
   const items = React.useMemo(() => normalizeOptions(options), [options])
 
   const toggle = (value: string) => {
@@ -65,7 +67,7 @@ export function MultiSelect({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={(next) => handleOpenChange(next, () => setOpen(next))}>
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -80,10 +82,18 @@ export function MultiSelect({
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+        {/* Always open below the trigger (never flip over the form) and keep the
+            list capped to the space left under it so the panel stays on-screen. */}
+        <PopoverContent
+          ref={contentRef}
+          side="bottom"
+          avoidCollisions={false}
+          className="w-[var(--radix-popover-trigger-width)] p-0"
+          align="start"
+        >
           <Command>
             <CommandInput placeholder={searchPlaceholder} />
-            <CommandList>
+            <CommandList className="min-h-0 max-h-[min(15rem,max(0px,var(--radix-popover-content-available-height,15rem)-2.75rem))] overflow-y-auto">
               <CommandEmpty>{emptyText}</CommandEmpty>
               <CommandGroup>
                 {items.map((item) => {

@@ -16,7 +16,7 @@ import { IMAGES } from "@/lib/images"
 import { loginOtpSchema, loginPhoneSchema, type LoginOtpValues, type LoginPhoneValues } from "@/lib/validation"
 import { ArrowLeft, Clock3, Loader2, ShieldCheck } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
-import { clearSignupDraft } from "@/lib/profile-store"
+import { clearSignupDraft, clearProfile } from "@/lib/profile-store"
 
 export default function LoginPage() {
   return (
@@ -73,6 +73,23 @@ function LoginPageInner() {
     setLoading(true)
     const digits = values.phone.replace(/\D/g, "").slice(0, 10)
     try {
+      // Route BEFORE any SMS: new numbers and numbers that started
+      // registration but never finished go straight to the wizard, so the
+      // member receives exactly one OTP for the whole signup.
+      try {
+        const status = await apiClient.auth.checkPhone({ phone: values.phone })
+        if (!status.exists || !status.hasProfile) {
+          router.push(
+            digits
+              ? `/register?phone=${encodeURIComponent(digits)}${status.exists ? "" : "&new=1"}`
+              : "/register"
+          )
+          return
+        }
+      } catch {
+        // Status lookup failed (offline?); fall through to sendOtp, whose
+        // "not registered" branch still routes correctly.
+      }
       await apiClient.auth.sendOtp({ phone: values.phone, consentAccepted: true, type: "login" })
       setOtpSent(true)
       setSeconds(30)
@@ -94,11 +111,16 @@ function LoginPageInner() {
     setLoading(true)
     try {
       const auth = await apiClient.auth.verifyOtp({ phone: phoneForm.getValues("phone"), otp: values.otp })
+      // Drop any prior session's cached profile (blob previews / wrong user).
+      clearProfile()
       if (auth.hasProfile) {
         router.push("/home")
       } else {
         clearSignupDraft()
-        router.push("/register")
+        // Carry the verified number into the wizard so the member doesn't
+        // re-type it and trigger a second OTP on the register step.
+        const digits = phoneForm.getValues("phone").replace(/\D/g, "").slice(0, 10)
+        router.push(digits ? `/register?phone=${encodeURIComponent(digits)}` : "/register")
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Invalid OTP. Please check and try again.")
@@ -110,6 +132,22 @@ function LoginPageInner() {
   const handleResend = async () => {
     setError("")
     try {
+      // Same pre-OTP routing as the initial send: never burn an SMS for a
+      // number that belongs in the registration wizard.
+      try {
+        const status = await apiClient.auth.checkPhone({ phone: phoneForm.getValues("phone") })
+        if (!status.exists || !status.hasProfile) {
+          const digits = phoneForm.getValues("phone").replace(/\D/g, "").slice(0, 10)
+          router.push(
+            digits
+              ? `/register?phone=${encodeURIComponent(digits)}${status.exists ? "" : "&new=1"}`
+              : "/register"
+          )
+          return
+        }
+      } catch {
+        // Fall through to sendOtp on lookup failure.
+      }
       await apiClient.auth.sendOtp({ phone: phoneForm.getValues("phone"), consentAccepted: true, type: "login" })
       setSeconds(30)
     } catch (err: unknown) {

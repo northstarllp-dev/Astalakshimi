@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
 import { useProfileQuery, useUnreadCountQuery } from "@/hooks/queries"
+import { getPrimaryPhotoSrc } from "@/lib/profile-store"
 import { cn } from "@/lib/utils"
 import { Bell, Search } from "lucide-react"
 import { ContactUnlockModal } from "./contact-unlock-modal"
@@ -30,6 +31,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { data: unread = 0 } = useUnreadCountQuery()
 
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
+  const primaryPhoto = getPrimaryPhotoSrc(profile)
   const pending = profile?.verificationStatus === "pending"
   const isany = pathname.startsWith("/profiles/")
 
@@ -90,9 +92,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             )}
             <Link href="/profile" aria-label="My profile">
               <Avatar className="size-9 border-2 border-primary/20">
-                {profile?.photos[0] ? (
+                {primaryPhoto ? (
                   <Image
-                    src={getMediaUrl(profile.photos[0])}
+                    src={getMediaUrl(primaryPhoto)}
                     alt={firstName}
                     width={36}
                     height={36}

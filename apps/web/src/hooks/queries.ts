@@ -1,7 +1,7 @@
 type UserSettings = any;
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { loadProfile, saveProfile, emptySignupData, DEMO_REJECTION_REASON, formatSiblings, type SignupData } from "@/lib/profile-store"
-import { apiClient } from "@/lib/api-client"
+import { apiClient, isVerificationPendingError } from "@/lib/api-client"
 import { formatHeightFromCm, parseHeightToCm, weightToKg, formatWeightFromKg } from "@/lib/input-units"
 import { resolveChildrenFields } from "@/lib/identity-fields"
 export const queryKeys = {
@@ -100,8 +100,12 @@ export function useProfileQuery() {
               horoscopeName: fullProfile.horoscope?.horoscopeFileName ?? '',
               horoscopeS3Key: fullProfile.horoscope?.horoscopeS3Key ?? '',
               horoscopeSize: fullProfile.horoscope?.horoscopeFileSizeBytes ?? 0,
-              photos: fullProfile.photos.map((p: any) => p.url || p.s3Key),
-              photoS3Keys: fullProfile.photos.map((p: any) => p.s3Key),
+              photos: fullProfile.photos
+                .map((p: { url?: string; s3Key?: string }) => p.s3Key || p.url)
+                .filter((url): url is string => Boolean(url)),
+              photoS3Keys: fullProfile.photos
+                .map((p: { s3Key?: string }) => p.s3Key)
+                .filter((key): key is string => Boolean(key)),
               photoObjects: fullProfile.photos,
               verificationStatus: fullProfile.verificationStatus as any,
               prefAgeMin: fullProfile.preferences?.prefAgeMin ?? undefined,
@@ -115,6 +119,7 @@ export function useProfileQuery() {
               prefMinEducation: fullProfile.preferences?.prefMinEducation ?? '',
               prefAcceptableIncomes: fullProfile.preferences?.prefAcceptableIncomes ?? [],
               prefLocations: fullProfile.preferences?.prefLocations ?? [],
+              submittedAt: base.submittedAt || fullProfile.profile.createdAt || new Date().toISOString(),
             };
             base = { ...base, ...mapped };
           } else {
@@ -246,15 +251,21 @@ export function useSaveProfileMutation() {
         apiClient.setToken()
       }
 
-      // 4. Complete registration (verification row starts as idle).
-      //    Then try submitVerification if required fields are already complete.
+      // 4. Complete registration — verification stays idle. Career/horoscope
+      //    are collected later in /profile/edit, so do NOT auto-submit here
+      //    (it always failed silently and left the UI out of sync).
       if (apiClient.getToken()) {
         await apiClient.profiles.completeRegistration(payload as any)
         await apiClient.auth.syncEnrollment()
-
+        // Refetch the server profile so React Query / sessionStorage store S3
+        // keys — not blob: previews from the signup form (those break avatars
+        // until a hard reload).
         try {
-          await apiClient.profiles.submitVerification()
-          next = { ...next, verificationStatus: "pending" }
+          const fullProfile = await apiClient.profiles.getMyProfile()
+          next = mapFullProfileToSignupData(
+            { ...next, verificationStatus: "idle", phone: data.phone },
+            fullProfile,
+          )
         } catch {
           next = { ...next, verificationStatus: "idle" }
         }
@@ -265,6 +276,7 @@ export function useSaveProfileMutation() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.profile, data)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile })
     },
   })
 }
@@ -504,13 +516,15 @@ function mapFullProfileToSignupData(
     prefAcceptableIncomes: fullProfile.preferences?.prefAcceptableIncomes ?? base.prefAcceptableIncomes,
     prefLocations: fullProfile.preferences?.prefLocations ?? base.prefLocations,
     photos: fullProfile.photos
-      .map((p: { url?: string; s3Key?: string }) => p.url || p.s3Key)
+      .map((p: { url?: string; s3Key?: string }) => p.s3Key || p.url)
       .filter((url): url is string => Boolean(url)),
     photoS3Keys: fullProfile.photos
       .map((p: { s3Key?: string }) => p.s3Key)
       .filter((key): key is string => Boolean(key)),
     photoObjects: fullProfile.photos,
     verificationStatus: fullProfile.verificationStatus as SignupData["verificationStatus"],
+    // Treat any saved profile as submitted so signup-default selects count as filled.
+    submittedAt: base.submittedAt || fullProfile.profile.createdAt || new Date().toISOString(),
   }
 }
 
@@ -540,9 +554,14 @@ export function useAddPhotoMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ s3Key, contentHash }: { s3Key: string; contentHash?: string }) => {
-      await apiClient.photos.add(s3Key, contentHash);
+      const fullProfile = await apiClient.photos.add(s3Key, contentHash)
+      const base = loadProfile() || emptySignupData()
+      const mapped = mapFullProfileToSignupData(base, fullProfile)
+      saveProfile(mapped)
+      return mapped
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.profile, data)
       void queryClient.invalidateQueries({ queryKey: queryKeys.profile })
     },
   })
@@ -552,9 +571,14 @@ export function useDeletePhotoMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (photoId: string) => {
-      await apiClient.photos.remove(photoId);
+      const fullProfile = await apiClient.photos.remove(photoId)
+      const base = loadProfile() || emptySignupData()
+      const mapped = mapFullProfileToSignupData(base, fullProfile)
+      saveProfile(mapped)
+      return mapped
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.profile, data)
       void queryClient.invalidateQueries({ queryKey: queryKeys.profile })
     },
   })
@@ -564,9 +588,14 @@ export function useReorderPhotosMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (photoIds: string[]) => {
-      await apiClient.photos.reorder(photoIds);
+      const fullProfile = await apiClient.photos.reorder(photoIds)
+      const base = loadProfile() || emptySignupData()
+      const mapped = mapFullProfileToSignupData(base, fullProfile)
+      saveProfile(mapped)
+      return mapped
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.profile, data)
       void queryClient.invalidateQueries({ queryKey: queryKeys.profile })
     },
   })
@@ -633,17 +662,25 @@ export function useResubmitVerificationMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: SignupData) => {
-      if (apiClient.getToken()) {
-        try {
-          await apiClient.media.confirmVerification({
-            method: data.verificationMethod as "selfie" | "govt_id",
-            selfieS3Key: data.selfieS3Key,
-            govtIdType: data.govtIdType,
-            govtIdS3Key: data.govtIdS3Key,
-          });
-        } catch (e) {
-          console.error("Failed to resubmit verification to backend:", e)
-        }
+      if (!apiClient.getToken()) {
+        throw new Error("Please sign in again to submit verification.")
+      }
+
+      const method = (data.verificationMethod as "selfie" | "govt_id") || "selfie"
+      const hasNewSelfie = method === "selfie" && Boolean(data.selfieS3Key)
+      const hasNewGovtId = method === "govt_id" && Boolean(data.govtIdS3Key && data.govtIdType)
+
+      if (hasNewSelfie || hasNewGovtId) {
+        // confirm-verification stores docs and promotes to pending when complete.
+        await apiClient.media.confirmVerification({
+          method,
+          selfieS3Key: data.selfieS3Key,
+          govtIdType: data.govtIdType,
+          govtIdS3Key: data.govtIdS3Key,
+        })
+      } else {
+        // Docs already on the server from registration — just promote idle → pending.
+        await apiClient.profiles.submitVerification()
       }
 
       const next: SignupData = {
@@ -657,6 +694,7 @@ export function useResubmitVerificationMutation() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.profile, data)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile })
     },
   })
 }
@@ -849,10 +887,13 @@ export function useSendInterestMutation() {
       }
       return { previous };
     },
-    onError: (_err, _payload, context) => {
+    onError: (err, _payload, context) => {
       if (context?.previous) {
         queryClient.setQueryData(queryKeys.interests, context.previous);
       }
+      // Pending verification is gated in the UI; if a call still lands, don't
+      // escalate beyond the mutation error state (avoids noisy overlays).
+      if (isVerificationPendingError(err)) return
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.interests })

@@ -2,7 +2,7 @@ import { Controller, Post, Get, Body, UseGuards, BadRequestException } from '@ne
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { sendOtpSchema, verifyOtpSchema, adminLoginSchema, type SendOtpInput, type VerifyOtpInput, type AdminLoginInput } from '@astalakshimi/validation';
+import { sendOtpSchema, verifyOtpSchema, checkPhoneSchema, adminLoginSchema, type SendOtpInput, type VerifyOtpInput, type CheckPhoneInput, type AdminLoginInput } from '@astalakshimi/validation';
 import { JwtAuthGuard } from '../common/guards/auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { AllowIncomplete } from '../common/decorators/allow-incomplete.decorator';
@@ -19,6 +19,13 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async sendOtp(@Body(new ZodValidationPipe(sendOtpSchema)) input: SendOtpInput) {
     return this.authService.sendOtp(input);
+  }
+
+  @Public()
+  @Post('check-phone')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async checkPhone(@Body(new ZodValidationPipe(checkPhoneSchema)) input: CheckPhoneInput) {
+    return this.authService.checkPhone(input);
   }
 
   @Public()

@@ -60,11 +60,19 @@ export const profiles = pgTable('profiles', {
   // Privacy Settings
   photoPrivacy: photoPrivacyEnum('photo_privacy').default('blurred').notNull(),
 
+  /**
+   * Denormalized Layer-B completeness: true when every required Discover field
+   * is filled (see @astalakshimi/validation requiredFieldsComplete). Maintained
+   * on profile / lifestyle / horoscope / photo writes.
+   */
+  requiredComplete: boolean('required_complete').default(false).notNull(),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   searchIdx: index('profiles_search_idx').on(table.gender, table.religion, table.caste, table.city),
   dobIdx: index('profiles_dob_idx').on(table.dob),
+  requiredCompleteIdx: index('profiles_required_complete_idx').on(table.requiredComplete),
 }));
 
 export type Profile = typeof profiles.$inferSelect;

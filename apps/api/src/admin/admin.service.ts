@@ -23,6 +23,7 @@ import { S3Provider } from '../media/providers/s3.provider';
 import { calculateProfileCompleteness } from './profile-completeness';
 import { isOwnedPhotoKey } from '../common/photo-access';
 import { ProfilesService } from '../profiles/profiles.service';
+import { refreshRequiredComplete } from '../profiles/refresh-required-complete';
 
 @Injectable()
 export class AdminService {
@@ -416,6 +417,9 @@ export class AdminService {
       reviewedBy: v?.reviewedBy,
       reviewedAt: v?.reviewedAt,
       horoscopeName: h?.horoscopeS3Key ? h.horoscopeFileName || 'Uploaded Horoscope' : null,
+      horoscopeS3Key: h?.horoscopeS3Key
+        ? await this.s3Provider.getAdminSignedViewUrl(h.horoscopeS3Key)
+        : null,
       birthTime: h?.birthTime || null,
       birthPlace: h?.birthPlace || null,
       rashi: h?.rashi || null,
@@ -443,7 +447,10 @@ export class AdminService {
     const month = input.dobMonth.padStart(2, '0');
     const day = input.dobDay.padStart(2, '0');
     const dobStr = `${input.dobYear}-${month}-${day}`;
-    const heightCm = input.gender === 'Male' ? 172 : 160;
+    const heightCm = this.parseHeightCm(input.height, input.gender);
+    if (!heightCm) {
+      throw new BadRequestException('Enter a valid height (e.g. 168 cm or 5\'6").');
+    }
     const now = new Date();
 
     const profileId = await this.db.transaction(async (tx) => {
@@ -489,7 +496,7 @@ export class AdminService {
           hasChildren: input.hasChildren,
           childrenCount: input.childrenCount,
           childrenLivingWithMe: input.childrenLivingWithMe,
-          heightCm: input.height ? parseInt(input.height, 10) : heightCm, // use the parsed heightCm if available, otherwise just parse it or fall back
+          heightCm,
           aboutMe: input.aboutMe?.trim() || 'Profile created by staff on behalf of the family.',
           city: input.city.trim(),
           state: input.state?.trim() || 'Tamil Nadu',
@@ -501,6 +508,8 @@ export class AdminService {
           employmentStatus: input.employmentStatus as any,
           annualIncome: input.annualIncome,
           photoPrivacy: 'visible',
+          // Photos attach after create — flag flips true in attachPhotos.
+          requiredComplete: false,
         })
         .returning();
 
@@ -518,15 +527,19 @@ export class AdminService {
 
       await tx.insert(lifestyleInterests).values({
         profileId: id,
-        diet: input.diet || 'Vegetarian',
-        smoking: 'Never',
-        alcohol: 'Never',
+        diet: input.diet,
+        smoking: null,
+        alcohol: null,
         interests: [],
       });
 
       await tx.insert(horoscopes).values({
         profileId: id,
-        manglik: "Don't Know",
+        nakshatra: input.nakshatra.trim(),
+        rashi: input.rashi.trim(),
+        manglik: input.manglik,
+        birthTime: input.birthTime.trim(),
+        birthPlace: input.birthPlace.trim(),
       });
 
       await tx.insert(partnerPreferences).values({
@@ -545,11 +558,11 @@ export class AdminService {
 
       await tx.insert(userSettings).values({ userId }).onConflictDoNothing();
 
+      // Idle until photos land and refreshRequiredComplete promotes staff to verified.
       await tx.insert(verifications).values({
         profileId: id,
         method: 'selfie',
-        status: 'verified',
-        reviewedAt: now,
+        status: 'idle',
       });
 
       let finalPlanId = input.planId || 'free';
@@ -643,7 +656,42 @@ export class AdminService {
       })),
     );
 
+    // Flips required_complete and auto-verifies staff profiles when Layer B is met.
+    await refreshRequiredComplete(this.db, profileId);
+
     return this.getProfile(profileId);
+  }
+
+  /** Accept "168", "168 cm", or 5'6" style heights used by the admin form. */
+  private parseHeightCm(raw: string, gender: string): number | null {
+    const trimmed = (raw || '').trim();
+    if (!trimmed) return null;
+
+    const cmLabel = trimmed.match(/^(\d{2,3})\s*cm$/i);
+    if (cmLabel) {
+      const n = parseInt(cmLabel[1], 10);
+      return n >= 120 && n <= 230 ? n : null;
+    }
+
+    if (/^\d{2,3}$/.test(trimmed)) {
+      const n = parseInt(trimmed, 10);
+      return n >= 120 && n <= 230 ? n : null;
+    }
+
+    const ftIn = trimmed.match(/^(\d)\s*['′]\s*(\d{1,2})/);
+    if (ftIn) {
+      const feet = parseInt(ftIn[1], 10);
+      const inches = parseInt(ftIn[2], 10);
+      if (inches > 11) return null;
+      const cm = Math.round(feet * 30.48 + inches * 2.54);
+      return cm >= 120 && cm <= 230 ? cm : null;
+    }
+
+    // Last resort: bare parseInt on strings like "160 cm extra" — only if in range.
+    const bare = parseInt(trimmed, 10);
+    if (!Number.isNaN(bare) && bare >= 120 && bare <= 230) return bare;
+
+    return gender === 'Male' ? 172 : 160;
   }
 
   async deleteProfile(profileId: string) {

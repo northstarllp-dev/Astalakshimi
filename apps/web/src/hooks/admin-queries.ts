@@ -177,6 +177,7 @@ export function useAdminProfileQuery(id: string) {
         ...p,
         selfiePhoto: getMediaUrl(p.selfieS3Key),
         govtIdPhoto: getMediaUrl(p.govtIdS3Key),
+        horoscopeUrl: p.horoscopeS3Key ? getMediaUrl(p.horoscopeS3Key) : null,
         photos: p.photos ? p.photos.map((ph: any) => ({
           ...ph,
           url: getMediaUrl(ph.s3Key),
@@ -297,6 +298,11 @@ export function useCreateAdminProfileMutation() {
         educationLevel: string
         employmentStatus: string
         annualIncome: string
+        nakshatra: string
+        rashi: string
+        manglik: "Yes" | "No" | "Don't Know" | "Both"
+        birthTime: string
+        birthPlace: string
         brothersCount: number
         sistersCount: number
         planId?: string

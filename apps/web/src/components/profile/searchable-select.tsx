@@ -13,6 +13,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useBelowViewportScroll } from "@/components/profile/use-below-viewport-scroll"
 
 export type SelectOption = {
   value: string
@@ -55,6 +56,7 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
+  const { contentRef, handleOpenChange } = useBelowViewportScroll()
   const items = React.useMemo(() => normalizeOptions(options), [options])
   const selected = items.find((item) => item.value === value)
 
@@ -70,8 +72,10 @@ export function SearchableSelect({
 
   return (
     <Popover open={open} onOpenChange={(next) => {
+      handleOpenChange(next, () => {
+        if (!next) setSearch("")
+      })
       setOpen(next)
-      if (!next) setSearch("")
     }}>
       <PopoverTrigger asChild>
         <Button
@@ -90,7 +94,15 @@ export function SearchableSelect({
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+      {/* Always open below the trigger (never flip over the form) and keep the
+          list capped to the space left under it so the panel stays on-screen. */}
+      <PopoverContent
+        ref={contentRef}
+        side="bottom"
+        avoidCollisions={false}
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+        align="start"
+      >
         <Command
           filter={(itemValue, searchStr) =>
             itemValue.toLowerCase().includes(searchStr.trim().toLowerCase()) ? 1 : 0
@@ -101,7 +113,7 @@ export function SearchableSelect({
             value={search}
             onValueChange={setSearch}
           />
-          <CommandList className="max-h-60 sm:max-h-72 overflow-y-auto">
+          <CommandList className="min-h-0 max-h-[min(15rem,max(0px,var(--radix-popover-content-available-height,15rem)-2.75rem))] overflow-y-auto">
             <CommandEmpty>
               <div className="py-2 text-center">
                 <p className="text-xs text-muted-foreground">{emptyText}</p>

@@ -161,12 +161,6 @@ function ProfileMeta({ profile }: { profile?: ProfileSummary }) {
           <Briefcase className="h-3 w-3 sm:h-4 sm:w-4" /> {profile.profession || "Professional"}
         </span>
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <Badge variant="secondary" className="gap-1 font-medium bg-secondary/20 text-xs">
-          <ShieldCheck className="h-3 w-3" />
-          Verified
-        </Badge>
-      </div>
     </div>
   )
 }
@@ -677,7 +671,7 @@ function ShortlistedTab({
         caste: prof.caste || prof.community || "",
         profession: prof.profession || prof.occupation || "Professional",
         educationLevel: prof.educationLevel || prof.education || "",
-        photo: prof.photo || (prof.photos && prof.photos[0]) || null,
+        photo: prof.photo || (prof.photos && prof.photos[0]) || item.photo || null,
       }
     })
   }, [ids])

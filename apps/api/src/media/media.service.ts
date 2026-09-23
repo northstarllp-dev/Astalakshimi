@@ -7,6 +7,7 @@ import { eq, and } from 'drizzle-orm';
 import { S3Provider } from './providers/s3.provider';
 import { isOwnedPhotoKey } from '../common/photo-access';
 import { requiredFieldsComplete } from '../profiles/required-fields-complete';
+import { refreshRequiredComplete } from '../profiles/refresh-required-complete';
 import type {
   PresignedUploadInput,
   ConfirmPhotoInput,
@@ -116,6 +117,8 @@ export class MediaService {
       })
       .returning();
 
+    await refreshRequiredComplete(this.db, profile.id);
+
     return {
       success: true,
       photo,
@@ -169,23 +172,41 @@ export class MediaService {
       throw new BadRequestException('Complete your profile before submitting for verification');
     }
 
+    // Preserve existing doc keys when the client omits them (common after
+    // reload — FE draft may lack selfieS3Key even though the DB already has it).
+    const [existingVerification] = await this.db
+      .select()
+      .from(verifications)
+      .where(eq(verifications.profileId, profile.id))
+      .limit(1);
+
+    const nextSelfie = input.selfieS3Key || existingVerification?.selfieS3Key || null;
+    const nextGovtId = input.govtIdS3Key || existingVerification?.govtIdS3Key || null;
+    const nextGovtType = input.govtIdType || existingVerification?.govtIdType || null;
+
+    if (!nextSelfie && !nextGovtId) {
+      throw new BadRequestException(
+        'Upload a selfie or government ID before submitting for verification',
+      );
+    }
+
     const [verification] = await this.db
       .insert(verifications)
       .values({
         profileId: profile.id,
         method: input.method,
-        selfieS3Key: input.selfieS3Key || null,
-        govtIdType: input.govtIdType || null,
-        govtIdS3Key: input.govtIdS3Key || null,
+        selfieS3Key: nextSelfie,
+        govtIdType: nextGovtType,
+        govtIdS3Key: nextGovtId,
         status: 'pending',
       })
       .onConflictDoUpdate({
         target: verifications.profileId,
         set: {
           method: input.method,
-          selfieS3Key: input.selfieS3Key || null,
-          govtIdType: input.govtIdType || null,
-          govtIdS3Key: input.govtIdS3Key || null,
+          selfieS3Key: nextSelfie,
+          govtIdType: nextGovtType,
+          govtIdS3Key: nextGovtId,
           status: 'pending',
           rejectionReason: null,
           reviewedBy: null,
@@ -265,6 +286,7 @@ export class MediaService {
 
     await this.db.delete(profilePhotos).where(eq(profilePhotos.id, photoId));
     await this.s3Provider.deleteObject(photo.s3Key, false);
+    await refreshRequiredComplete(this.db, profile.id);
 
     return {
       success: true,

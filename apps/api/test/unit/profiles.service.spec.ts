@@ -1251,12 +1251,20 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       const mockWhere = jest.fn().mockResolvedValue(undefined);
       mockDb.update.mockReturnValue({ set: mockSet, where: mockWhere });
 
+      const refreshed = {
+        profile: { id: 'prof-1' } as any,
+        photos: [{ id: 'photo-2', s3Key: 'profiles/u/2.jpeg', isPrimary: true, displayOrder: 0 }],
+        verificationStatus: 'idle' as const,
+      };
+      jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue(refreshed as any);
+
       const result = await profilesService.deletePhoto('user-1', 'photo-1');
 
       expect(mockDb.delete).toHaveBeenCalledWith(profilePhotos);
       // Verify promotion of next photo to primary
       expect(mockSet).toHaveBeenCalledWith({ isPrimary: true });
-      expect(result).toEqual({ success: true });
+      // Client needs the refreshed profile so avatars update immediately.
+      expect(result).toEqual(refreshed);
     });
 
     it('should throw NotFoundException when deleting photo belonging to someone else', async () => {

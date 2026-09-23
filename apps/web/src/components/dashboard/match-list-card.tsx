@@ -7,7 +7,6 @@ import { cn, getMediaUrl } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  BadgeCheck,
   Bookmark,
   Briefcase,
   Building2,
@@ -326,15 +325,11 @@ export function MatchListCard({
         <div className="absolute inset-x-0 bottom-0 z-20 flex flex-col justify-end">
           {/* Profile Details (Clickable link to full profile) */}
           <Link href={`/profiles/${match.id}`} className="block px-4 pb-3 text-white">
-            {/* Name, Age, Blue Verified Badge */}
+            {/* Name, Age */}
             <div className="flex items-center gap-1.5">
               <h2 className="font-serif text-2xl font-bold tracking-tight text-white drop-shadow-sm">
                 {match.fullName}, {match.age}
               </h2>
-              {/* Blue verified badge with checkmark */}
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d9bf0] text-white shadow-sm ring-1 ring-white/30">
-                <Check className="h-3 w-3 stroke-[3]" />
-              </span>
             </div>
 
             {/* Line 2: 5' 3" • Mudaliar - Senguntha • Software Developer... */}
@@ -470,11 +465,6 @@ export function MatchListCard({
                     <Star className="h-3 w-3 fill-current" /> {match.matchPercent}% match
                   </span>
                 )}
-                {match.photoVerified && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-xs border border-white/10">
-                    <BadgeCheck className="h-3 w-3 text-secondary" /> Verified
-                  </span>
-                )}
               </div>
 
               <div className="flex items-center gap-1.5">
@@ -544,9 +534,6 @@ export function MatchListCard({
                     className="font-serif text-2xl lg:text-[1.65rem] font-bold text-foreground hover:text-primary transition-colors flex items-center gap-2"
                   >
                     <span>{match.fullName}, {match.age}</span>
-                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1d9bf0] text-white shadow-xs ring-1 ring-white/30" title="Verified Profile">
-                      <Check className="h-2.5 w-2.5 stroke-[3]" />
-                    </span>
                   </Link>
                 </div>
 

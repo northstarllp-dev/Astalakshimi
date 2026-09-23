@@ -173,4 +173,90 @@ describe('Feature 6: Search & Filtering - SearchService (Unit Tests)', () => {
     const result = await searchService.searchProfiles('curr-user-id', {});
     expect(result.profiles[0].photos).toEqual(['photo-key-123.jpg']);
   });
+
+  it('unfiltered search (no age/city) still returns the opposite-gender pool', async () => {
+    const mockCurrentUser = {
+      id: 'prof-curr',
+      gender: 'Male',
+      city: 'Chennai',
+      state: 'Tamil Nadu',
+    };
+    const pool = [
+      { id: 'p1', userId: 'u1', fullName: 'A', gender: 'Female', createdAt: new Date() },
+      { id: 'p2', userId: 'u2', fullName: 'B', gender: 'Female', createdAt: new Date() },
+    ];
+
+    let selectCallCount = 0;
+    mockDb.select.mockImplementation(() => {
+      selectCallCount++;
+      const currentCall = selectCallCount;
+      const value =
+        currentCall === 1 ? [mockCurrentUser]
+        : currentCall === 2 ? []
+        : currentCall === 3 ? pool
+        : [];
+      return mockChain(value);
+    });
+
+    // Mirrors Discover default: tab=all, no ageMin/ageMax.
+    const result = await searchService.searchProfiles('curr-user-id', { tab: 'all' });
+    expect(result.totalCount).toBe(2);
+    expect(result.profiles.map((p: { id: string }) => p.id)).toEqual(['p1', 'p2']);
+  });
+
+  it('verified browse tab still returns scored profiles', async () => {
+    const mockCurrentUser = { id: 'prof-curr', gender: 'Male', city: 'Chennai', state: 'Tamil Nadu' };
+    const mockResultProfile = {
+      id: 'prof-verified',
+      userId: 'user-v',
+      fullName: 'Verified Alice',
+      gender: 'Female',
+      createdAt: new Date(),
+    };
+
+    let selectCallCount = 0;
+    mockDb.select.mockImplementation(() => {
+      selectCallCount++;
+      const currentCall = selectCallCount;
+      const value =
+        currentCall === 1 ? [mockCurrentUser]
+        : currentCall === 2 ? []
+        : currentCall === 3 ? [mockResultProfile]
+        : [];
+      return mockChain(value);
+    });
+
+    const result = await searchService.searchProfiles('curr-user-id', { tab: 'verified' });
+    expect(result.totalCount).toBe(1);
+    expect(result.profiles[0].id).toBe('prof-verified');
+    expect(result.profiles[0].matchPercent).toBeGreaterThanOrEqual(40);
+  });
+
+  it('nearby browse tab uses the viewer city without requiring age filters', async () => {
+    const mockCurrentUser = { id: 'prof-curr', gender: 'Male', city: 'Chennai', state: 'Tamil Nadu' };
+    const mockResultProfile = {
+      id: 'prof-near',
+      userId: 'user-n',
+      fullName: 'Nearby Priya',
+      gender: 'Female',
+      city: 'Chennai',
+      createdAt: new Date(),
+    };
+
+    let selectCallCount = 0;
+    mockDb.select.mockImplementation(() => {
+      selectCallCount++;
+      const currentCall = selectCallCount;
+      const value =
+        currentCall === 1 ? [mockCurrentUser]
+        : currentCall === 2 ? []
+        : currentCall === 3 ? [mockResultProfile]
+        : [];
+      return mockChain(value);
+    });
+
+    const result = await searchService.searchProfiles('curr-user-id', { tab: 'nearby' });
+    expect(result.totalCount).toBe(1);
+    expect(result.profiles[0].id).toBe('prof-near');
+  });
 });

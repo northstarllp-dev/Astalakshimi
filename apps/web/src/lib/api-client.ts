@@ -1,6 +1,8 @@
 import type {
   SendOtpRequest,
   VerifyOtpRequest,
+  CheckPhoneRequest,
+  CheckPhoneResponse,
   AuthResponse,
   User,
   FullProfileView,
@@ -14,6 +16,33 @@ import type { PartnerPreferencesInput } from '@astalakshimi/validation';
 
 // Use Next.js BFF Proxy for all client API requests
 const API_BASE_URL = '/api/proxy';
+
+/** Typed HTTP failure from the API / BFF proxy. */
+export class ApiError extends Error {
+  readonly status: number
+  readonly code?: string
+
+  constructor(message: string, status: number, code?: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+  }
+}
+
+const VERIFICATION_PENDING_RE =
+  /verification pending|unlock after admin verification/i
+
+/** True when the API blocked an interaction because the member is not verified yet. */
+export function isVerificationPendingError(err: unknown): boolean {
+  if (err instanceof ApiError) {
+    return err.status === 403 && VERIFICATION_PENDING_RE.test(err.message)
+  }
+  if (err instanceof Error) {
+    return VERIFICATION_PENDING_RE.test(err.message)
+  }
+  return false
+}
 
 class ApiClient {
   private baseUrl: string;
@@ -82,7 +111,7 @@ class ApiClient {
             window.location.href = `/login?callbackUrl=${callbackUrl}`;
           }
         }
-        throw new Error('Your session has expired. Please log in again.');
+        throw new ApiError('Your session has expired. Please log in again.', 401);
       }
     }
 
@@ -103,7 +132,7 @@ class ApiClient {
       } catch {
         errorMessage = `HTTP error ${response.status}: ${response.statusText}`;
       }
-      throw new Error(errorMessage);
+      throw new ApiError(errorMessage, response.status);
     }
 
     return response.json();
@@ -111,6 +140,12 @@ class ApiClient {
 
   // --- Auth APIs ---
   auth = {
+    checkPhone: (data: CheckPhoneRequest) =>
+      this.request<CheckPhoneResponse>('/auth/check-phone', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
     sendOtp: (data: SendOtpRequest) =>
       this.request<{ message: string }>('/auth/send-otp', {
         method: 'POST',
@@ -139,6 +174,13 @@ class ApiClient {
     logout: async () => {
       await fetch('/api/auth/logout', { method: 'POST' });
       this.clearToken();
+      // Drop cached profile so the next login never paints blob: avatar URLs.
+      try {
+        const { clearProfile } = await import('@/lib/profile-store');
+        clearProfile();
+      } catch {
+        // ignore
+      }
     },
 
     adminLogin: async (data: import('@astalakshimi/validation').AdminLoginInput): Promise<AuthResponse> => {
@@ -261,7 +303,7 @@ class ApiClient {
       }),
 
     remove: (photoId: string) =>
-      this.request<{ success: boolean }>(`/profiles/me/photos/${photoId}`, {
+      this.request<FullProfileView>(`/profiles/me/photos/${photoId}`, {
         method: 'DELETE',
       }),
 

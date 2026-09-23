@@ -296,7 +296,10 @@ export function clearSignupDraft() {
 export const emptySignupData = (): SignupData => ({
   phone: "",
   otp: "",
-  consentAccepted: true,
+  // Consent starts unticked: the member must actively accept on the register
+  // consent step. It flips to true on step-1 submit and persists in the draft
+  // so going back (or reloading) never silently unchecks it.
+  consentAccepted: false,
   referredBy: "",
   profileFor: "",
   fullName: "",
@@ -400,16 +403,19 @@ export function getPrefix(profileFor: string) {
 
 export function saveProfile(data: SignupData) {
   if (typeof window === "undefined") return
+  // Never persist blob:/data: previews — they break Next/Image after navigation
+  // and getMediaUrl used to mis-encode blob: as an S3 key (blank avatar until reload).
+  const sanitized = sanitizeSignupDraftData(data)
   try {
-    sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(data))
+    sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(sanitized))
   } catch (err) {
     console.warn("Storage quota limit reached, saving sanitized lightweight profile:", err)
     try {
       const lightweight = {
-        ...data,
-        photos: data.photos.map((p) => p.startsWith("data:") ? "" : p),
-        selfiePhoto: data.selfiePhoto?.startsWith("data:") ? "" : data.selfiePhoto,
-        govtIdPhoto: data.govtIdPhoto?.startsWith("data:") ? "" : data.govtIdPhoto,
+        ...sanitized,
+        photos: sanitized.photos.filter((p) => !isTransientMediaUrl(p)),
+        selfiePhoto: isTransientMediaUrl(sanitized.selfiePhoto) ? "" : sanitized.selfiePhoto,
+        govtIdPhoto: isTransientMediaUrl(sanitized.govtIdPhoto) ? "" : sanitized.govtIdPhoto,
       }
       sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(lightweight))
     } catch {
@@ -423,10 +429,33 @@ export function loadProfile(): SignupData | null {
   const raw = sessionStorage.getItem(PROFILE_STORAGE_KEY)
   if (!raw) return null
   try {
-    return { ...emptySignupData(), ...JSON.parse(raw) } as SignupData
+    const parsed = { ...emptySignupData(), ...JSON.parse(raw) } as SignupData
+    return sanitizeSignupDraftData(parsed)
   } catch {
     return null
   }
+}
+
+/** Clear cached member profile (call on logout so the next login never sees stale blob previews). */
+export function clearProfile() {
+  if (typeof window === "undefined") return
+  try {
+    sessionStorage.removeItem(PROFILE_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Stable display URL for the primary profile photo.
+ * Prefers S3 keys over in-memory blob/data previews so avatars survive login/navigation.
+ */
+export function getPrimaryPhotoSrc(data: Pick<SignupData, "photos" | "photoS3Keys"> | null | undefined): string | null {
+  if (!data) return null
+  const key = data.photoS3Keys?.find(Boolean)
+  if (key) return key
+  const photo = data.photos?.find((p) => p && !isTransientMediaUrl(p))
+  return photo || null
 }
 
 export function formatSiblings(brothersCount: number, sistersCount: number) {

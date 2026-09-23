@@ -156,6 +156,63 @@ describe('Feature 1: Authentication - AuthService (Unit Tests)', () => {
     });
   });
 
+  describe('checkPhone', () => {
+    const userRow = (rows: any[]) => ({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue(rows),
+        }),
+      }),
+    });
+    const profileRows = (rows: any[]) => ({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue(rows),
+        }),
+      }),
+    });
+
+    it('should return exists:false for an unknown number without touching OTP or SMS', async () => {
+      mockDb.select.mockReturnValueOnce(userRow([]));
+
+      await expect(authService.checkPhone({ phone: '9876543210' })).resolves.toEqual({
+        exists: false,
+        hasProfile: false,
+      });
+
+      expect(mockDb.insert).not.toHaveBeenCalled();
+      expect(mockSms.sendOtp).not.toHaveBeenCalled();
+    });
+
+    it('should return exists:true, hasProfile:false for an incomplete member', async () => {
+      mockDb.select
+        .mockReturnValueOnce(userRow([{ id: 'user-1' }]))
+        .mockReturnValueOnce(profileRows([]));
+
+      await expect(authService.checkPhone({ phone: '9876543210' })).resolves.toEqual({
+        exists: true,
+        hasProfile: false,
+      });
+
+      expect(mockDb.insert).not.toHaveBeenCalled();
+      expect(mockSms.sendOtp).not.toHaveBeenCalled();
+    });
+
+    it('should return exists:true, hasProfile:true for a fully enrolled member', async () => {
+      mockDb.select
+        .mockReturnValueOnce(userRow([{ id: 'user-1' }]))
+        .mockReturnValueOnce(profileRows([{ id: 'profile-1' }]));
+
+      await expect(authService.checkPhone({ phone: '9876543210' })).resolves.toEqual({
+        exists: true,
+        hasProfile: true,
+      });
+
+      expect(mockDb.insert).not.toHaveBeenCalled();
+      expect(mockSms.sendOtp).not.toHaveBeenCalled();
+    });
+  });
+
   describe('verifyOtp', () => {
     it('should throw BadRequestException when no pending OTP attempt is found', async () => {
       const mockChain = {

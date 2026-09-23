@@ -11,6 +11,8 @@ import {
   seedMatchFixtures,
   cleanupMatchFixtures,
   closeMatchFixtures,
+  CANDIDATE_A_NAME,
+  CANDIDATE_B_NAME,
   type MatchFixtures,
 } from './helpers/match-fixtures';
 
@@ -117,5 +119,73 @@ test.describe('Discover sub-tabs', () => {
 
     await page.goto('/dashboard');
     await expect(page.getByText('98% match').first()).toBeVisible({ timeout: 45_000 });
+  });
+
+  test('Search & Filter with no filters lists every opposite-gender candidate', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/dashboard?view=search');
+    await expect(page.getByRole('tab', { name: 'Search & Filter' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+      { timeout: 30_000 },
+    );
+
+    // Default search must not apply an age band — both seeded candidates appear.
+    await expect(page.getByText(/profiles found/i)).toBeVisible({ timeout: 45_000 });
+    await expect.poll(async () => {
+      const text = await page.getByText(/\d+\s+profiles found/i).first().textContent();
+      const n = Number((text || '').match(/(\d+)/)?.[1] || 0);
+      return n;
+    }).toBeGreaterThanOrEqual(2);
+
+    // Prefer role+name: MatchListCard keeps a mobile-only h2 that Playwright
+    // treats as hidden on the desktop chromium viewport.
+    await expect(
+      page.getByRole('link', { name: new RegExp(CANDIDATE_A_NAME) }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.getByRole('link', { name: new RegExp(CANDIDATE_B_NAME) }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('Verified browse tab only keeps admin-verified profiles', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/dashboard?view=search');
+    await expect(page.getByRole('button', { name: 'Verified' })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Verified' }).click();
+
+    await expect(page.getByText(/profiles found/i)).toBeVisible({ timeout: 45_000 });
+    // Both seeded candidates are verified in match-fixtures.
+    await expect(
+      page.getByRole('link', { name: new RegExp(CANDIDATE_A_NAME) }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('Nearby browse tab keeps same-city candidate A', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/dashboard?view=search');
+    await expect(page.getByRole('button', { name: 'Nearby' })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Nearby' }).click();
+
+    await expect(page.getByText(/profiles found/i)).toBeVisible({ timeout: 45_000 });
+    // Viewer + Candidate A share Chennai; Candidate B is Coimbatore (same state).
+    await expect(
+      page.getByRole('link', { name: new RegExp(CANDIDATE_A_NAME) }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('New profiles browse tab still lists candidates', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/dashboard?view=search');
+    await expect(page.getByRole('button', { name: 'New profiles' })).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.getByRole('button', { name: 'New profiles' }).click();
+
+    await expect(page.getByText(/profiles found/i)).toBeVisible({ timeout: 45_000 });
+    await expect.poll(async () => {
+      const text = await page.getByText(/\d+\s+profiles found/i).first().textContent();
+      return Number((text || '').match(/(\d+)/)?.[1] || 0);
+    }).toBeGreaterThanOrEqual(2);
   });
 });

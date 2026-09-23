@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest"
 import {
   emptySignupData,
   sanitizeSignupDraftData,
+  getPrimaryPhotoSrc,
   inferSignupResumeStep,
   seedPreferenceDefaults,
   saveSignupDraft,
@@ -48,6 +49,21 @@ describe("sanitizeSignupDraftData", () => {
   it("falls back to s3 key for selfie when transient", () => {
     const d = { ...emptySignupData(), selfiePhoto: "blob:selfie", selfieS3Key: "selfie-key" }
     expect(sanitizeSignupDraftData(d).selfiePhoto).toBe("selfie-key")
+  })
+})
+
+describe("getPrimaryPhotoSrc", () => {
+  it("prefers S3 keys over blob previews", () => {
+    expect(
+      getPrimaryPhotoSrc({
+        photos: ["blob:preview"],
+        photoS3Keys: ["profiles/u/photo.jpg"],
+      }),
+    ).toBe("profiles/u/photo.jpg")
+  })
+
+  it("returns null when only blob previews exist", () => {
+    expect(getPrimaryPhotoSrc({ photos: ["blob:x"], photoS3Keys: [] })).toBeNull()
   })
 })
 

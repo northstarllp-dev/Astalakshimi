@@ -2,11 +2,14 @@ import { describe, it, expect } from "vitest"
 import {
   EMPTY_ADVANCED,
   DEFAULT_DISCOVER,
+  DEFAULT_AGE_MIN,
+  DEFAULT_AGE_MAX,
   PAID_TABS,
   BROWSE_TABS,
   DISCOVER_VIEWS,
   DEFAULT_VIEW,
   parseDiscoverView,
+  toSearchApiParams,
 } from "./discover"
 
 describe("discover constants", () => {
@@ -22,9 +25,10 @@ describe("discover constants", () => {
     expect(EMPTY_ADVANCED.stars).toEqual([])
     expect(EMPTY_ADVANCED.relocate).toBe("")
   })
-  it("DEFAULT_DISCOVER has sensible defaults", () => {
-    expect(DEFAULT_DISCOVER.ageMin).toBe(21)
-    expect(DEFAULT_DISCOVER.ageMax).toBe(40)
+  it("DEFAULT_DISCOVER starts with age filter off so search returns all ages", () => {
+    expect(DEFAULT_DISCOVER.ageMin).toBe(DEFAULT_AGE_MIN)
+    expect(DEFAULT_DISCOVER.ageMax).toBe(DEFAULT_AGE_MAX)
+    expect(DEFAULT_DISCOVER.ageFilterEnabled).toBe(false)
     expect(DEFAULT_DISCOVER.tab).toBe("all")
     expect(DEFAULT_DISCOVER.advanced).toEqual(EMPTY_ADVANCED)
   })
@@ -38,6 +42,41 @@ describe("discover constants", () => {
   it("BROWSE_TABS includes all expected tabs", () => {
     const ids = BROWSE_TABS.map((t) => t.id)
     expect(ids).toEqual(["all", "new", "nearby", "premium", "verified", "active"])
+  })
+})
+
+describe("toSearchApiParams", () => {
+  it("omits age when the age filter is inactive", () => {
+    const params = toSearchApiParams({ ...DEFAULT_DISCOVER, page: 1, limit: 10 })
+    expect(params.ageMin).toBeUndefined()
+    expect(params.ageMax).toBeUndefined()
+    expect(params.tab).toBe("all")
+    expect(params.page).toBe(1)
+  })
+
+  it("includes age when the age filter is enabled", () => {
+    const params = toSearchApiParams({
+      ...DEFAULT_DISCOVER,
+      ageFilterEnabled: true,
+      ageMin: 25,
+      ageMax: 32,
+      city: "Chennai",
+    })
+    expect(params.ageMin).toBe(25)
+    expect(params.ageMax).toBe(32)
+    expect(params.city).toBe("Chennai")
+  })
+
+  it("omits empty city and community", () => {
+    const params = toSearchApiParams(DEFAULT_DISCOVER)
+    expect(params.city).toBeUndefined()
+    expect(params.community).toBeUndefined()
+  })
+
+  it("forwards browse tabs including verified and nearby", () => {
+    expect(toSearchApiParams({ ...DEFAULT_DISCOVER, tab: "verified" }).tab).toBe("verified")
+    expect(toSearchApiParams({ ...DEFAULT_DISCOVER, tab: "nearby" }).tab).toBe("nearby")
+    expect(toSearchApiParams({ ...DEFAULT_DISCOVER, tab: "new" }).tab).toBe("new")
   })
 })
 

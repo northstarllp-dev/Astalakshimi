@@ -29,10 +29,13 @@ import { VERIFICATION_SLA_HOURS, INCOME_BANDS, DIETS, STARS } from "@/lib/profil
 import {
   BROWSE_TABS,
   DEFAULT_DISCOVER,
+  DEFAULT_AGE_MIN,
+  DEFAULT_AGE_MAX,
   EMPTY_ADVANCED,
   DISCOVER_VIEWS,
   DEFAULT_VIEW,
   parseDiscoverView,
+  toSearchApiParams,
   type AdvancedFilters,
   type DiscoverQuery,
   type DiscoverView,
@@ -249,6 +252,10 @@ function DiscoverPage() {
                 <Link href="/profile/verify" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
                   Re-upload verification
                 </Link>
+              ) : onboardingState === "incomplete" ? (
+                <Link href="/profile/edit" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
+                  Complete required fields
+                </Link>
               ) : null}
             </div>
           </div>
@@ -388,7 +395,7 @@ function SearchFilterPanel({
     let count = 0
     if (query.city) count++
     if (query.community) count++
-    if (query.ageMin !== 21 || query.ageMax !== 40) count++
+    if (query.ageFilterEnabled) count++
     if (query.advanced.heights.length > 0) count++
     if (query.advanced.educations.length > 0) count++
     if (query.advanced.occupations.length > 0) count++
@@ -402,7 +409,9 @@ function SearchFilterPanel({
     return count
   }, [query])
 
-  const { data: searchResult, isLoading: isSearchLoading } = useSearchQuery({ ...query, page, limit: 10 })
+  const { data: searchResult, isLoading: isSearchLoading } = useSearchQuery(
+    toSearchApiParams({ ...query, page, limit: 10 }),
+  )
   const visibleMatches = (searchResult?.profiles || []).filter((match: any) => !skipped.includes(match.id))
   const totalCount = searchResult?.totalCount || 0
 
@@ -410,6 +419,10 @@ function SearchFilterPanel({
     setPrefsApplied(false)
     setQuery((q) => {
       const next = { ...q, ...patch }
+      // Touching age values enables the age filter for the API.
+      if (patch.ageMin !== undefined || patch.ageMax !== undefined) {
+        next.ageFilterEnabled = patch.ageFilterEnabled ?? true
+      }
       const parsed = discoverQuickSchema.safeParse({
         ageMin: next.ageMin,
         ageMax: next.ageMax,
@@ -448,6 +461,7 @@ function SearchFilterPanel({
         ...q,
         ageMin: prefs?.prefAgeMin ?? q.ageMin,
         ageMax: prefs?.prefAgeMax ?? q.ageMax,
+        ageFilterEnabled: true,
         city: locations[0] ?? q.city,
         community: castes[0] ?? q.community,
         advanced: EMPTY_ADVANCED,
@@ -547,14 +561,21 @@ function SearchFilterPanel({
           <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide shrink-0 mr-1">
             Active:
           </span>
-          {(query.ageMin !== 21 || query.ageMax !== 40) && (
+          {(query.ageFilterEnabled) && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground">
               {query.ageMin}–{query.ageMax} yrs
               <button
                 type="button"
-                onClick={() => setQuick({ ageMin: 21, ageMax: 40 })}
+                onClick={() =>
+                  setQuery((q) => ({
+                    ...q,
+                    ageMin: DEFAULT_AGE_MIN,
+                    ageMax: DEFAULT_AGE_MAX,
+                    ageFilterEnabled: false,
+                  }))
+                }
                 className="text-muted-foreground hover:text-foreground"
-                aria-label="Reset age"
+                aria-label="Clear age filter"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -757,7 +778,9 @@ function SearchFilterPanel({
                     Age range
                   </span>
                   <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary tabular-nums">
-                    {query.ageMin} – {query.ageMax} yrs
+                    {query.ageFilterEnabled
+                      ? `${query.ageMin} – ${query.ageMax} yrs`
+                      : "Any age"}
                   </span>
                 </div>
                 <div className="mt-2 flex h-12 items-center rounded-xl border border-input bg-card px-4 shadow-xs">

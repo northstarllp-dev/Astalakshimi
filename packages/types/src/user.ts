@@ -32,6 +32,15 @@ export interface VerifyOtpRequest {
   otp: string;
 }
 
+export interface CheckPhoneRequest {
+  phone: string;
+}
+
+export interface CheckPhoneResponse {
+  exists: boolean;
+  hasProfile: boolean;
+}
+
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;

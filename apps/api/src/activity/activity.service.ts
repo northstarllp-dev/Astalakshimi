@@ -1,8 +1,9 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { profiles, interests, shortlists, profilePhotos, profileViews } from '@astalakshimi/database';
+import { profiles, interests, shortlists, profileViews } from '@astalakshimi/database';
 import { eq, and, desc } from 'drizzle-orm';
+import { getApprovedPrimaryPhotos } from '../common/photo-access';
 
 @Injectable()
 export class ActivityService {
@@ -68,24 +69,31 @@ export class ActivityService {
       .orderBy(desc(profileViews.viewedAt))
       .limit(10);
 
+    const relatedIds = [
+      ...receivedInterests.map((r) => r.sender.id),
+      ...receivedShortlists.map((r) => r.sender.id),
+      ...recentViewers.map((r) => r.viewer.id),
+    ];
+    const photoMap = await getApprovedPrimaryPhotos(this.db, [...new Set(relatedIds)]);
+
     return {
       viewers: recentViewers.map((r) => ({
         id: r.viewer.id,
         name: r.viewer.fullName,
-        photo: null,
+        photo: photoMap.get(r.viewer.id)?.s3Key ?? null,
         subtitle: r.view.viewedAt.toISOString(),
       })),
       youViewed: [], // Implement if needed
       interestsReceived: receivedInterests.map((r) => ({
         id: r.sender.id,
         name: r.sender.fullName,
-        photo: null, // Should join photos if needed
+        photo: photoMap.get(r.sender.id)?.s3Key ?? null,
         subtitle: r.interest.createdAt.toISOString(),
       })),
       shortlistedYou: receivedShortlists.map((r) => ({
         id: r.sender.id,
         name: r.sender.fullName,
-        photo: null,
+        photo: photoMap.get(r.sender.id)?.s3Key ?? null,
         subtitle: r.shortlist.createdAt.toISOString(),
       })),
     };

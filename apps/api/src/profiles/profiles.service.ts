@@ -35,6 +35,7 @@ import { LruCache } from '../common/cache/lru-cache';
 import { loadViewerContext } from '../matches/viewer-context';
 import { scoreCandidate } from '../matches/match-scoring';
 import { requiredFieldsComplete } from './required-fields-complete';
+import { refreshRequiredComplete } from './refresh-required-complete';
 
 @Injectable()
 export class ProfilesService {
@@ -449,7 +450,7 @@ export class ProfilesService {
 
     this.assertDobAge(data.dobYear, data.dobMonth, data.dobDay, data.gender);
 
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       // 1. Format DOB as YYYY-MM-DD
       const month = data.dobMonth.padStart(2, '0');
       const day = data.dobDay.padStart(2, '0');
@@ -778,6 +779,10 @@ export class ProfilesService {
         profileId,
       };
     });
+
+    // Outside the tx so sibling rows are visible; sets profiles.required_complete.
+    await refreshRequiredComplete(this.db, result.profileId);
+    return result;
   }
 
   /**
@@ -1242,6 +1247,7 @@ export class ProfilesService {
 
     // Read after commit — calling getMyProfile inside the tx callback used a
     // separate pool connection that could not see uncommitted writes.
+    await refreshRequiredComplete(this.db, profileId);
     return this.getMyProfile(userId);
   }
 
@@ -1275,6 +1281,7 @@ export class ProfilesService {
       status: 'pending' as const,
     });
 
+    await refreshRequiredComplete(this.db, profileId);
     return this.getMyProfile(userId);
   }
 
@@ -1297,7 +1304,9 @@ export class ProfilesService {
       }
     }
 
-    return { success: true };
+    await refreshRequiredComplete(this.db, profile.id);
+    // Return the refreshed profile so the client can update avatars immediately.
+    return this.getMyProfile(userId);
   }
 
   async reorderPhotos(userId: string, photoIds: string[]) {
@@ -1319,13 +1328,15 @@ export class ProfilesService {
 
     // Single batched UPDATE via CASE/VALUES instead of N sequential round trips.
     // CASE maps photo id -> new position; isPrimary follows displayOrder 0.
+    // Cast THEN arms to int — postgres.js otherwise binds JS numbers as text and
+    // `CASE … END = 0` fails with "operator does not exist: text = integer".
     const orderPairs = photoIds.map((id, i) => ({ id, order: i }));
     const idsSql = sql.join(
       orderPairs.map((p) => sql`${p.id}::uuid`),
       sql`, `,
     );
     const caseSql = sql.join(
-      orderPairs.map((p) => sql`WHEN id = ${p.id}::uuid THEN ${p.order}`),
+      orderPairs.map((p) => sql`WHEN id = ${p.id}::uuid THEN ${p.order}::integer`),
       sql` `,
     );
 

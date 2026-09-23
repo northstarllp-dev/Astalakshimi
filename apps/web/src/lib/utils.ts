@@ -14,7 +14,9 @@ const CLOUDFRONT_BASE = process.env.NEXT_PUBLIC_CLOUDFRONT_URL || "";
 
 export function buildMediaUrl(path: string): string {
   if (!path) return "/images/logo-lakshmi.png";
-  if (/^(https?:|data:|\/)/.test(path)) return path;
+  // Pass through absolute / relative / in-memory preview URLs. Blob URLs must
+  // never be treated as S3 keys (that produces a broken CDN URL after login).
+  if (/^(https?:|data:|blob:|\/)/.test(path)) return path;
   
   const encoded = path.split("/").map(encodeURIComponent).join("/");
 
@@ -30,8 +32,23 @@ export function buildMediaUrl(path: string): string {
   return `${S3_PUBLIC_BASE}/${encoded}`;
 }
 
-export function getMediaUrl(path: string | undefined | null): string {
-  return buildMediaUrl(path ?? "");
+/** Normalize API photo fields that may be a key string or `{ s3Key | url }` object. */
+export function resolveMediaPath(
+  path: string | { s3Key?: string; url?: string } | null | undefined,
+): string {
+  if (!path) return ""
+  if (typeof path === "string") return path
+  if (typeof path === "object") {
+    const key = path.s3Key || path.url
+    return typeof key === "string" ? key : ""
+  }
+  return ""
+}
+
+export function getMediaUrl(
+  path: string | { s3Key?: string; url?: string } | null | undefined,
+): string {
+  return buildMediaUrl(resolveMediaPath(path));
 }
 
 export function calculateProfileCompleteness(profile: any): number {

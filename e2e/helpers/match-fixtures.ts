@@ -154,6 +154,11 @@ async function seedProfile(opts: {
     VALUES (${opts.userId}, 'never')
   `;
 
+  await dbi`
+    INSERT INTO verifications (profile_id, method, status)
+    VALUES (${profile.id}, 'selfie', 'verified')
+  `;
+
   return profile as { id: string };
 }
 
@@ -202,10 +207,7 @@ export async function seedMatchFixtures(): Promise<MatchFixtures> {
     INSERT INTO horoscopes (profile_id, birth_time, birth_place, manglik, rashi, nakshatra)
     VALUES (${viewerProfile.id}, '10:45 AM', 'Chennai', 'No', 'Mesha', 'Ashwini')
   `;
-  await dbi`
-    INSERT INTO verifications (profile_id, method, status)
-    VALUES (${viewerProfile.id}, 'selfie', 'verified')
-  `;
+  // Verification is already inserted by seedProfile (unique on profile_id).
 
   // --- Candidate A: every soft dimension matches → deterministic 98% ---
   const [aUser] = await dbi`

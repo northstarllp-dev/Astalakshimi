@@ -5,7 +5,7 @@ import Link from "next/link"
 import { getMediaUrl } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { LockedPhoto } from "@/components/profile/locked-photo"
-import { BadgeCheck, Star } from "lucide-react"
+import { Star } from "lucide-react"
 
 export function MatchThumbCard({
   match,
@@ -40,14 +40,6 @@ export function MatchThumbCard({
           <Badge className="border-transparent bg-emerald-500 text-[10px] font-bold text-white">
             <Star className="fill-current" /> {match.matchPercent}%
           </Badge>
-          {match.photoVerified && (
-            <Badge
-              variant="outline"
-              className="border-transparent bg-black/50 text-[10px] font-semibold text-white backdrop-blur"
-            >
-              <BadgeCheck className="text-secondary" /> Verified
-            </Badge>
-          )}
         </div>
         <div className="absolute inset-x-0 bottom-0 p-2.5 text-white">
           <h3 className="truncate font-serif text-base font-bold leading-tight sm:text-lg">

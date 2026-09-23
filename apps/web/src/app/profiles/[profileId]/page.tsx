@@ -104,8 +104,6 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
     state: data.profile.state,
     lastActive: "Recently",
     photos: (data.photos || []).map((p: { s3Key?: string; url?: string }) => p.s3Key || p.url || ''),
-    photoVerified: data.verificationStatus === 'verified',
-    verified: data.verificationStatus === 'verified',
     hasHoroscope: !!data.hasHoroscope || !!data.horoscope?.horoscopeS3Key,
     blurPhoto: data.blurPhoto,
     matchPercent: data.matchPercent ?? null,
@@ -198,8 +196,6 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
               state={profile.state}
               lastActive={profile.lastActive}
               photos={profile.photos}
-              photoVerified={profile.photoVerified}
-              verified={profile.verified}
               hasHoroscope={profile.hasHoroscope}
               blurPhoto={profile.blurPhoto}
               plan={profile.planSlug}
