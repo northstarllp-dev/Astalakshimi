@@ -306,7 +306,7 @@ export default function ProfileEditPage() {
         onSuccess: (saved) => {
           form.reset(saved)
           setSaved(true)
-          // Just finished Layer B → Home so the "submit for verification" CTA is visible.
+          // Just finished Layer B → Home so the pending verification is visible.
           // Otherwise return to My Profile (not Discover, which still locks interactions).
           const destination =
             justCompletedRequired || isProfileComplete(saved) ? "/home" : "/profile"
@@ -496,7 +496,7 @@ export default function ProfileEditPage() {
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
           <p className="text-sm font-semibold text-primary">All required fields done</p>
           <p className="mt-1 text-xs text-primary/80">
-            Next: go to Home and submit for verification so an admin can approve you.
+            Next: your profile will be reviewed by an admin for verification.
           </p>
         </div>
       ) : completenessStats.missingRequired.length > 0 ? (
@@ -507,7 +507,7 @@ export default function ProfileEditPage() {
           </p>
           <p className="mt-1 text-xs text-destructive/90">
             Still needed: {completenessStats.missingRequired.map((field) => field.label).join(", ")}.
-            After these are filled, submit for verification from Home.
+            After these are filled, your profile will be submitted for verification.
           </p>
         </div>
       ) : null}
@@ -1262,9 +1262,10 @@ export default function ProfileEditPage() {
             />
           </Field>
           <Field label="Birth place" required missing={isMissing("birthPlace")} error={fieldError(errors, "birthPlace")}>
-            <Input
-              value={data.birthPlace}
-              onChange={(e) => update({ birthPlace: e.target.value })}
+            <CityAutocomplete
+              city={data.birthPlace}
+              citySlug={""}
+              onCityChange={({ city }) => update({ birthPlace: city })}
               placeholder="e.g. Chennai, TN"
               className={cn(isMissing("birthPlace") && invalidCls)}
             />

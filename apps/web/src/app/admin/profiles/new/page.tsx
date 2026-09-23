@@ -34,6 +34,9 @@ import { ArrowLeft, Loader2, Upload, X } from "lucide-react"
 import { MultiSelect } from "@/components/profile/multi-select"
 import { ChildrenFields } from "@/components/profile/children-fields"
 import { maritalAsksChildren } from "@/lib/identity-fields"
+import { CityAutocomplete } from "@/components/profile/city-autocomplete"
+import { CommunityFields } from "@/components/profile/community-fields"
+import { BirthTimeInput } from "@/components/profile/input-with-unit"
 
 const MAX_PHOTOS = 6
 const MAX_IMAGE_MB = 5
@@ -315,10 +318,20 @@ export default function AdminCreateProfilePage() {
           <h2 className="font-serif text-xl font-bold">Community & Location</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="City" error={form.formState.errors.city?.message}>
-              <Input {...form.register("city")} />
+              <CityAutocomplete
+                city={form.watch("city")}
+                citySlug={""}
+                onCityChange={({ city }) => {
+                  form.setValue("city", city, { shouldValidate: true })
+                }}
+                placeholder="Search city…"
+              />
             </Field>
             <Field label="Religion" error={form.formState.errors.religion?.message}>
-              <Select value={form.watch("religion")} onValueChange={(v) => form.setValue("religion", v)}>
+              <Select value={form.watch("religion")} onValueChange={(v) => {
+                form.setValue("religion", v)
+                form.setValue("caste", "")
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {RELIGIONS.map((v) => (
@@ -328,7 +341,13 @@ export default function AdminCreateProfilePage() {
               </Select>
             </Field>
             <Field label="Caste / community" error={form.formState.errors.caste?.message}>
-              <Input {...form.register("caste")} />
+              <CommunityFields
+                religion={form.watch("religion")}
+                caste={form.watch("caste")}
+                onChange={(value) => {
+                  if (value.caste !== undefined) form.setValue("caste", value.caste, { shouldValidate: true })
+                }}
+              />
             </Field>
             <Field label="Mother tongue" error={form.formState.errors.motherTongue?.message}>
               <Select value={form.watch("motherTongue")} onValueChange={(v) => form.setValue("motherTongue", v)}>
@@ -379,17 +398,27 @@ export default function AdminCreateProfilePage() {
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(["Yes", "No", "Don't Know", "Both"] as const).map((v) => (
+                  {(["Yes", "No", "Don't Know"] as const).map((v) => (
                     <SelectItem key={v} value={v}>{v}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
             <Field label="Birth time" error={form.formState.errors.birthTime?.message}>
-              <Input {...form.register("birthTime")} placeholder="e.g. 10:45 AM" />
+              <BirthTimeInput
+                value={form.watch("birthTime")}
+                onChange={(birthTime) => form.setValue("birthTime", birthTime, { shouldValidate: true })}
+              />
             </Field>
             <Field label="Birth place" error={form.formState.errors.birthPlace?.message}>
-              <Input {...form.register("birthPlace")} placeholder="City of birth" />
+              <CityAutocomplete
+                city={form.watch("birthPlace")}
+                citySlug={""}
+                onCityChange={({ city }) => {
+                  form.setValue("birthPlace", city, { shouldValidate: true })
+                }}
+                placeholder="City of birth"
+              />
             </Field>
           </div>
         </div>
@@ -563,30 +592,36 @@ export default function AdminCreateProfilePage() {
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-            {previews.map((src, index) => (
-              <div key={src} className="relative aspect-square overflow-hidden rounded-2xl border border-border">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={`Photo ${index + 1}`} className="h-full w-full object-cover" />
+            {Array.from({ length: MAX_PHOTOS }).map((_, index) => {
+              const src = previews[index]
+              if (src) {
+                return (
+                  <div key={src} className="relative aspect-square overflow-hidden rounded-2xl border border-border">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={`Photo ${index + 1}`} className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(index)}
+                      className="absolute right-1.5 top-1.5 rounded-full bg-background/90 p-1 shadow-sm"
+                      aria-label={`Remove photo ${index + 1}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )
+              }
+              return (
                 <button
+                  key={`empty-${index}`}
                   type="button"
-                  onClick={() => removePhoto(index)}
-                  className="absolute right-1.5 top-1.5 rounded-full bg-background/90 p-1 shadow-sm"
-                  aria-label={`Remove photo ${index + 1}`}
+                  onClick={() => photoInputRef.current?.click()}
+                  className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <Upload className="h-5 w-5" />
+                  <span className="text-xs font-medium">Add photo</span>
                 </button>
-              </div>
-            ))}
-            {photos.length < MAX_PHOTOS && (
-              <button
-                type="button"
-                onClick={() => photoInputRef.current?.click()}
-                className="flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
-              >
-                <Upload className="h-5 w-5" />
-                <span className="text-xs font-medium">Add photo</span>
-              </button>
-            )}
+              )
+            })}
           </div>
           <input
             ref={photoInputRef}

@@ -361,7 +361,7 @@ export const adminCreateProfileSchema = z
     annualIncome: z.string().min(1, "Select annual income."),
     nakshatra: z.string().trim().min(1, "Select star / nakshatra."),
     rashi: z.string().trim().min(1, "Select rashi."),
-    manglik: z.enum(["Yes", "No", "Don't Know", "Both"], {
+    manglik: z.enum(["Yes", "No", "Don't Know"], {
       errorMap: () => ({ message: "Select manglik status." }),
     }),
     birthTime: z.string().trim().min(1, "Enter birth time."),

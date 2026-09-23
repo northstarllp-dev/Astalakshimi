@@ -728,7 +728,7 @@ export class ProfilesService {
           selfieS3Key,
           govtIdType,
           govtIdS3Key,
-          status: 'idle',
+          status: 'pending',
         })
         .onConflictDoUpdate({
           target: verifications.profileId,
@@ -737,7 +737,7 @@ export class ProfilesService {
             selfieS3Key,
             govtIdType,
             govtIdS3Key,
-            status: 'idle',
+            status: 'pending',
             rejectionReason: null,
             reviewedBy: null,
             reviewedAt: null,

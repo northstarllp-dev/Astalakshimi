@@ -191,8 +191,8 @@ export default function MyProfilePage() {
                       ? completeness >= 90
                         ? " Excellent — your profile stands out to families."
                         : " Required details are in. You can browse and interact."
-                      : " Required details are in. Submit for verification from Home to unlock interests and messaging."
-                    : " Fill required details, then submit for verification from Home. Specialization and employer are optional."}
+                      : " Required details are in. Verification is under review."
+                    : " Fill required details to unlock interests and messaging. Specialization and employer are optional."}
                 </p>
                 {!completenessStats.requiredComplete && completenessStats.missingRequired.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">

@@ -206,6 +206,61 @@ export default function AdminProfileReviewPage() {
         )}
       </section>
 
+      <section className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
+        <h2 className="font-serif text-xl font-bold">Background & Lifestyle</h2>
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+          <Detail label="Height" value={profile.height ? `${profile.height} cm` : ""} />
+          <Detail label="Diet" value={profile.diet} />
+          <Detail label="Marital Status" value={profile.maritalStatus} />
+          {profile.maritalStatus !== "Never Married" && (
+            <>
+              <Detail label="Has Children" value={profile.hasChildren} />
+              <Detail label="Children Count" value={profile.childrenCount?.toString()} />
+              <Detail label="Children Living With Me" value={profile.childrenLivingWithMe} />
+            </>
+          )}
+          <Detail label="Subcaste" value={profile.subcaste} />
+          <Detail label="Gotra" value={profile.gotra} />
+        </dl>
+      </section>
+
+      <section className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
+        <h2 className="font-serif text-xl font-bold">Education & Career</h2>
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+          <Detail label="Education Level" value={profile.educationLevel} />
+          <Detail label="Employment Status" value={profile.employmentStatus} />
+          <Detail label="Annual Income" value={profile.annualIncome} />
+        </dl>
+      </section>
+
+      <section className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
+        <h2 className="font-serif text-xl font-bold">Family Details</h2>
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+          <Detail label="Family Type" value={profile.familyType} />
+          <Detail label="Family Status" value={profile.familyStatus} />
+          <Detail label="Family Values" value={profile.familyValues} />
+          <Detail label="Father's Occupation" value={profile.fatherOccupation} />
+          <Detail label="Mother's Occupation" value={profile.motherOccupation} />
+          <Detail label="Brothers" value={profile.brothersCount?.toString()} />
+          <Detail label="Sisters" value={profile.sistersCount?.toString()} />
+        </dl>
+      </section>
+
+      <section className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
+        <h2 className="font-serif text-xl font-bold">Partner Preferences</h2>
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+          <Detail label="Age" value={profile.prefAgeMin && profile.prefAgeMax ? `${profile.prefAgeMin} - ${profile.prefAgeMax} yrs` : ""} />
+          <Detail label="Height" value={profile.prefHeightMinCm && profile.prefHeightMaxCm ? `${profile.prefHeightMinCm} - ${profile.prefHeightMaxCm} cm` : ""} />
+          <Detail label="Marital Status" value={profile.prefMaritalStatuses?.join(", ")} />
+          <Detail label="Religion" value={profile.prefReligions?.join(", ")} />
+          <Detail label="Community" value={profile.prefCastes?.join(", ")} />
+          <Detail label="Mother Tongue" value={profile.prefMotherTongues?.join(", ")} />
+          <Detail label="Education" value={profile.prefMinEducation} />
+          <Detail label="Income" value={profile.prefAcceptableIncomes?.join(", ")} />
+          <Detail label="Location" value={profile.prefLocations?.join(", ")} />
+        </dl>
+      </section>
+
       {profile.verificationStatus === "pending" && (
         <footer className="sticky bottom-4 rounded-2xl border border-secondary/30 bg-[#fffbf4]/95 p-4 shadow-lg backdrop-blur">
           {!showReject ? (

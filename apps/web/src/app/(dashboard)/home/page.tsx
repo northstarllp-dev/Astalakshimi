@@ -148,7 +148,7 @@ export default function HomePage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground">Complete your profile</p>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    Fill every required detail, then submit for verification to unlock interests and messaging.
+                    Fill every required detail to unlock interests and messaging.
                   </p>
                   <Link href="/profile/edit" className="mt-2 inline-block">
                     <Button size="sm" className="h-8 rounded-md">
@@ -159,31 +159,7 @@ export default function HomePage() {
               </div>
             ) : null}
 
-            {readyToSubmit ? (
-              <div className="flex items-start gap-3 border border-primary/20 bg-primary/5 px-3 py-3 sm:px-4">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-foreground">Profile complete — submit for verification</p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    You can browse matches now. Submit for admin review to unlock send interest and messaging.
-                  </p>
-                  {submitVerification.isError ? (
-                    <p className="mt-1.5 text-sm font-medium text-destructive" role="alert">
-                      {(submitVerification.error as Error)?.message ||
-                        "Couldn't submit for verification. Upload a selfie or government ID first, then try again."}
-                    </p>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    className="mt-2 h-8 rounded-md"
-                    disabled={submitVerification.isPending}
-                    onClick={() => submitVerification.mutate()}
-                  >
-                    {submitVerification.isPending ? "Submitting…" : "Submit for verification"}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
+
 
             {pending ? (
               <div className="flex items-start gap-3 border border-[#e8d4a8] bg-[#fff8ef] px-3 py-3 sm:px-4">

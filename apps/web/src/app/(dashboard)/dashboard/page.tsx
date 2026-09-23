@@ -240,15 +240,9 @@ function DiscoverPage() {
                   ? `Browse and shortlist freely. Send interest and messaging unlock after approval — usually within ${VERIFICATION_SLA_HOURS} hours.`
                   : onboardingState === "rejected"
                     ? "Verification was rejected. Re-upload your selfie or ID to unlock interactions."
-                    : onboardingState === "ready_to_submit"
-                      ? "Submit for verification to unlock send interest and messaging. Shortlist stays available."
-                      : "Complete your profile and get verified to unlock send interest and messaging."}
+                    : "Complete your profile and get verified to unlock send interest and messaging."}
               </p>
-              {onboardingState === "ready_to_submit" ? (
-                <Link href="/home" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
-                  Submit for verification on Home
-                </Link>
-              ) : onboardingState === "rejected" ? (
+              {onboardingState === "rejected" ? (
                 <Link href="/profile/verify" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
                   Re-upload verification
                 </Link>

@@ -251,11 +251,17 @@ export function useSaveProfileMutation() {
         apiClient.setToken()
       }
 
-      // 4. Complete registration — verification stays idle. Career/horoscope
-      //    are collected later in /profile/edit, so do NOT auto-submit here
-      //    (it always failed silently and left the UI out of sync).
+      // 4. Complete registration and auto-submit verification since we removed the manual submit button.
       if (apiClient.getToken()) {
         await apiClient.profiles.completeRegistration(payload as any)
+        
+        // Auto-submit verification (promotes from idle -> pending)
+        try {
+          await apiClient.profiles.submitVerification()
+        } catch (err) {
+          console.warn("Failed to auto-submit verification:", err)
+        }
+
         await apiClient.auth.syncEnrollment()
         // Refetch the server profile so React Query / sessionStorage store S3
         // keys — not blob: previews from the signup form (those break avatars
@@ -263,11 +269,11 @@ export function useSaveProfileMutation() {
         try {
           const fullProfile = await apiClient.profiles.getMyProfile()
           next = mapFullProfileToSignupData(
-            { ...next, verificationStatus: "idle", phone: data.phone },
+            { ...next, verificationStatus: "pending", phone: data.phone },
             fullProfile,
           )
         } catch {
-          next = { ...next, verificationStatus: "idle" }
+          next = { ...next, verificationStatus: "pending" }
         }
         saveProfile(next)
       }

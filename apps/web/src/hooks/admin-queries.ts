@@ -94,7 +94,7 @@ export function useAdminStatsQuery() {
     queryFn: async () => {
       let mappedProfiles: AdminProfile[] | undefined;
       try {
-        const actualProfiles = await apiClient.admin.getAllProfiles()
+        const actualProfiles = await apiClient.admin.getAllProfiles() as any[]
         mappedProfiles = actualProfiles.map((p: any) => ({
           ...p,
           id: p.id,
@@ -118,7 +118,7 @@ export function useAdminStatsQuery() {
       } catch (err) {}
 
       const mockStats = getAdminStats(mappedProfiles)
-      const actualStats = await tryAdminApi(() => apiClient.admin.getStats())
+      const actualStats = await tryAdminApi(() => apiClient.admin.getStats()) as any
       if (!actualStats) return mockStats
       return {
         ...mockStats,
@@ -137,7 +137,7 @@ export function useAdminProfilesQuery() {
     queryKey: adminQueryKeys.profiles,
     queryFn: async () => {
       try {
-        const actualProfiles = await apiClient.admin.getAllProfiles()
+        const actualProfiles = await apiClient.admin.getAllProfiles() as any[]
         return actualProfiles.map((p: any) => ({
           ...p,
           id: p.id,
@@ -171,7 +171,7 @@ export function useAdminProfileQuery(id: string) {
     queryKey: adminQueryKeys.profile(id),
     queryFn: async () => {
       if (id.startsWith("adm-")) return getAdminProfile(id)
-      const p = await tryAdminApi(() => apiClient.admin.getProfile(id))
+      const p = await tryAdminApi(() => apiClient.admin.getProfile(id)) as any
       if (!p) return null
       return {
         ...p,
@@ -192,7 +192,7 @@ export function usePendingVerificationsQuery() {
   return useQuery({
     queryKey: adminQueryKeys.pending,
     queryFn: async () => {
-      const actualPending = await tryAdminApi(() => apiClient.admin.getPendingVerifications())
+      const actualPending = await tryAdminApi(() => apiClient.admin.getPendingVerifications()) as any[]
       if (!actualPending) return getPendingVerifications()
       return actualPending.map((p) => ({
           id: `ver-${p.id}`,
@@ -300,7 +300,7 @@ export function useCreateAdminProfileMutation() {
         annualIncome: string
         nakshatra: string
         rashi: string
-        manglik: "Yes" | "No" | "Don't Know" | "Both"
+        manglik: "Yes" | "No" | "Don't Know"
         birthTime: string
         birthPlace: string
         brothersCount: number

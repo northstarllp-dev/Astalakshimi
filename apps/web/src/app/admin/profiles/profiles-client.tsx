@@ -19,6 +19,8 @@ import {
   usePendingVerificationsQuery,
   useDeleteProfileMutation,
   useAdminSessionQuery,
+  useApproveProfileMutation,
+  useRejectProfileMutation,
 } from "@/hooks/admin-queries"
 import { formatRelativeHours, type AdminProfile } from "@/lib/admin-store"
 import { cn } from "@/lib/utils"
@@ -42,6 +44,8 @@ export default function AdminProfilesPageInner() {
   const { data: pending = [] } = usePendingVerificationsQuery()
   const { data: session } = useAdminSessionQuery()
   const deleteMutation = useDeleteProfileMutation()
+  const approveMutation = useApproveProfileMutation()
+  const rejectMutation = useRejectProfileMutation()
 
   const cities = React.useMemo(
     () => Array.from(new Set(profiles.map((p) => p.city))).sort(),
@@ -165,9 +169,8 @@ export default function AdminProfilesPageInner() {
             <EmptyState message="No profiles waiting for review." />
           ) : (
             filteredPending.map((row) => (
-              <Link
+              <div
                 key={row.id}
-                href={`/admin/profiles/${row.profileId}`}
                 className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:bg-muted/30"
               >
                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border">
@@ -194,8 +197,39 @@ export default function AdminProfilesPageInner() {
                     </span>
                   </div>
                 </div>
-                <span className="text-xs font-semibold text-primary">Review</span>
-              </Link>
+                <div className="flex items-center gap-2">
+                  <Link href={`/admin/profiles/${row.profileId}`}>
+                    <Button size="sm" variant="outline" className="rounded-lg">
+                      Review
+                    </Button>
+                  </Link>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="rounded-lg text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" 
+                    onClick={() => {
+                      if (!session) return;
+                      void approveMutation.mutateAsync({ profileId: row.profileId, staff: session });
+                    }}
+                  >
+                    Approve
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="rounded-lg text-destructive hover:bg-destructive/10" 
+                    onClick={() => {
+                      if (!session) return;
+                      const reason = window.prompt("Reason for rejection:");
+                      if (reason !== null) {
+                        void rejectMutation.mutateAsync({ profileId: row.profileId, staff: session, rejectionReason: reason || "Photo unclear or ID invalid" });
+                      }
+                    }}
+                  >
+                    Reject
+                  </Button>
+                </div>
+              </div>
             ))
           )}
         </div>

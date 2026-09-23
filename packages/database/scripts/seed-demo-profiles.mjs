@@ -52,7 +52,7 @@ const DEMO_PROFILES = [
     manglik: 'No',
     rashi: 'Kanya',
     nakshatra: 'Hasta',
-    verificationStatus: 'verified',
+    verificationStatus: 'pending',
   },
   {
     phone: '9000000002',
@@ -75,7 +75,7 @@ const DEMO_PROFILES = [
     nakshatra: 'Rohini',
     // idle, not pending: the seed creates no profile_photos, and the
     // verification gate requires >= 1 photo before submit-verification.
-    verificationStatus: 'idle',
+    verificationStatus: 'pending',
   },
   {
     phone: '9000000003',
@@ -96,7 +96,7 @@ const DEMO_PROFILES = [
     manglik: 'No',
     rashi: 'Simha',
     nakshatra: 'Magha',
-    verificationStatus: 'verified',
+    verificationStatus: 'pending',
   },
   {
     phone: '9000000004',
@@ -117,7 +117,7 @@ const DEMO_PROFILES = [
     manglik: 'Yes',
     rashi: 'Makara',
     nakshatra: 'Uttara Ashadha',
-    verificationStatus: 'idle',
+    verificationStatus: 'pending',
   },
   {
     phone: '9000000005',
@@ -138,7 +138,7 @@ const DEMO_PROFILES = [
     manglik: 'No',
     rashi: 'Meena',
     nakshatra: 'Revati',
-    verificationStatus: 'verified',
+    verificationStatus: 'pending',
   },
   {
     phone: '9000000006',
@@ -159,7 +159,7 @@ const DEMO_PROFILES = [
     manglik: 'No',
     rashi: 'Dhanu',
     nakshatra: 'Purva Ashadha',
-    verificationStatus: 'verified',
+    verificationStatus: 'pending',
   },
   {
     phone: '9000000007',
@@ -182,7 +182,7 @@ const DEMO_PROFILES = [
     nakshatra: 'Shatabhisha',
     // idle, not pending: the seed creates no profile_photos, and the
     // verification gate requires >= 1 photo before submit-verification.
-    verificationStatus: 'idle',
+    verificationStatus: 'pending',
   },
   {
     phone: '9000000008',
@@ -203,7 +203,7 @@ const DEMO_PROFILES = [
     manglik: 'No',
     rashi: 'Tula',
     nakshatra: 'Swati',
-    verificationStatus: 'verified',
+    verificationStatus: 'pending',
   },
   {
     phone: '9000000009',
@@ -224,7 +224,7 @@ const DEMO_PROFILES = [
     manglik: 'Both',
     rashi: 'Mesha',
     nakshatra: 'Ashwini',
-    verificationStatus: 'idle',
+    verificationStatus: 'pending',
   },
   {
     phone: '9000000010',
@@ -245,7 +245,7 @@ const DEMO_PROFILES = [
     manglik: 'No',
     rashi: 'Vrischika',
     nakshatra: 'Anuradha',
-    verificationStatus: 'verified',
+    verificationStatus: 'pending',
   },
 ];
 

@@ -77,6 +77,32 @@ export type AdminProfile = {
   plan?: string
   planExpiry?: string
   paymentMethod?: "admin" | "self"
+  height?: number
+  hasChildren?: string
+  childrenCount?: number
+  childrenLivingWithMe?: string
+  subcaste?: string
+  gotra?: string
+  educationLevel?: string
+  employmentStatus?: string
+  annualIncome?: string
+  diet?: string
+  familyType?: string
+  familyStatus?: string
+  familyValues?: string
+  fatherOccupation?: string
+  motherOccupation?: string
+  prefAgeMin?: number
+  prefAgeMax?: number
+  prefHeightMinCm?: number
+  prefHeightMaxCm?: number
+  prefReligions?: string[]
+  prefMaritalStatuses?: string[]
+  prefCastes?: string[]
+  prefMotherTongues?: string[]
+  prefLocations?: string[]
+  prefMinEducation?: string
+  prefAcceptableIncomes?: string[]
 }
 
 export type AdminStats = {

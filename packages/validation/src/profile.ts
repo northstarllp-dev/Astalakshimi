@@ -48,7 +48,7 @@ export const familyTypeSchema = z.enum(['Nuclear', 'Joint', 'Extended']);
 export const parentOccupationSchema = z.enum(['Employed', 'Business', 'Retired', 'Homemaker', 'Passed Away']);
 export const dietSchema = z.enum(['Vegetarian', 'Non-vegetarian', 'Eggetarian', 'Jain', 'Vegan']);
 export const habitFrequencySchema = z.enum(['Never', 'Occasionally', 'Regularly', 'Planning to quit']);
-export const manglikStatusSchema = z.enum(['Yes', 'No', "Don't Know", 'Both']);
+export const manglikStatusSchema = z.enum(['Yes', 'No', "Don't Know"]);
 export const govtIdTypeSchema = z.enum(['Aadhaar', 'PAN card', 'Passport', 'Driving licence', 'Voter ID']);
 
 export const MARITAL_STATUSES_WITH_CHILDREN = ['Divorced', 'Widowed'] as const;
