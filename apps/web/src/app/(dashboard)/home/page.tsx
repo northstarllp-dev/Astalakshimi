@@ -252,8 +252,8 @@ export default function HomePage() {
               ) : previewMatches.length === 0 ? (
                 <div className="px-4 py-10 text-center">
                   <p className="text-sm font-semibold">
-                    {!(profile?.prefReligion?.length > 0) ||
-                    !(profile?.prefMaritalStatuses?.length > 0) ||
+                    {!(profile?.prefReligion?.length) ||
+                    !(profile?.prefMaritalStatuses?.length) ||
                     typeof profile?.prefAgeMin !== "number" ||
                     typeof profile?.prefAgeMax !== "number"
                       ? "Set who you are looking for"

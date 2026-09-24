@@ -52,7 +52,7 @@ export default function AdminCreateProfilePage() {
   const photoInputRef = React.useRef<HTMLInputElement>(null)
 
   const form = useForm<AdminCreateProfileValues>({
-    resolver: zodResolver(adminCreateProfileSchema),
+    resolver: zodResolver(adminCreateProfileSchema) as any,
     defaultValues: {
       profileFor: "Daughter",
       phone: "",
@@ -217,7 +217,7 @@ export default function AdminCreateProfilePage() {
 
       <form
         className="space-y-8 rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6"
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={form.handleSubmit(onSubmit as any)}
       >
         {/* Section 1: Basic & Personal Info */}
         <div className="space-y-4">

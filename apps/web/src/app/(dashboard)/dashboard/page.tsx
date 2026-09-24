@@ -282,8 +282,8 @@ function TopMatchesPanel({
   const totalCount = data?.totalCount || 0
   const totalPages = Math.max(1, Math.ceil(totalCount / MATCHES_PAGE_SIZE))
   const prefsIncomplete =
-    !(profile?.prefReligion?.length > 0) ||
-    !(profile?.prefMaritalStatuses?.length > 0) ||
+    !(profile?.prefReligion?.length) ||
+    !(profile?.prefMaritalStatuses?.length) ||
     typeof profile?.prefAgeMin !== "number" ||
     typeof profile?.prefAgeMax !== "number"
 
