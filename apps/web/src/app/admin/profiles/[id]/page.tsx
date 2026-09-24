@@ -39,11 +39,20 @@ export default function AdminProfileReviewPage() {
   const approve = useApproveProfileMutation()
   const reject = useRejectProfileMutation()
   const [showReject, setShowReject] = React.useState(false)
+  const [rejectType, setRejectType] = React.useState("Photo is unclear or invalid")
 
   const rejectForm = useForm<AdminRejectValues>({
     resolver: zodResolver(adminRejectSchema),
-    defaultValues: { rejectionReason: "" },
+    defaultValues: { rejectionReason: "Photo is unclear or invalid" },
   })
+
+  React.useEffect(() => {
+    if (rejectType !== "other") {
+      rejectForm.setValue("rejectionReason", rejectType)
+    } else {
+      rejectForm.setValue("rejectionReason", "")
+    }
+  }, [rejectType, rejectForm])
 
   if (isLoading) {
     return (
@@ -72,10 +81,11 @@ export default function AdminProfileReviewPage() {
 
   const handleReject = async (values: AdminRejectValues) => {
     if (!session) return
+    const finalReason = rejectType === "other" ? values.rejectionReason : rejectType
     await reject.mutateAsync({
       profileId: profile.id,
       staff: session,
-      rejectionReason: values.rejectionReason,
+      rejectionReason: finalReason,
     })
     router.push("/admin/profiles?tab=review")
   }
@@ -295,10 +305,26 @@ export default function AdminProfileReviewPage() {
           ) : (
             <form className="space-y-3" onSubmit={rejectForm.handleSubmit(handleReject)}>
               <div>
-                <Label htmlFor="rejectionReason">Rejection reason</Label>
-                <Input id="rejectionReason" {...rejectForm.register("rejectionReason")} placeholder="Explain what needs to be fixed…" />
-                {rejectForm.formState.errors.rejectionReason && (
-                  <p className="mt-1 text-xs text-destructive">{rejectForm.formState.errors.rejectionReason.message}</p>
+                <Label htmlFor="rejectionType">Reason for rejection</Label>
+                <select
+                  id="rejectionType"
+                  value={rejectType}
+                  onChange={(e) => setRejectType(e.target.value)}
+                  className="mt-1.5 mb-3 flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <option value="Photo is unclear or invalid">Photo is unclear or invalid</option>
+                  <option value="Government ID is unclear or invalid">Government ID is unclear or invalid</option>
+                  <option value="other">Other (type reason below)</option>
+                </select>
+
+                {rejectType === "other" && (
+                  <div className="mt-2">
+                    <Label htmlFor="rejectionReason">Custom reason</Label>
+                    <Input id="rejectionReason" {...rejectForm.register("rejectionReason")} placeholder="Explain what needs to be fixed…" className="mt-1.5" />
+                    {rejectForm.formState.errors.rejectionReason && (
+                      <p className="mt-1 text-xs text-destructive">{rejectForm.formState.errors.rejectionReason.message}</p>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="flex gap-2">

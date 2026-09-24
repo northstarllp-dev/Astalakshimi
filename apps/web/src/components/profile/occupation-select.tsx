@@ -6,6 +6,8 @@ import { SearchableSelect } from "@/components/profile/searchable-select"
 import { cn } from "@/lib/utils"
 import { EMPLOYMENT_STATUSES } from "@/lib/profile-store"
 
+import { REQUIRED_FIELD_INVALID_CLASS } from "@/lib/profile-completeness"
+
 /**
  * Occupation is now flat: an `employmentStatus` enum (Employed / Business
  * Owner / Freelancer / Not Working) plus a free-text `profession`. No catalog
@@ -39,7 +41,7 @@ export function OccupationSelect({
         placeholder="Select employment status"
         searchPlaceholder="Search employment status…"
         emptyText="No results found."
-        className={cn(missing && "border-destructive", className)}
+        className={cn(missing && REQUIRED_FIELD_INVALID_CLASS, className)}
       />
       <Input
         value={profession}

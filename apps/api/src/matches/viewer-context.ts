@@ -124,7 +124,7 @@ export function visibilitySql(viewerIsPaid: boolean) {
 export function lowerIn(column: any, values: string[]) {
   const cleaned = values.map((v) => v.trim().toLowerCase()).filter(Boolean);
   if (cleaned.length === 0) return sql`false`;
-  return sql`lower(${column}) in (${sql.join(
+  return sql`lower(${column}::text) in (${sql.join(
     cleaned.map((v) => sql`${v}`),
     sql`, `,
   )})`;

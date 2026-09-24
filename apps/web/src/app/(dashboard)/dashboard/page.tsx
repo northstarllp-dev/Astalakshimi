@@ -21,6 +21,7 @@ import {
   useSkippedQuery,
   useSearchQuery,
   useTopMatchesPaginatedQuery,
+  useActivitySummaryQuery,
   queryKeys,
 } from "@/hooks/queries"
 import { discoverQuickSchema } from "@/lib/validation"
@@ -181,8 +182,12 @@ function DiscoverPage() {
   const onboardingState = getOnboardingState(profile)
   const interactionsLocked = !canInteract(profile)
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
+  
+  const { data: activitySummary } = useActivitySummaryQuery()
+  
   const interestCount = interests?.pendingCount ?? 0
   const shortlistCount = shortlist.length
+  const viewsCount = activitySummary?.viewers.length ?? 0
 
   const handleSkip = (id: string) => {
     if (interactionsLocked) return
@@ -202,7 +207,14 @@ function DiscoverPage() {
       <div className="mb-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Search & browse</p>
-          <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">Discover</h1>
+          <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">
+            Discover
+            {interactionsLocked && (
+              <span className="ml-3 inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-semibold text-amber-800 align-middle">
+                Preview Only
+              </span>
+            )}
+          </h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
             Namaste, {firstName}. People who match who you are looking for, or browse everyone.
           </p>
@@ -211,7 +223,7 @@ function DiscoverPage() {
           {[
             { label: "Interests", value: String(interestCount), href: "/interests" },
             { label: "Shortlisted", value: String(shortlistCount), href: "/interests?tab=shortlisted" },
-            { label: "Views", value: "21", href: "/notifications" },
+            { label: "Views", value: String(viewsCount), href: "/notifications" },
           ].map((stat) => (
             <Link
               key={stat.label}
@@ -227,34 +239,7 @@ function DiscoverPage() {
 
       <DiscoverViewTabs view={view} onChange={setView} />
 
-      {interactionsLocked && (
-        <div className="mb-5 shrink-0 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-[#fff8ef] shadow-sm">
-          <div className="flex items-start gap-3 p-3.5 sm:p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800">
-              <Clock3 className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-amber-950">You&apos;re in preview mode</p>
-              <p className="mt-0.5 text-sm text-amber-900/75">
-                {onboardingState === "pending"
-                  ? `Browse and shortlist freely. Send interest and messaging unlock after approval — usually within ${VERIFICATION_SLA_HOURS} hours.`
-                  : onboardingState === "rejected"
-                    ? "Verification was rejected. Re-upload your selfie or ID to unlock interactions."
-                    : "Complete your profile and get verified to unlock send interest and messaging."}
-              </p>
-              {onboardingState === "rejected" ? (
-                <Link href="/profile/verify" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
-                  Re-upload verification
-                </Link>
-              ) : onboardingState === "incomplete" ? (
-                <Link href="/profile/edit" className="mt-2 inline-block text-sm font-semibold text-primary hover:underline">
-                  Complete required fields
-                </Link>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {view === "matches" ? (
         <TopMatchesPanel
@@ -507,66 +492,7 @@ function SearchFilterPanel({
 
   return (
     <>
-      {/* Compact Filters Button Bar */}
-      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <CityAutocomplete
-          city={query.city}
-          onCityChange={({ city }) => setQuick({ city })}
-          placeholder="Any city"
-          searchPlaceholder="Search city…"
-          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm"
-        />
-        <SearchableSelect
-          value={query.community}
-          onValueChange={(community) => setQuick({ community })}
-          options={communityOptions}
-          placeholder="Any community"
-          searchPlaceholder="Search community…"
-          emptyText="No matching community found."
-          allowCustom={true}
-          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm"
-        />
-      </div>
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <input
-          type="number"
-          min={18}
-          max={80}
-          inputMode="numeric"
-          aria-label="Minimum age"
-          placeholder="Min age"
-          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm"
-          value={query.ageFilterEnabled ? String(query.ageMin) : ""}
-          onChange={(e) => {
-            const raw = e.target.value
-            if (raw === "") {
-              setQuery((q) => ({ ...q, ageFilterEnabled: false }))
-              setPage(1)
-              return
-            }
-            setQuick({ ageMin: Number(raw) })
-          }}
-        />
-        <input
-          type="number"
-          min={18}
-          max={80}
-          inputMode="numeric"
-          aria-label="Maximum age"
-          placeholder="Max age"
-          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm"
-          value={query.ageFilterEnabled ? String(query.ageMax) : ""}
-          onChange={(e) => {
-            const raw = e.target.value
-            if (raw === "") {
-              setQuery((q) => ({ ...q, ageFilterEnabled: false }))
-              setPage(1)
-              return
-            }
-            setQuick({ ageMax: Number(raw) })
-          }}
-        />
-      </div>
+
       <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
           {/* Small Filters Button */}
@@ -707,34 +633,7 @@ function SearchFilterPanel({
         </div>
       )}
 
-      {/* Browse tabs */}
-      <div className="-mx-3 mb-4 flex shrink-0 gap-2 overflow-x-auto px-3 pb-1 hide-scrollbar sm:mx-0 sm:px-0">
-        {BROWSE_TABS.map((tab) => {
-          const locked = Boolean(tab.paid) && !paid
-          const active = query.tab === tab.id
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                if (locked) {
-                  setPaywall(tab.label)
-                  return
-                }
-                setPaywall(null)
-                setQuick({ tab: tab.id })
-              }}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold",
-                active ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {locked && <Lock className="h-3.5 w-3.5" />}
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
+
 
       <div
         role="tabpanel"

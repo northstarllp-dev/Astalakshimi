@@ -43,34 +43,13 @@ export default function AdminHomePage() {
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <StatCard label="Revenue" value={revenue} hint="Demo total" />
+        <StatCard label="Revenue" value={revenue} />
         <StatCard label="Verified (7d)" value={stats?.verifiedThisWeek ?? ""} tone="ok" />
         <StatCard label="Rejected" value={stats?.rejectedCount ?? ""} tone="bad" />
         <StatCard label="Incomplete" value={stats?.incompleteCount ?? ""} hint="< 80%" />
       </div>
 
-      <section className="rounded-xl border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold">Pending by type</h2>
-          {stats && stats.slaBreachCount > 0 && (
-            <span className="text-[11px] font-medium text-destructive">
-              {stats.slaBreachCount} over 12h
-            </span>
-          )}
-        </div>
-        <ul className="divide-y divide-border">
-          {[
-            { label: "Photos", count: stats?.pendingByType.photos ?? 0 },
-            { label: "Govt ID / selfie", count: stats?.pendingByType.govtId ?? 0 },
-            { label: "Horoscope", count: stats?.pendingByType.horoscope ?? 0 },
-          ].map((row) => (
-            <li key={row.label} className="flex items-center justify-between px-4 py-3 text-sm">
-              <span className="text-muted-foreground">{row.label}</span>
-              <span className="font-semibold tabular-nums">{row.count}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+
 
       <section className="rounded-xl border border-border bg-card">
         <div className="border-b border-border px-4 py-3">
