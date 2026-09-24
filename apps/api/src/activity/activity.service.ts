@@ -69,10 +69,23 @@ export class ActivityService {
       .orderBy(desc(profileViews.viewedAt))
       .limit(10);
 
+    // 4. Fetch Views (who you viewed)
+    const youViewedProfiles = await this.db
+      .select({
+        view: profileViews,
+        target: profiles,
+      })
+      .from(profileViews)
+      .innerJoin(profiles, eq(profileViews.targetProfileId, profiles.id))
+      .where(eq(profileViews.viewerProfileId, profileId))
+      .orderBy(desc(profileViews.viewedAt))
+      .limit(10);
+
     const relatedIds = [
       ...receivedInterests.map((r) => r.sender.id),
       ...receivedShortlists.map((r) => r.sender.id),
       ...recentViewers.map((r) => r.viewer.id),
+      ...youViewedProfiles.map((r) => r.target.id),
     ];
     const photoMap = await getApprovedPrimaryPhotos(this.db, [...new Set(relatedIds)]);
 
@@ -83,7 +96,12 @@ export class ActivityService {
         photo: photoMap.get(r.viewer.id)?.s3Key ?? null,
         subtitle: r.view.viewedAt.toISOString(),
       })),
-      youViewed: [], // Implement if needed
+      youViewed: youViewedProfiles.map((r) => ({
+        id: r.target.id,
+        name: r.target.fullName,
+        photo: photoMap.get(r.target.id)?.s3Key ?? null,
+        subtitle: r.view.viewedAt.toISOString(),
+      })),
       interestsReceived: receivedInterests.map((r) => ({
         id: r.sender.id,
         name: r.sender.fullName,

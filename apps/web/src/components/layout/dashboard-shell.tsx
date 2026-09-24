@@ -18,9 +18,9 @@ import { ContactUnlockModal } from "./contact-unlock-modal"
 const desktopLinks = [
   { href: "/home", label: "Home", match: (p: string) => p === "/home" },
   { href: "/dashboard", label: "Discover", match: (p: string) => p === "/dashboard" || p.startsWith("/search") },
-  { href: "/inbox", label: "Inbox", match: (p: string) => p.startsWith("/inbox") },
-  { href: "/matches", label: "Matches", match: (p: string) => p.startsWith("/matches") },
   { href: "/interests", label: "Interests", match: (p: string) => p.startsWith("/interests") },
+  { href: "/matches", label: "Matches", match: (p: string) => p.startsWith("/matches") },
+  { href: "/inbox", label: "Inbox", match: (p: string) => p.startsWith("/inbox") },
   { href: "/plans", label: "Premium", match: (p: string) => p.startsWith("/plans") || p.startsWith("/checkout") },
 ]
 
