@@ -1,8 +1,8 @@
 import { Injectable, Inject, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans, verifications } from '@astalakshimi/database';
-import { eq, and, ne, inArray, gte, lte, or, desc, sql, gt } from 'drizzle-orm';
+import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans, verifications, lifestyleInterests, horoscopes } from '@astalakshimi/database';
+import { eq, and, ne, inArray, gte, lte, or, desc, sql, gt, lt, between } from 'drizzle-orm';
 import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
 import { dobBoundsForAgeWindow, loadViewerContext, visibilitySql } from '../matches/viewer-context';
 import { candidateAge, targetGenders } from '../matches/match-scoring';
@@ -150,20 +150,62 @@ export class SearchService {
       }
 
       if (adv.heights && adv.heights.length > 0) {
-        // Reject the request when any height is unparseable — silently rewriting
-        // input to 165cm returned wrong matches without telling the caller.
-        const heights = adv.heights.map((h: string) => {
+        const heightConditions = adv.heights.map((h: string) => {
+          if (h === "0-164" || h.startsWith("Up to 5'4") || h.startsWith("Up to 164")) return lt(profiles.heightCm, 165);
+          if (h === "165-173" || h.startsWith("5'5") || h.startsWith("165 cm")) return between(profiles.heightCm, 165, 173);
+          if (h === "174-300" || h.startsWith("5'9") || h.startsWith("174 cm")) return gt(profiles.heightCm, 173);
           const n = parseInt(h, 10);
-          if (!Number.isFinite(n) || n < 100 || n > 250) {
-            throw new BadRequestException(`Invalid height value: ${h}`);
-          }
-          return n;
-        });
-        conditions.push(inArray(profiles.heightCm, heights));
+          if (Number.isFinite(n) && !h.includes("-")) return eq(profiles.heightCm, n);
+          return null;
+        }).filter(Boolean);
+        if (heightConditions.length > 0) {
+          conditions.push(or(...heightConditions));
+        }
       }
       if (adv.educations && adv.educations.length > 0) conditions.push(inArray(profiles.educationLevel, adv.educations));
       if (adv.incomes && adv.incomes.length > 0) conditions.push(inArray(profiles.annualIncome, adv.incomes));
       if (adv.occupations && adv.occupations.length > 0) conditions.push(inArray(profiles.profession, adv.occupations));
+      
+      if (adv.diets && adv.diets.length > 0) {
+        conditions.push(inArray(profiles.id, this.db.select({ id: lifestyleInterests.profileId }).from(lifestyleInterests).where(inArray(lifestyleInterests.diet, adv.diets))));
+      }
+
+      if (adv.smoking && adv.smoking.length > 0) {
+        const mapped = adv.smoking.flatMap((s: string) => {
+          if (s === 'No') return ['Never'];
+          if (s === 'Occasionally') return ['Occasionally'];
+          if (s === 'Yes') return ['Regularly', 'Planning to quit'];
+          return [];
+        });
+        if (mapped.length > 0) {
+          conditions.push(inArray(profiles.id, this.db.select({ id: lifestyleInterests.profileId }).from(lifestyleInterests).where(inArray(lifestyleInterests.smoking, mapped))));
+        }
+      }
+
+      if (adv.drinking && adv.drinking.length > 0) {
+        const mapped = adv.drinking.flatMap((s: string) => {
+          if (s === 'No') return ['Never'];
+          if (s === 'Occasionally') return ['Occasionally'];
+          if (s === 'Yes') return ['Regularly', 'Planning to quit'];
+          return [];
+        });
+        if (mapped.length > 0) {
+          conditions.push(inArray(profiles.id, this.db.select({ id: lifestyleInterests.profileId }).from(lifestyleInterests).where(inArray(lifestyleInterests.alcohol, mapped))));
+        }
+      }
+
+      if (adv.manglik && adv.manglik.length > 0) {
+        const mapped = adv.manglik.map((m: string) => m === "Don't know" ? "Don't Know" : m);
+        conditions.push(inArray(profiles.id, this.db.select({ id: horoscopes.profileId }).from(horoscopes).where(inArray(horoscopes.manglik, mapped))));
+      }
+
+      if (adv.stars && adv.stars.length > 0) {
+        conditions.push(inArray(profiles.id, this.db.select({ id: horoscopes.profileId }).from(horoscopes).where(inArray(horoscopes.nakshatra, adv.stars))));
+      }
+
+      if (adv.relocate) {
+        conditions.push(eq(profiles.willingToRelocate, adv.relocate === 'yes' ? 'Yes' : 'No'));
+      }
     }
 
     // pagination

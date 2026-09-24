@@ -49,19 +49,13 @@ import { ProfileContactUnlockDialog } from "@/components/profile/profile-contact
 
 function formatHeight(height?: string, heightCm?: number): string {
   if (heightCm && heightCm > 0) {
-    const totalInches = Math.round(heightCm / 2.54)
-    const feet = Math.floor(totalInches / 12)
-    const inches = totalInches % 12
-    return `${feet}' ${inches}"`
+    return `${heightCm} cm`
   }
   if (!height) return ""
-  if (height.includes("'")) return height
+  if (height.includes("cm") || height.includes("'")) return height
   const num = parseInt(height.replace(/\D/g, ""), 10)
   if (!isNaN(num) && num >= 100 && num <= 250) {
-    const totalInches = Math.round(num / 2.54)
-    const feet = Math.floor(totalInches / 12)
-    const inches = totalInches % 12
-    return `${feet}' ${inches}"`
+    return `${num} cm`
   }
   return height
 }
@@ -459,11 +453,6 @@ export function MatchListCard({
             {/* Top Photo Badges */}
             <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-2.5">
               <div className="flex flex-col items-start gap-1">
-                {Array.isArray(match.matchReasons) && match.matchReasons.length > 0 && (
-                  <p className="mt-1 line-clamp-1 text-[11px] text-white/90">
-                    {match.matchReasons.slice(0, 3).join(" · ")}
-                  </p>
-                )}
               </div>
 
               <div className="flex items-center gap-1.5">
@@ -555,18 +544,13 @@ export function MatchListCard({
                 </div>
               </div>
 
-              {/* Badges on the right */}
+              {/* Match Reasons Badges on the right */}
               <div className="flex flex-wrap items-center gap-1.5">
-                {featured && (
-                  <Badge variant="secondary" className="text-xs font-bold bg-amber-50 text-amber-900 border-amber-200">
-                    <Sparkles className="mr-1 h-3 w-3 text-amber-600" /> Top
+                {Array.isArray(match.matchReasons) && match.matchReasons.map((reason: string, i: number) => (
+                  <Badge key={i} variant="secondary" className="text-[11px] font-semibold bg-primary/10 text-primary border-primary/20">
+                    <Sparkles className="mr-1.5 h-3 w-3" /> {reason}
                   </Badge>
-                )}
-                {["Online now", "Today", "2 hours ago"].includes(match.lastActive) && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active today
-                  </span>
-                )}
+                ))}
               </div>
             </div>
 

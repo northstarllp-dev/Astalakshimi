@@ -164,7 +164,7 @@ export function ProfileAboutSection({
               ) : null}
             </>
           )}
-          {height ? <DetailRow label="Height" value={height} /> : null}
+          {height ? <DetailRow label="Height" value={`${height}${String(height).includes('cm') ? '' : ' cm'}`} /> : null}
           {weight ? <DetailRow label="Weight" value={weight} /> : null}
           {complexion ? <DetailRow label="Complexion" value={complexion} /> : null}
           {disability ? <DetailRow label="Disability" value={disability} /> : null}

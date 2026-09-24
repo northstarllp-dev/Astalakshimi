@@ -1340,7 +1340,7 @@ function Step6Preferences({
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Feet and inches, same as your height. Leave both empty to ignore height. A range ranks people inside it higher; it does not hide anyone outside it.
+            In centimetres, same as your height. Leave both empty to ignore height. A range ranks people inside it higher; it does not hide anyone outside it.
           </p>
           {errors.prefHeightMinCm && (
             <p className="text-xs text-destructive">{errors.prefHeightMinCm.message}</p>

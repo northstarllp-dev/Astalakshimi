@@ -12,6 +12,7 @@ export function MatchSnapFeed({
     <div
       className={cn(
         "min-h-0 flex-1 snap-y snap-mandatory overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]",
+        "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
         className,
       )}
     >
@@ -28,7 +29,7 @@ export function MatchSnapSlide({
   className?: string
 }) {
   return (
-    <div className={cn("flex h-full snap-start snap-always flex-col py-2", className)}>
+    <div className={cn("flex snap-start snap-always flex-col py-2", className)}>
       {children}
     </div>
   )

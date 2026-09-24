@@ -205,7 +205,7 @@ export class InterestsService {
             : `${sender.fullName} sent you an interest request.`,
           category: 'interests',
           kind: 'interest_received',
-          href: '/inbox',
+          href: '/interests',
         });
 
         return {
@@ -237,7 +237,7 @@ export class InterestsService {
         : `${sender.fullName} sent you an interest request.`,
       category: 'interests',
       kind: 'interest_received',
-      href: '/inbox',
+      href: '/interests',
     });
 
     return {

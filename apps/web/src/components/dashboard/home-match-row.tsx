@@ -81,7 +81,7 @@ export function HomeMatchRow({
             </Link>
             <PlanCrownBadge plan={planTier} size="sm" />
             <p className="text-xs text-muted-foreground sm:text-sm">
-              {match.age} yrs{height ? `, ${height}` : ""}
+              {match.age} yrs{height ? `, ${height}${String(height).includes('cm') ? '' : ' cm'}` : ""}
             </p>
           </div>
           {community ? <p className="mt-0.5 truncate text-xs text-foreground/85 sm:mt-1 sm:text-sm">{community}</p> : null}

@@ -172,23 +172,24 @@ export function HeightInput({
   onChange: (value: string) => void
   className?: string
 }) {
-  const shown = displayHeight(value)
-
   return (
     <InputWithUnit
-      value={shown}
-      onChange={(next) => onChange(maskHeightInput(next, shown))}
-      placeholder={`5'11"`}
+      value={value}
+      onChange={(next) => {
+        const digits = next.replace(/\D/g, "").slice(0, 3)
+        onChange(digits)
+      }}
+      placeholder="165"
       inputMode="numeric"
-      maxLength={6}
+      maxLength={3}
       aria-label="Height"
-      unit={`ft'in"`}
+      unit="cm"
       className={className}
     />
   )
 }
 
-/** Feet/inches field backed by a centimetre integer (partner height range). */
+/** Integer centimetre field for partner height ranges. */
 export function HeightCmInput({
   valueCm,
   onChangeCm,
@@ -201,27 +202,27 @@ export function HeightCmInput({
   className?: string
 }) {
   const [draft, setDraft] = React.useState<string | null>(null)
-  const shown = draft ?? (typeof valueCm === "number" ? formatHeightFromCm(valueCm) : "")
+  const shown = draft ?? (typeof valueCm === "number" ? String(valueCm) : "")
 
   return (
     <InputWithUnit
       value={shown}
       onChange={(next) => {
-        const masked = maskHeightInput(next, shown)
-        setDraft(masked)
-        if (!masked) {
+        const digits = next.replace(/\D/g, "").slice(0, 3)
+        setDraft(digits)
+        if (!digits) {
           onChangeCm(undefined)
           return
         }
-        const cm = parseHeightToCm(masked)
-        if (cm != null) onChangeCm(cm)
+        const cm = parseInt(digits, 10)
+        if (Number.isFinite(cm)) onChangeCm(cm)
       }}
       onBlur={() => setDraft(null)}
-      placeholder={`5'4"`}
+      placeholder="165"
       inputMode="numeric"
-      maxLength={6}
+      maxLength={3}
       aria-label={ariaLabel}
-      unit={`ft'in"`}
+      unit="cm"
       className={className}
     />
   )

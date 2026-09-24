@@ -203,7 +203,7 @@ export class AdminService {
           : `Your profile verification was rejected. Reason: ${rejectionReason || 'Please contact support.'}`,
         category: 'account',
         kind: 'verification',
-        href: '/profile/edit',
+        href: status === 'verified' ? '/profile' : '/profile/edit',
       });
     }
 

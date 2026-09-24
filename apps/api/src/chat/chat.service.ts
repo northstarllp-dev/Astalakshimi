@@ -255,7 +255,7 @@ export class ChatService {
           body: dto.text.length > 60 ? dto.text.slice(0, 57) + '...' : dto.text,
           category: 'messages',
           kind: 'interest_accepted',
-          href: `/inbox/${senderProfile.id}`,
+          href: '/inbox',
         });
       } catch (err) {
         // Non-blocking notification failure

@@ -209,4 +209,43 @@ test.describe('Discover sub-tabs', () => {
       return Number((text || '').match(/(\d+)/)?.[1] || 0);
     }).toBeGreaterThanOrEqual(4);
   });
+
+  test('Inbox stats tiles display correctly', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/dashboard');
+    
+    await expect(page.getByText('Interests').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Shortlisted').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Views').first()).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('Filter modal opens and closes correctly on Browse tab', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/dashboard?view=search');
+    
+    const filterBtn = page.getByRole('button', { name: /Age & filters/i });
+    await expect(filterBtn).toBeVisible({ timeout: 30_000 });
+    await filterBtn.click();
+    
+    const filterModalHeading = page.getByRole('heading', { name: 'Filters' }).first();
+    await expect(filterModalHeading).toBeVisible({ timeout: 30_000 });
+    
+    // Close modal
+    const closeBtn = page.getByRole('button', { name: 'Close' });
+    await closeBtn.click();
+    await expect(filterModalHeading).toBeHidden();
+  });
+
+  test('Quick preferences button applies filters', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/dashboard?view=search');
+    
+    const prefsBtn = page.getByRole('button', { name: /My preferences/i });
+    await expect(prefsBtn).toBeVisible({ timeout: 30_000 });
+    await prefsBtn.click();
+    
+    // Once applied, the button label might change or filters appear as active chips.
+    // The label changes to "Preferences applied"
+    await expect(page.getByRole('button', { name: /Preferences applied/i })).toBeVisible({ timeout: 30_000 });
+  });
 });

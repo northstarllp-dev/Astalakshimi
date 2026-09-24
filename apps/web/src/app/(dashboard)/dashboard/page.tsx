@@ -55,11 +55,36 @@ import {
   Sparkles,
   X,
 } from "lucide-react"
-import { CityAutocomplete } from "@/components/profile/city-autocomplete"
-import { SearchableSelect } from "@/components/profile/searchable-select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { getCommunities } from "@/lib/community-data"
 
-const HEIGHT_BANDS = ["Up to 5'4\"", "5'5\" – 5'8\"", "5'9\" & above"]
+const POPULAR_CITIES = [
+  "Bengaluru",
+  "Chennai",
+  "Coimbatore",
+  "Delhi",
+  "Hyderabad",
+  "Kochi",
+  "Madurai",
+  "Mumbai",
+  "Pune",
+  "Salem",
+  "Thiruvananthapuram",
+  "Tiruchirappalli",
+  "Tirunelveli",
+]
+
+const HEIGHT_BANDS = [
+  { label: "Short (Under 165 cm)", value: "0-164" },
+  { label: "Average (165 - 173 cm)", value: "165-173" },
+  { label: "Tall (174 cm & above)", value: "174-300" }
+]
 const EDUCATION_GROUPS = ["B.Tech", "B.E", "MBA", "M.Sc", "Ph.D", "M.Phil", "Post Doctorate", "Others"]
 const MATCHES_PAGE_SIZE = 10
 
@@ -319,8 +344,6 @@ function TopMatchesPanel({
               match={match}
               featured={index === 0 && page === 1}
               priority={index === 0}
-              fillViewport
-              className="h-full"
               interactionsLocked={interactionsLocked}
               onSkip={onSkip}
               onConnect={onConnect}
@@ -609,6 +632,42 @@ function SearchFilterPanel({
               </button>
             </span>
           )}
+          {(["heights", "educations", "incomes", "occupations", "diets", "smoking", "drinking", "manglik", "stars"] as const).flatMap(key => 
+            query.advanced[key].map(val => {
+              const prefix = ["smoking", "drinking", "manglik"].includes(key)
+                ? `${key.charAt(0).toUpperCase() + key.slice(1)}: `
+                : "";
+              let displayVal = val;
+              if (key === 'heights') {
+                const band = HEIGHT_BANDS.find(b => b.value === val);
+                if (band) displayVal = band.label;
+              }
+              return (
+                <span key={`${key}-${val}`} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground">
+                  {prefix}{displayVal}
+                  <button
+                    type="button"
+                    onClick={() => setAdvanced({ [key]: query.advanced[key].filter((x: string) => x !== val) })}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )
+            })
+          )}
+          {query.advanced.relocate && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground">
+              Relocate: {query.advanced.relocate}
+              <button
+                type="button"
+                onClick={() => setAdvanced({ relocate: "" })}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setFilterOpen(true)}
@@ -660,8 +719,6 @@ function SearchFilterPanel({
                 match={match}
                 featured={index === 0 && query.tab === "all"}
                 priority={index === 0}
-                fillViewport
-                className="h-full"
                 interactionsLocked={interactionsLocked}
                 onSkip={onSkip}
                 onConnect={onConnect}
@@ -807,24 +864,22 @@ function SearchFilterPanel({
                   ) : null}
                 </div>
                 <div className="relative mt-2">
-                  <CityAutocomplete
-                    city={query.city}
-                    onCityChange={({ city }) => setQuick({ city })}
-                    placeholder="Any city"
-                    searchPlaceholder="Search city (e.g. Chennai, Bengaluru)…"
-                    className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm"
-                  />
-                  {query.city ? (
-                    <button
-                      type="button"
-                      onClick={() => setQuick({ city: "" })}
-                      className="absolute right-9 top-1/2 -translate-y-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition"
-                      aria-label="Clear location"
-                      title="Clear location"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  ) : null}
+                  <Select
+                    value={query.city || undefined}
+                    onValueChange={(city) => setQuick({ city: city === "any" ? "" : city })}
+                  >
+                    <SelectTrigger className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm">
+                      <SelectValue placeholder="Any city" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[70]">
+                      <SelectItem value="any">Any city</SelectItem>
+                      {POPULAR_CITIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -845,27 +900,22 @@ function SearchFilterPanel({
                   ) : null}
                 </div>
                 <div className="relative mt-2">
-                  <SearchableSelect
-                    value={query.community}
-                    onValueChange={(community) => setQuick({ community })}
-                    options={communityOptions}
-                    placeholder="Any community"
-                    searchPlaceholder="Search or type community…"
-                    emptyText="No matching community found."
-                    allowCustom={true}
-                    className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm"
-                  />
-                  {query.community ? (
-                    <button
-                      type="button"
-                      onClick={() => setQuick({ community: "" })}
-                      className="absolute right-9 top-1/2 -translate-y-1/2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground transition"
-                      aria-label="Clear community"
-                      title="Clear community"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  ) : null}
+                  <Select
+                    value={query.community || undefined}
+                    onValueChange={(community) => setQuick({ community: community === "any" ? "" : community })}
+                  >
+                    <SelectTrigger className="h-12 w-full rounded-xl border border-input bg-card px-4 text-sm">
+                      <SelectValue placeholder="Any community" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[70]">
+                      <SelectItem value="any">Any community</SelectItem>
+                      {communityOptions.filter(o => o.value).map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -942,10 +992,10 @@ function SearchFilterPanel({
             <FilterSection title="Height">
               {HEIGHT_BANDS.map((h) => (
                 <CheckItem
-                  key={h}
-                  label={h}
-                  checked={query.advanced.heights.includes(h)}
-                  onChange={() => setAdvanced({ heights: toggle(query.advanced.heights, h) })}
+                  key={h.value}
+                  label={h.label}
+                  checked={query.advanced.heights.includes(h.value)}
+                  onChange={() => setAdvanced({ heights: toggle(query.advanced.heights, h.value) })}
                 />
               ))}
             </FilterSection>

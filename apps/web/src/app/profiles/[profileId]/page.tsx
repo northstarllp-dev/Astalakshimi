@@ -171,7 +171,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
         ? `${data.partnerPreferences.prefAgeMin} - ${data.partnerPreferences.prefAgeMax} yrs` 
         : "Not specified",
       heightRange: data.partnerPreferences?.prefHeightMinCm && data.partnerPreferences?.prefHeightMaxCm
-        ? `${formatHeightFromCm(data.partnerPreferences.prefHeightMinCm)} - ${formatHeightFromCm(data.partnerPreferences.prefHeightMaxCm)}`
+        ? `${formatHeightFromCm(data.partnerPreferences.prefHeightMinCm)} cm - ${formatHeightFromCm(data.partnerPreferences.prefHeightMaxCm)} cm`
         : "Not specified",
       maritalStatus: data.partnerPreferences?.prefMaritalStatuses?.length ? data.partnerPreferences.prefMaritalStatuses.join(", ") : "Not specified",
       religion: data.partnerPreferences?.prefReligions?.length ? data.partnerPreferences.prefReligions.join(", ") : "Not specified",
@@ -207,7 +207,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
           <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
             <div className="flex flex-wrap gap-2 text-sm">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
-                <Ruler className="h-3.5 w-3.5 text-primary" /> {profile.height}
+                <Ruler className="h-3.5 w-3.5 text-primary" /> {profile.height} cm
               </span>
               {profile.education && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">

@@ -62,7 +62,7 @@ export default function AdminCreateProfilePage() {
       dobMonth: "01",
       dobYear: "1998",
       maritalStatus: "Never Married",
-      height: "160 cm",
+      height: "160",
       diet: "Vegetarian",
       city: "",
       religion: "Hindu",
@@ -295,8 +295,8 @@ export default function AdminCreateProfilePage() {
           )}
 
           <div className="grid gap-4 sm:grid-cols-2 pt-2">
-            <Field label="Height" error={form.formState.errors.height?.message}>
-              <Input {...form.register("height")} placeholder="e.g. 5' 6&quot; or 168 cm" />
+            <Field label="Height (cm)" error={form.formState.errors.height?.message}>
+              <Input {...form.register("height")} placeholder="165" type="number" />
             </Field>
             <Field label="Diet" error={form.formState.errors.diet?.message}>
               <Select value={form.watch("diet")} onValueChange={(v) => form.setValue("diet", v as AdminCreateProfileValues["diet"])}>
