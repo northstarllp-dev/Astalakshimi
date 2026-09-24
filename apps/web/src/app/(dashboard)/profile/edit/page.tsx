@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { getMediaUrl } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
+import { startHoroscopeDownload } from "@/lib/horoscope-download"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,12 +25,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { DateOfBirthPicker } from "@/components/profile/date-of-birth-picker"
-import { BirthTimeInput, HeightInput, WeightInput } from "@/components/profile/input-with-unit"
+import { BirthTimeInput, HeightCmInput, HeightInput, WeightInput } from "@/components/profile/input-with-unit"
 import { EducationFields } from "@/components/profile/education-fields"
 import { OccupationSelect } from "@/components/profile/occupation-select"
 import { MultiSelect } from "@/components/profile/multi-select"
 import { SearchableSelect } from "@/components/profile/searchable-select"
-import { CityAutocomplete } from "@/components/profile/city-autocomplete"
+import { CityAutocomplete, CityMultiSelect } from "@/components/profile/city-autocomplete"
 import { ChildrenFields } from "@/components/profile/children-fields"
 import { getCommunityLabelsForReligion, findCommunityByLabel, getCommunities } from "@/lib/community-data"
 import { CommunityFields } from "@/components/profile/community-fields"
@@ -75,7 +76,7 @@ import {
 } from "@/lib/profile-completeness"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeft, Camera, Check, ChevronLeft, ChevronRight, ExternalLink, Eye, FileText, GripVertical, Star, Trash2, Upload } from "lucide-react"
+import { ArrowLeft, Camera, Check, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FileText, GripVertical, Star, Trash2, Upload } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { hashFile } from "@/lib/file-hash"
@@ -174,6 +175,8 @@ const SAVE_FIELD_SECTION: Record<string, string> = {
   rashi: "#horoscope",
   manglik: "#horoscope",
   prefReligion: "#preferences",
+  prefMaritalStatuses: "#preferences",
+  prefAge: "#preferences",
 }
 
 /**
@@ -187,7 +190,7 @@ const EDIT_TABS: { id: string; label: string; requiredIds: string[] }[] = [
   { id: "family", label: "Family", requiredIds: [] },
   { id: "location", label: "Location", requiredIds: [] },
   { id: "lifestyle", label: "Lifestyle", requiredIds: ["diet"] },
-  { id: "preferences", label: "Preferences", requiredIds: ["prefReligion"] },
+  { id: "preferences", label: "Preferences", requiredIds: ["prefReligion", "prefMaritalStatuses", "prefAge"] },
   { id: "photos", label: "Photos", requiredIds: ["photos"] },
   { id: "horoscope", label: "Horoscope", requiredIds: ["star", "rashi", "manglik", "birthTime", "birthPlace"] },
 ]
@@ -968,36 +971,30 @@ export default function ProfileEditPage() {
       <EditSection id="preferences" title="Partner preferences">
         <p className="text-sm text-muted-foreground">Changes affect your daily match results immediately.</p>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Min age">
-            <Input type="number" value={data.prefAgeMin} onChange={(e) => update({ prefAgeMin: Number(e.target.value) || 18 })} />
+          <Field label="Min age" required missing={isMissing("prefAge")} error={fieldError(errors, "prefAgeMin")}>
+            <Input type="number" value={data.prefAgeMin ?? ""} onChange={(e) => update({ prefAgeMin: e.target.value === "" ? undefined : Number(e.target.value) })} />
           </Field>
-          <Field label="Max age">
-            <Input type="number" value={data.prefAgeMax} onChange={(e) => update({ prefAgeMax: Number(e.target.value) || 40 })} />
+          <Field label="Max age" required missing={isMissing("prefAge")} error={fieldError(errors, "prefAgeMax")}>
+            <Input type="number" value={data.prefAgeMax ?? ""} onChange={(e) => update({ prefAgeMax: e.target.value === "" ? undefined : Number(e.target.value) })} />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Min height (cm)">
-            <Input
-              type="number"
-              value={data.prefHeightMinCm ?? ""}
-              onChange={(e) =>
-                update({ prefHeightMinCm: e.target.value === "" ? undefined : Number(e.target.value) })
-              }
-              placeholder="e.g. 150"
+          <Field label="Min height">
+            <HeightCmInput
+              valueCm={data.prefHeightMinCm}
+              onChangeCm={(cm) => update({ prefHeightMinCm: cm })}
+              ariaLabel="Preferred minimum height"
             />
           </Field>
-          <Field label="Max height (cm)">
-            <Input
-              type="number"
-              value={data.prefHeightMaxCm ?? ""}
-              onChange={(e) =>
-                update({ prefHeightMaxCm: e.target.value === "" ? undefined : Number(e.target.value) })
-              }
-              placeholder="e.g. 185"
+          <Field label="Max height">
+            <HeightCmInput
+              valueCm={data.prefHeightMaxCm}
+              onChangeCm={(cm) => update({ prefHeightMaxCm: cm })}
+              ariaLabel="Preferred maximum height"
             />
           </Field>
         </div>
-        <Field label="Preferred religions" required error={fieldError(errors, "prefReligion")}>
+        <Field label="Preferred religions" required missing={isMissing("prefReligion")} error={fieldError(errors, "prefReligion")}>
           <MultiSelect
             values={data.prefReligion || []}
             onValuesChange={(values) => update({ prefReligion: values })}
@@ -1006,19 +1003,25 @@ export default function ProfileEditPage() {
             searchPlaceholder="Search religions…"
           />
         </Field>
-        <Field label="Preferred marital status">
+        <Field label="Preferred marital status" required missing={isMissing("prefMaritalStatuses")} error={fieldError(errors, "prefMaritalStatuses")}>
           <MultiSelect
             values={data.prefMaritalStatuses || []}
             onValuesChange={(values) => update({ prefMaritalStatuses: values })}
             options={[...MARITAL_STATUSES]}
-            placeholder="Any marital status"
+            placeholder="Select marital status"
             searchPlaceholder="Search…"
           />
         </Field>
         <Field label="Preferred communities">
           <MultiSelect
             values={data.prefCastes || []}
-            onValuesChange={(values) => update({ prefCastes: values })}
+            onValuesChange={(values) =>
+              update({
+                prefCastes: values.some((value) => value.trim().toLowerCase() === "caste no bar")
+                  ? ["Caste no bar"]
+                  : values,
+              })
+            }
             options={communityOptions}
             placeholder="Any community"
             searchPlaceholder="Search communities…"
@@ -1043,17 +1046,10 @@ export default function ProfileEditPage() {
           />
         </Field>
         <Field label="Preferred locations">
-          <Input
-            value={(data.prefLocations || []).join(", ")}
-            onChange={(e) =>
-              update({
-                prefLocations: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="e.g. Chennai, Bengaluru"
+          <CityMultiSelect
+            values={data.prefLocations || []}
+            onValuesChange={(values) => update({ prefLocations: values })}
+            placeholder="Search cities…"
           />
         </Field>
       </EditSection>
@@ -1326,6 +1322,19 @@ export default function ProfileEditPage() {
                       <ExternalLink className="mr-1.5 h-4 w-4" />
                       Open
                     </Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      void startHoroscopeDownload(data.horoscopeName).catch(() => {
+                        alert("Could not download the horoscope. Try again in a moment.")
+                      })
+                    }}
+                  >
+                    <Download className="mr-1.5 h-4 w-4" />
+                    Download
                   </Button>
                   <Button type="button" variant="ghost" size="sm" onClick={() => horoscopeRef.current?.click()}>
                     <Upload className="mr-1.5 h-4 w-4" />

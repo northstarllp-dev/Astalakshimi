@@ -85,8 +85,8 @@ test('preferences step opens with "same as me" pre-filled from the community ste
   await expect(page.getByText('Tamil', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Preferred locations')).toHaveValue('Chennai');
 
-  // Marital status defaults to Never Married, and the age window is seeded.
-  await expect(page.getByText('Never Married', { exact: true })).toBeVisible();
+  // Marital status is required and is not same-as-me / defaulted.
+  await expect(page.getByText('Never Married', { exact: true })).toHaveCount(0);
   const minAge = await page.getByLabel('Preferred minimum age').inputValue();
   const maxAge = await page.getByLabel('Preferred maximum age').inputValue();
   expect(Number(minAge)).toBeGreaterThanOrEqual(18);
@@ -106,6 +106,11 @@ test('editing the preferences writes the member’s real choices to the draft', 
   await page.getByRole('option', { name: 'Jain' }).click();
   await page.keyboard.press('Escape');
 
+  await page.getByLabel('Preferred marital status').click();
+  await page.getByRole('option', { name: 'Never Married' }).click();
+  await page.getByRole('option', { name: 'Divorced' }).click();
+  await page.keyboard.press('Escape');
+
   // Minimum education is optional — set it to prove it flows through.
   await page.getByLabel('Minimum education').click();
   await page.getByRole('option', { name: CHOSEN_PREFS.prefMinEducation }).click();
@@ -120,6 +125,7 @@ test('editing the preferences writes the member’s real choices to the draft', 
   expect(draft.data.prefAgeMin).toBe(CHOSEN_PREFS.prefAgeMin);
   expect(draft.data.prefAgeMax).toBe(CHOSEN_PREFS.prefAgeMax);
   expect(draft.data.prefReligion).toEqual(expect.arrayContaining(['Hindu', 'Jain']));
+  expect(draft.data.prefMaritalStatuses).toEqual(expect.arrayContaining(['Never Married', 'Divorced']));
   expect(draft.data.prefMinEducation).toBe(CHOSEN_PREFS.prefMinEducation);
   expect(draft.data.prefCastes).toEqual(['Brahmin']);
   expect(draft.data.prefMotherTongues).toEqual(['Tamil']);
@@ -149,6 +155,16 @@ test('an inverted age range blocks Continue with a message', async ({ page }) =>
   await page.getByRole('button', { name: /continue/i }).click();
 
   await expect(page.getByText('Minimum age cannot be above maximum age.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Who are you looking for?' })).toBeVisible();
+});
+
+test('leaving marital status empty blocks Continue with a message', async ({ page }) => {
+  await page.goto('/register');
+  await expect(page.getByRole('heading', { name: 'Who are you looking for?' })).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole('button', { name: /continue/i }).click();
+
+  await expect(page.getByText(/at least one preferred marital status/i)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Who are you looking for?' })).toBeVisible();
 });
 
@@ -196,6 +212,8 @@ test('registering stores the chosen preferences and they drive the matches', asy
       photoS3Keys: [`profiles/${fx.userId}/photos/11111111-1111-4111-8111-111111111111.jpeg`],
       verificationMethod: 'selfie',
       selfieS3Key: `verifications/${fx.userId}/selfie-22222222-2222-4222-8222-222222222222.jpeg`,
+      govtIdType: 'PAN card',
+      govtIdS3Key: `verifications/${fx.userId}/govt-id-33333333-3333-4333-8333-333333333333.pdf`,
       ...CHOSEN_PREFS,
     },
   });
@@ -209,15 +227,14 @@ test('registering stores the chosen preferences and they drive the matches', asy
   expect(prefs.prefAgeMin).toBe(CHOSEN_PREFS.prefAgeMin);
   expect(prefs.prefAgeMax).toBe(CHOSEN_PREFS.prefAgeMax);
   expect(prefs.prefReligions).toEqual(expect.arrayContaining(CHOSEN_PREFS.prefReligions));
+  expect(prefs.prefMaritalStatuses).toEqual(expect.arrayContaining(CHOSEN_PREFS.prefMaritalStatuses));
   expect(prefs.prefCastes).toEqual(expect.arrayContaining(CHOSEN_PREFS.prefCastes));
   expect(prefs.prefMotherTongues).toEqual(expect.arrayContaining(CHOSEN_PREFS.prefMotherTongues));
   expect(prefs.prefMinEducation).toBe(CHOSEN_PREFS.prefMinEducation);
   expect(prefs.prefReligions).not.toEqual(['Hindu']);
+  expect(prefs.prefMaritalStatuses).not.toEqual(['Never Married']);
   expect(prefs.prefAgeMin).not.toBe(24);
 
-  // The engine honours them: the prefs-matching candidate is returned, while the
-  // one that only satisfied the OLD defaults (age 26, Christian) is excluded by
-  // the religion + age hard filters.
   const topRes = await page.request.get('/api/proxy/matches/top');
   expect(topRes.ok()).toBeTruthy();
   const top = (await topRes.json()) as Array<{ id: string; fullName: string; matchPercent?: number }>;
@@ -225,8 +242,6 @@ test('registering stores the chosen preferences and they drive the matches', asy
   expect(ids).toContain(fx.matchProfileId);
   expect(ids).not.toContain(fx.nonMatchProfileId);
 
-  // ...and the score the API returns is a real computed percentage.
   const match = top.find((m) => m.id === fx.matchProfileId)!;
-  expect(typeof match.matchPercent).toBe('number');
-  expect(match.matchPercent).toBeGreaterThan(60);
+  expect(match.matchPercent).toBeUndefined();
 });

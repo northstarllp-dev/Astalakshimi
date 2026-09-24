@@ -2,11 +2,11 @@ import { z } from 'zod';
 
 export const partnerPreferencesSchema = z
   .object({
-    prefAgeMin: z.number().int().min(18, 'Minimum age is 18').max(100),
-    prefAgeMax: z.number().int().min(18).max(100),
-    prefHeightMinCm: z.number().int().min(120).max(230).default(140),
-    prefHeightMaxCm: z.number().int().min(120).max(230).default(200),
-    prefMaritalStatuses: z.array(z.string()).default(['Never Married']),
+    prefAgeMin: z.number().int().min(18, 'Minimum age is 18').max(80, 'Maximum age is 80'),
+    prefAgeMax: z.number().int().min(18).max(80, 'Maximum age is 80'),
+    prefHeightMinCm: z.number().int().min(120).max(230).optional(),
+    prefHeightMaxCm: z.number().int().min(120).max(230).optional(),
+    prefMaritalStatuses: z.array(z.string()).min(1, 'Select at least one preferred marital status'),
     prefReligions: z.array(z.string()).min(1, 'Please select at least one religion'),
     prefCastes: z.array(z.string()).default([]),
     prefMotherTongues: z.array(z.string()).default([]),
@@ -22,7 +22,11 @@ export const partnerPreferencesSchema = z
         message: 'Max age must be greater than or equal to min age',
       });
     }
-    if (data.prefHeightMinCm > data.prefHeightMaxCm) {
+    if (
+      data.prefHeightMinCm != null &&
+      data.prefHeightMaxCm != null &&
+      data.prefHeightMinCm > data.prefHeightMaxCm
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['prefHeightMaxCm'],

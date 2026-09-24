@@ -43,6 +43,13 @@ function dobAge(day: string, month: string, year: string, gender: string) {
   return { ok: true as const, age }
 }
 
+function optionalInt(min: number, max: number) {
+  return z.preprocess(
+    (v) => (v === "" || v === null || Number.isNaN(v) ? undefined : v),
+    z.number().int().min(min).max(max).optional(),
+  )
+}
+
 export const signupStep2Schema = z
   .object({
     fullName: z
@@ -105,23 +112,22 @@ export const signupStep3Schema = z.object({
   motherTongue: z.string().min(1, "Select a mother tongue."),
 })
 
-// Step 5 — partner preferences. Age range + preferred religion are required
-// (they drive the match engine's hard filters); the rest is optional and
-// pre-filled "same as me" from the community step. The age fields stay
-// structurally optional so an emptied input is representable — presence is
-// enforced in the refine below.
+// Step 5 — partner preferences. Age range, preferred religion, and preferred
+// marital status are required (they drive For you hard filters); the rest is optional.
+// Age fields stay structurally optional so an emptied input is representable —
+// presence is enforced in the refine below.
 export const signupStepPreferencesSchema = z
   .object({
     prefAgeMin: z.number().int("Enter a whole number.").min(18, "Minimum age is 18.").max(80, "Maximum age is 80.").optional(),
     prefAgeMax: z.number().int("Enter a whole number.").min(18, "Minimum age is 18.").max(80, "Maximum age is 80.").optional(),
     prefReligion: z.array(z.string()).min(1, "Select at least one preferred religion."),
-    prefMaritalStatuses: z.array(z.string()).optional(),
+    prefMaritalStatuses: z.array(z.string()).min(1, "Select at least one preferred marital status."),
     prefCastes: z.array(z.string()).optional(),
     prefMotherTongues: z.array(z.string()).optional(),
     prefMinEducation: z.string().optional(),
     prefLocations: z.array(z.string()).optional(),
-    prefHeightMinCm: z.number().int().min(120).max(230).optional(),
-    prefHeightMaxCm: z.number().int().min(120).max(230).optional(),
+    prefHeightMinCm: optionalInt(120, 230),
+    prefHeightMaxCm: optionalInt(120, 230),
   })
   .superRefine((value, ctx) => {
     if (value.prefAgeMin === undefined) {
@@ -200,8 +206,8 @@ export const profileEditSchema = z
     employmentStatus: z.string().optional(),
     profession: z.string().optional(),
     annualIncome: z.string().optional(),
-    prefReligion: z.array(z.string()).optional(),
-    prefMaritalStatuses: z.array(z.string()).optional(),
+    prefReligion: z.array(z.string()).min(1, "Select at least one preferred religion."),
+    prefMaritalStatuses: z.array(z.string()).min(1, "Select at least one preferred marital status."),
     prefCastes: z.array(z.string()).optional(),
     prefMotherTongues: z.array(z.string()).optional(),
     prefMinEducation: z.string().optional(),
@@ -209,8 +215,8 @@ export const profileEditSchema = z
     aboutMe: z.string().max(1000, "Keep this under 1000 characters."),
     prefAgeMin: z.number().int().min(18).max(80).optional(),
     prefAgeMax: z.number().int().min(18).max(80).optional(),
-    prefHeightMinCm: z.number().int().min(120).max(230).optional(),
-    prefHeightMaxCm: z.number().int().min(120).max(230).optional(),
+    prefHeightMinCm: optionalInt(120, 230),
+    prefHeightMaxCm: optionalInt(120, 230),
     brothersCount: z.number().int().min(0).max(5),
     sistersCount: z.number().int().min(0).max(5),
   })
@@ -372,8 +378,8 @@ export const adminCreateProfileSchema = z
     planId: z.string().optional(),
     prefAgeMin: z.number().int().min(18).max(80),
     prefAgeMax: z.number().int().min(18).max(80),
-    prefHeightMinCm: z.number().int().min(120).max(230).optional(),
-    prefHeightMaxCm: z.number().int().min(120).max(230).optional(),
+    prefHeightMinCm: optionalInt(120, 230),
+    prefHeightMaxCm: optionalInt(120, 230),
     prefMaritalStatuses: z.array(z.string()).min(1, "Select preferred marital statuses."),
     prefReligions: z.array(z.string()).min(1, "Select preferred religions."),
     prefCastes: z.array(z.string()).optional(),

@@ -1,14 +1,11 @@
 /**
  * Match scoring contracts shared between the API and web.
  *
- * `matchPercent` is computed by `apps/api/src/matches/match-scoring.ts`
- * (base 40 + up to 60 soft points, capped 98). Absent/null means
- * "no score computed" (e.g. viewing your own profile) — the UI must
- * hide the badge rather than fabricate a number.
+ * For you may include `matchReasons` (plain labels). The product never shows
+ * a match percentage.
  */
 
 export interface MatchScoreInfo {
-  matchPercent?: number | null;
   matchReasons?: string[];
 }
 

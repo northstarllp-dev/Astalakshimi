@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react"
+import { ArrowLeft, ChevronRight, Loader2, UserRound } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 import { getMediaUrl } from "@/lib/utils"
 import {
@@ -40,9 +40,9 @@ import {
   type SignupData,
 } from "@/lib/profile-store"
 import { StepHeading, StepProgress, TapCard } from "@/components/signup/shared"
-import { CityAutocomplete } from "@/components/profile/city-autocomplete"
+import { CityAutocomplete, CityMultiSelect } from "@/components/profile/city-autocomplete"
 import { CommunityFields } from "@/components/profile/community-fields"
-import { HeightInput } from "@/components/profile/input-with-unit"
+import { HeightCmInput, HeightInput } from "@/components/profile/input-with-unit"
 import { ChildrenFields } from "@/components/profile/children-fields"
 import { MultiSelect } from "@/components/profile/multi-select"
 import { SearchableSelect } from "@/components/profile/searchable-select"
@@ -58,6 +58,11 @@ import {
 import { getCommunities } from "@astalakshimi/reference"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+
+function directPreview(value: string | undefined) {
+  if (!value) return ""
+  return value.startsWith("blob:") || value.startsWith("data:image/") ? value : ""
+}
 
 const TOTAL_STEPS = SIGNUP_TOTAL_STEPS
 const REFERRED_BY_KEY = "astalakshimi.referredBy"
@@ -103,12 +108,8 @@ function SignupPageInner() {
           )
             .filter(Boolean)
             .map((path) => getMediaUrl(path)),
-          selfiePhoto: draft.data.selfieS3Key
-            ? getMediaUrl(draft.data.selfieS3Key)
-            : draft.data.selfiePhoto || "",
-          govtIdPhoto: draft.data.govtIdS3Key
-            ? getMediaUrl(draft.data.govtIdS3Key)
-            : draft.data.govtIdPhoto || "",
+          selfiePhoto: directPreview(draft.data.selfiePhoto),
+          govtIdPhoto: directPreview(draft.data.govtIdPhoto),
         }
         // Seed the "same as me" preference pre-fills when resuming into (or
         // past) the preferences step, so step 5 opens pre-filled and the draft
@@ -622,13 +623,18 @@ function Step2Identity({
     <form className="space-y-8" onSubmit={form.handleSubmit(() => nextStep())}>
       <StepHeading
         title="Identity"
-        subtitle="Tell us about the person looking for a match."
+        subtitle="Tell us about the person looking for a match. Fields marked * are required."
       />
 
       <div className="space-y-5">
         {/* Name */}
           <div className="space-y-2">
-          <Label htmlFor="fullName">{p}Full name</Label>
+          <Label htmlFor="fullName">
+            {p}Full name
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
             <Input
               id="fullName"
               placeholder="e.g. Priya Sharma"
@@ -643,7 +649,12 @@ function Step2Identity({
 
         {/* Gender */}
           <div className="space-y-2">
-          <Label>Gender</Label>
+          <Label>
+            Gender
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
             <div className="grid grid-cols-3 gap-2.5">
               {["Male", "Female", "Other"].map((g) => (
                 <TapCard key={g} selected={data.gender === g} onClick={() => updateData({ gender: g })} title={g} />
@@ -653,7 +664,12 @@ function Step2Identity({
 
         {/* DOB */}
           <div className="space-y-2">
-          <Label>{p}Date of birth</Label>
+          <Label>
+            {p}Date of birth
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
             <DobFields
               day={data.dobDay}
               month={data.dobMonth}
@@ -666,7 +682,12 @@ function Step2Identity({
 
         {/* Marital status */}
           <div className="space-y-2">
-          <Label>{p}Marital status</Label>
+          <Label>
+            {p}Marital status
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
           <Select
             value={data.maritalStatus || undefined}
             onValueChange={(maritalStatus) =>
@@ -693,7 +714,12 @@ function Step2Identity({
 
         {/* Diet */}
         <div className="space-y-2">
-          <Label>{p}Diet</Label>
+          <Label>
+            {p}Diet
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
           <Select
             value={data.diet || undefined}
             onValueChange={(diet) => updateData({ diet })}
@@ -713,7 +739,12 @@ function Step2Identity({
         </div>
 
         <div className="space-y-2">
-          <Label>{p}Height</Label>
+          <Label>
+            {p}Height
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
           <HeightInput value={data.height} onChange={(height) => updateData({ height })} />
           {errors.height && <p className="text-xs text-destructive">{errors.height.message}</p>}
         </div>
@@ -734,7 +765,12 @@ function Step2Identity({
 
         {/* Location */}
         <div className="space-y-2">
-          <Label htmlFor="city">{p}Current city</Label>
+          <Label htmlFor="city">
+            {p}Current city
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
           <CityAutocomplete
             city={data.city}
             state={data.state}
@@ -790,13 +826,18 @@ function Step3Community({
     <form className="space-y-8" onSubmit={form.handleSubmit(() => nextStep())}>
       <StepHeading
         title="Community & background"
-        subtitle="These details help families find the right match."
+        subtitle="These details help families find the right match. Fields marked * are required."
       />
 
       <div className="space-y-5">
         {/* Religion */}
         <div className="space-y-2">
-          <Label htmlFor="religion">{p}Religion / community</Label>
+          <Label htmlFor="religion">
+            {p}Religion / community
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
           <Select
             value={data.religion || undefined}
             onValueChange={(religion) =>
@@ -823,7 +864,12 @@ function Step3Community({
           {errors.religion && <p className="text-xs text-destructive">{errors.religion.message}</p>}
         </div>
         <div className="space-y-2">
-          <Label>{p}Caste / community</Label>
+          <Label>
+            {p}Caste / community
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
           <CommunityFields
             religion={data.religion}
             caste={data.caste}
@@ -837,7 +883,12 @@ function Step3Community({
 
         {/* Mother tongue */}
         <div className="space-y-2">
-          <Label htmlFor="tongue">{p}Mother tongue</Label>
+          <Label htmlFor="tongue">
+            {p}Mother tongue
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
           <Select
             value={data.motherTongue || undefined}
             onValueChange={(motherTongue) => updateData({ motherTongue })}
@@ -860,9 +911,9 @@ function Step3Community({
           <div>
             <p className="text-sm font-semibold text-foreground">Family details</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Brothers, sisters, and family background  used by families to assess compatibility.
+              Optional — brothers, sisters, and family background used by families to assess compatibility.
             </p>
-    </div>
+          </div>
 
           {/* Family type */}
         <div className="space-y-2">
@@ -1059,14 +1110,17 @@ function Step6Preferences({
     mode: "onTouched",
   })
   const errors = form.formState.errors
+  const [copiedFromProfile, setCopiedFromProfile] = React.useState(false)
 
-  const sameAsMe = () => {
+  const copyFromMyProfile = () => {
     updateData({
       ...(data.religion ? { prefReligion: [data.religion] } : {}),
+      ...(data.maritalStatus ? { prefMaritalStatuses: [data.maritalStatus] } : {}),
       ...(data.caste ? { prefCastes: [data.caste] } : {}),
       ...(data.motherTongue ? { prefMotherTongues: [data.motherTongue] } : {}),
       ...(data.city ? { prefLocations: [data.city] } : {}),
     })
+    setCopiedFromProfile(true)
   }
 
   const onContinue = form.handleSubmit(() => nextStep())
@@ -1075,10 +1129,57 @@ function Step6Preferences({
     <form className="space-y-8" onSubmit={onContinue}>
       <StepHeading
         title="Who are you looking for?"
-        subtitle="These preferences decide which profiles reach you first. You can refine them anytime from your profile."
+        subtitle="Required fields decide who can appear. Everything else only changes the order. You can edit this later from your profile."
       />
 
+      <section
+        className="rounded-2xl border border-secondary/30 bg-[#fff8ef] px-4 py-3.5 text-sm leading-relaxed text-foreground/90"
+        aria-label="How matching works"
+      >
+        <p className="font-semibold text-foreground">How matching works</p>
+        <ul className="mt-2 space-y-1.5 text-[13px] text-foreground/80">
+          <li>
+            <span className="font-semibold text-foreground">Must match.</span> Age, religion, and
+            marital status. We also show the opposite gender. Anyone outside these is hidden.
+          </li>
+          <li>
+            <span className="font-semibold text-foreground">Ranks higher.</span> Community, mother
+            tongue, education, city, and height. Leave a field open and nobody is excluded for that
+            reason.
+          </li>
+        </ul>
+      </section>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Copy from my profile</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Sets religion, marital status, community, mother tongue, and city to yours. It does
+              not change age, education, or height.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={copyFromMyProfile}
+            className="tap-target inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-secondary/40 bg-[#fff8ef] px-4 text-xs font-semibold text-primary transition-colors hover:border-primary/40 hover:bg-muted"
+          >
+            <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
+            Copy my details
+          </button>
+        </div>
+        {copiedFromProfile && (
+          <p className="mt-2 text-xs font-medium text-primary" role="status">
+            Copied. Change any field if you want something different.
+          </p>
+        )}
+      </div>
+
       <div className="space-y-5">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Required — these filter who you see
+        </p>
+
         {/* Age range — required (hard filter) */}
         <div className="space-y-2">
           <Label>Preferred age range *</Label>
@@ -1112,21 +1213,15 @@ function Step6Preferences({
               placeholder="Max"
             />
           </div>
+          <p className="text-xs text-muted-foreground">
+            A starting range around your age. Change either number — it is not copied from your profile.
+          </p>
           {(errors.prefAgeMin || errors.prefAgeMax) && (
             <p className="text-xs text-destructive">
               {errors.prefAgeMin?.message || errors.prefAgeMax?.message}
             </p>
           )}
         </div>
-
-        {/* Same as me shortcut */}
-        <button
-          type="button"
-          onClick={sameAsMe}
-          className="tap-target inline-flex items-center gap-2 rounded-full border border-secondary/30 bg-muted/50 px-4 text-xs font-semibold text-primary transition-all hover:border-primary/40 hover:bg-muted"
-        >
-          ✦ Same as me
-        </button>
 
         {/* Preferred religions — required (hard filter) */}
         <div className="space-y-2">
@@ -1146,23 +1241,41 @@ function Step6Preferences({
 
         {/* Preferred marital status */}
         <div className="space-y-2">
-          <Label>Preferred marital status</Label>
+          <Label>
+            Preferred marital status
+            <span className="ml-0.5 text-destructive" aria-hidden="true">
+              *
+            </span>
+          </Label>
           <MultiSelect
             values={data.prefMaritalStatuses ?? []}
             onValuesChange={(values) => updateData({ prefMaritalStatuses: values })}
             options={[...MARITAL_STATUSES]}
-            placeholder="Any marital status"
+            placeholder="Select marital status"
             searchPlaceholder="Search…"
             ariaLabel="Preferred marital status"
           />
+          {errors.prefMaritalStatuses && (
+            <p className="text-xs text-destructive">{errors.prefMaritalStatuses.message}</p>
+          )}
         </div>
+
+        <p className="pt-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Optional — these only change the order
+        </p>
 
         {/* Preferred communities */}
         <div className="space-y-2">
           <Label>Preferred communities</Label>
           <MultiSelect
             values={data.prefCastes ?? []}
-            onValuesChange={(values) => updateData({ prefCastes: values })}
+            onValuesChange={(values) =>
+              updateData({
+                prefCastes: values.some((value) => value.trim().toLowerCase() === "caste no bar")
+                  ? ["Caste no bar"]
+                  : values,
+              })
+            }
             options={communityOptions}
             placeholder="Any community"
             searchPlaceholder="Search communities…"
@@ -1200,57 +1313,35 @@ function Step6Preferences({
         {/* Preferred locations */}
         <div className="space-y-2">
           <Label>Preferred locations</Label>
-          <Input
-            value={(data.prefLocations ?? []).join(", ")}
-            onChange={(e) =>
-              updateData({
-                prefLocations: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-            placeholder="e.g. Chennai, Bengaluru"
-            aria-label="Preferred locations"
+          <CityMultiSelect
+            values={data.prefLocations ?? []}
+            onValuesChange={(values) => updateData({ prefLocations: values })}
+            placeholder="Search cities…"
+            ariaLabel="Preferred locations"
           />
           <p className="text-xs text-muted-foreground">
-            Separate cities with commas. Leave empty to keep it open.
+            Same city list as your profile. Leave empty so location does not affect ranking.
           </p>
         </div>
 
         {/* Height range */}
         <div className="space-y-2">
-          <Label>Preferred height range (cm)</Label>
+          <Label>Preferred height range</Label>
           <div className="grid grid-cols-2 gap-3">
-            <Input
-              type="number"
-              min={120}
-              max={230}
-              inputMode="numeric"
-              aria-label="Preferred minimum height in centimetres"
-              value={data.prefHeightMinCm ?? ""}
-              onChange={(e) =>
-                updateData({
-                  prefHeightMinCm: e.target.value === "" ? undefined : Number(e.target.value),
-                })
-              }
-              placeholder="Min"
+            <HeightCmInput
+              valueCm={data.prefHeightMinCm}
+              onChangeCm={(cm) => updateData({ prefHeightMinCm: cm })}
+              ariaLabel="Preferred minimum height"
             />
-            <Input
-              type="number"
-              min={120}
-              max={230}
-              inputMode="numeric"
-              aria-label="Preferred maximum height in centimetres"
-              value={data.prefHeightMaxCm ?? ""}
-              onChange={(e) =>
-                updateData({
-                  prefHeightMaxCm: e.target.value === "" ? undefined : Number(e.target.value),
-                })
-              }
-              placeholder="Max"
+            <HeightCmInput
+              valueCm={data.prefHeightMaxCm}
+              onChangeCm={(cm) => updateData({ prefHeightMaxCm: cm })}
+              ariaLabel="Preferred maximum height"
             />
           </div>
+          <p className="text-xs text-muted-foreground">
+            Feet and inches, same as your height. Leave both empty to ignore height. A range ranks people inside it higher; it does not hide anyone outside it.
+          </p>
           {errors.prefHeightMinCm && (
             <p className="text-xs text-destructive">{errors.prefHeightMinCm.message}</p>
           )}

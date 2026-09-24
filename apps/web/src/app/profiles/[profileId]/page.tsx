@@ -106,8 +106,6 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
     photos: (data.photos || []).map((p: { s3Key?: string; url?: string }) => p.s3Key || p.url || ''),
     hasHoroscope: !!data.hasHoroscope || !!data.horoscope?.horoscopeS3Key,
     blurPhoto: data.blurPhoto,
-    matchPercent: data.matchPercent ?? null,
-    matchReasons: data.matchReasons ?? [],
     height: formatHeightFromCm(data.profile.heightCm),
     weight: data.profile.weightKg ? `${data.profile.weightKg} kg` : "",
     complexion: data.profile.complexion ?? "",
@@ -200,12 +198,6 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
               blurPhoto={profile.blurPhoto}
               plan={profile.planSlug}
             />
-
-            {typeof profile.matchPercent === "number" && (
-              <span className="absolute right-3 top-3 z-30 inline-flex items-center gap-1 rounded-full bg-emerald-500/95 px-2.5 py-1 text-xs font-bold text-white shadow backdrop-blur-xs">
-                <Star className="h-3.5 w-3.5 fill-current" /> {profile.matchPercent}% match
-              </span>
-            )}
           </div>
         </div>
 

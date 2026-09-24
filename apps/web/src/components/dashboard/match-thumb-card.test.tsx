@@ -36,7 +36,7 @@ describe("MatchThumbCard", () => {
         }}
       />,
     )
-    expect(screen.getByText(/98%/)).toBeInTheDocument()
+    expect(screen.queryByText(/98%/)).not.toBeInTheDocument()
     expect(screen.getByText(/E2E Candidate A, 28/)).toBeInTheDocument()
     expect(screen.queryByText(/verified/i)).not.toBeInTheDocument()
   })

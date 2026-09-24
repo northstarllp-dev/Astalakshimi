@@ -216,7 +216,7 @@ export function useSaveProfileMutation() {
         prefHeightMinCm: data.prefHeightMinCm,
         prefHeightMaxCm: data.prefHeightMaxCm,
         prefReligions: data.prefReligion || [],
-        prefMaritalStatuses: data.prefMaritalStatuses?.length ? data.prefMaritalStatuses : ["Never Married"],
+        prefMaritalStatuses: data.prefMaritalStatuses || [],
         prefCastes: data.prefCastes || [],
         prefMotherTongues: data.prefMotherTongues || [],
         prefMinEducation: blank(data.prefMinEducation),
@@ -225,13 +225,10 @@ export function useSaveProfileMutation() {
         photoS3Keys: data.photoS3Keys || [],
         photoContentHashes: data.photoContentHashes || [],
         photoPrivacy: (blank(data.photoPrivacy) as any) || "blurred",
-        verificationMethod: (blank(data.verificationMethod) as any) || "selfie",
-        selfieS3Key:
-          data.verificationMethod === "selfie" ? blank(data.selfieS3Key) : undefined,
-        govtIdType:
-          data.verificationMethod === "govt_id" ? (blank(data.govtIdType) as any) : undefined,
-        govtIdS3Key:
-          data.verificationMethod === "govt_id" ? blank(data.govtIdS3Key) : undefined,
+        verificationMethod: "selfie",
+        selfieS3Key: blank(data.selfieS3Key),
+        govtIdType: (blank(data.govtIdType) as any) || undefined,
+        govtIdS3Key: blank(data.govtIdS3Key),
         horoscopeS3Key: blank(data.horoscopeS3Key),
         horoscopeFileName: blank(data.horoscopeName),
         horoscopeFileSizeBytes: data.horoscopeSize || undefined,
@@ -672,14 +669,11 @@ export function useResubmitVerificationMutation() {
         throw new Error("Please sign in again to submit verification.")
       }
 
-      const method = (data.verificationMethod as "selfie" | "govt_id") || "selfie"
-      const hasNewSelfie = method === "selfie" && Boolean(data.selfieS3Key)
-      const hasNewGovtId = method === "govt_id" && Boolean(data.govtIdS3Key && data.govtIdType)
+      const hasDocs = Boolean(data.selfieS3Key && data.govtIdS3Key && data.govtIdType)
 
-      if (hasNewSelfie || hasNewGovtId) {
-        // confirm-verification stores docs and promotes to pending when complete.
+      if (hasDocs) {
         await apiClient.media.confirmVerification({
-          method,
+          method: "selfie",
           selfieS3Key: data.selfieS3Key,
           govtIdType: data.govtIdType,
           govtIdS3Key: data.govtIdS3Key,

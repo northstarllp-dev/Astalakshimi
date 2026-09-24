@@ -139,21 +139,40 @@ export default function AdminProfileReviewPage() {
         </ReviewPane>
 
         <ReviewPane title="Govt ID / Selfie" icon={IdCard}>
-          {profile.verificationMethod === "selfie" && profile.selfiePhoto ? (
-            <MediaLightbox src={profile.selfiePhoto} alt="Selfie verification">
-              <div className="relative aspect-[4/3] w-full">
-                <Image src={profile.selfiePhoto} alt="Selfie verification" fill className="object-cover" sizes="300px" />
-              </div>
-            </MediaLightbox>
-          ) : profile.govtIdPhoto ? (
-            <>
-              <p className="mb-2 text-sm font-medium">{profile.govtIdType || "Government ID"}</p>
-              <MediaLightbox src={profile.govtIdPhoto} alt={profile.govtIdType || "Government ID"}>
-                <div className="relative aspect-[4/3] w-full">
-                  <Image src={profile.govtIdPhoto} alt="Government ID" fill className="object-cover" sizes="300px" />
+          {profile.selfiePhoto || profile.govtIdPhoto ? (
+            <div className="space-y-4">
+              {profile.selfiePhoto ? (
+                <div>
+                  <p className="mb-2 text-sm font-medium">Live selfie</p>
+                  <MediaLightbox src={profile.selfiePhoto} alt="Selfie verification">
+                    <div className="relative aspect-[4/3] w-full">
+                      <Image src={profile.selfiePhoto} alt="Selfie verification" fill className="object-cover" sizes="300px" />
+                    </div>
+                  </MediaLightbox>
                 </div>
-              </MediaLightbox>
-            </>
+              ) : null}
+              {profile.govtIdPhoto ? (
+                <div>
+                  <p className="mb-2 text-sm font-medium">{profile.govtIdType || "Government ID"}</p>
+                  {/\.(pdf|docx?|bin)(\?|$)/i.test(profile.govtIdPhoto) ? (
+                    <a
+                      href={profile.govtIdPhoto}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-semibold text-primary hover:underline"
+                    >
+                      Open government ID
+                    </a>
+                  ) : (
+                    <MediaLightbox src={profile.govtIdPhoto} alt={profile.govtIdType || "Government ID"}>
+                      <div className="relative aspect-[4/3] w-full">
+                        <Image src={profile.govtIdPhoto} alt="Government ID" fill className="object-cover" sizes="300px" />
+                      </div>
+                    </MediaLightbox>
+                  )}
+                </div>
+              ) : null}
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">No verification document uploaded.</p>
           )}

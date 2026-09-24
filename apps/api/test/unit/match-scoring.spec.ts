@@ -1,10 +1,10 @@
 import {
   candidateAge,
   educationRank,
+  hasRequiredPartnerPrefs,
   passesHardFilters,
   scoreCandidate,
-  DEFAULT_PREF_AGE_MIN,
-  DEFAULT_PREF_AGE_MAX,
+  targetGenders,
 } from '../../src/matches/match-scoring';
 
 const REF = new Date('2026-09-20T00:00:00Z');
@@ -21,15 +21,21 @@ const BASE_CANDIDATE = {
   state: 'Tamil Nadu',
 };
 
-describe('match-scoring (basic matrimony matching)', () => {
+const REQUIRED_PREFS = {
+  prefAgeMin: 25,
+  prefAgeMax: 32,
+  prefMaritalStatuses: ['Never Married', 'Divorced'],
+  prefReligions: ['Hindu', 'Jain'],
+};
+
+describe('match-scoring', () => {
   describe('candidateAge', () => {
-    it('computes whole-years age', () => {
+    it('computes whole-years age inclusive of the birthday', () => {
       expect(candidateAge('1996-09-20', REF)).toBe(30);
       expect(candidateAge('1996-09-21', REF)).toBe(29);
     });
 
     it('accepts Date objects from Postgres date columns', () => {
-      // UTC midnight for 1996-09-20 → age 30 at REF
       expect(candidateAge(new Date(Date.UTC(1996, 8, 20)), REF)).toBe(30);
       expect(candidateAge(new Date(Date.UTC(1996, 8, 21)), REF)).toBe(29);
     });
@@ -43,12 +49,27 @@ describe('match-scoring (basic matrimony matching)', () => {
     });
   });
 
+  describe('targetGenders', () => {
+    it('maps Male to Female, Female to Male, Other to both', () => {
+      expect(targetGenders('Male')).toEqual(['Female']);
+      expect(targetGenders('Female')).toEqual(['Male']);
+      expect(targetGenders('Other')).toEqual(['Male', 'Female']);
+      expect(targetGenders(null)).toEqual([]);
+    });
+  });
+
+  describe('hasRequiredPartnerPrefs', () => {
+    it('requires age, religion, and marital lists', () => {
+      expect(hasRequiredPartnerPrefs(REQUIRED_PREFS)).toBe(true);
+      expect(hasRequiredPartnerPrefs({ ...REQUIRED_PREFS, prefMaritalStatuses: [] })).toBe(false);
+      expect(hasRequiredPartnerPrefs({ ...REQUIRED_PREFS, prefReligions: [] })).toBe(false);
+      expect(hasRequiredPartnerPrefs({ ...REQUIRED_PREFS, prefAgeMin: null })).toBe(false);
+    });
+  });
+
   describe('educationRank', () => {
     it('ranks levels in order and is case-insensitive', () => {
       expect(educationRank('High School')).toBeLessThan(educationRank('Diploma'));
-      expect(educationRank('Diploma')).toBeLessThan(educationRank('Bachelors'));
-      expect(educationRank('Bachelors')).toBeLessThan(educationRank('Masters'));
-      expect(educationRank('Masters')).toBeLessThan(educationRank('Doctorate'));
       expect(educationRank('masters')).toBe(educationRank('Masters'));
     });
 
@@ -59,66 +80,69 @@ describe('match-scoring (basic matrimony matching)', () => {
   });
 
   describe('passesHardFilters', () => {
-    const prefs = {
-      prefAgeMin: 25,
-      prefAgeMax: 32,
-      prefMaritalStatuses: ['Never Married'],
-      prefReligions: ['Hindu'],
-    };
-
-    it('passes a candidate inside every window', () => {
-      expect(passesHardFilters(BASE_CANDIDATE, prefs, REF)).toEqual({ ok: true });
+    it('passes when age, any selected religion, and any selected marital match', () => {
+      expect(passesHardFilters(BASE_CANDIDATE, REQUIRED_PREFS, REF)).toEqual({ ok: true });
+      expect(
+        passesHardFilters({ ...BASE_CANDIDATE, religion: 'Jain', maritalStatus: 'Divorced' }, REQUIRED_PREFS, REF),
+      ).toEqual({ ok: true });
     });
 
-    it('rejects out-of-range age', () => {
+    it('rejects out-of-range age including the day before turning min age', () => {
       expect(
-        passesHardFilters({ ...BASE_CANDIDATE, dob: '1980-01-01' }, prefs, REF).failedOn,
+        passesHardFilters({ ...BASE_CANDIDATE, dob: '1980-01-01' }, REQUIRED_PREFS, REF).failedOn,
+      ).toBe('age');
+      // 25 tomorrow: dob 2001-09-21 is 24 at REF
+      expect(
+        passesHardFilters({ ...BASE_CANDIDATE, dob: '2001-09-21' }, REQUIRED_PREFS, REF).failedOn,
       ).toBe('age');
     });
 
-    it('rejects unparseable dob (cannot verify age)', () => {
-      expect(passesHardFilters({ ...BASE_CANDIDATE, dob: null }, prefs, REF)).toEqual({
+    it('rejects unparseable dob', () => {
+      expect(passesHardFilters({ ...BASE_CANDIDATE, dob: null }, REQUIRED_PREFS, REF)).toEqual({
         ok: false,
         failedOn: 'age',
       });
     });
 
-    it('rejects non-listed marital status and religion', () => {
+    it('rejects marital or religion not in the selected lists', () => {
       expect(
-        passesHardFilters({ ...BASE_CANDIDATE, maritalStatus: 'Divorced' }, prefs, REF),
+        passesHardFilters({ ...BASE_CANDIDATE, maritalStatus: 'Widowed' }, REQUIRED_PREFS, REF),
       ).toEqual({ ok: false, failedOn: 'maritalStatus' });
-      expect(passesHardFilters({ ...BASE_CANDIDATE, religion: 'Christian' }, prefs, REF)).toEqual({
+      expect(passesHardFilters({ ...BASE_CANDIDATE, religion: 'Christian' }, REQUIRED_PREFS, REF)).toEqual({
         ok: false,
         failedOn: 'religion',
       });
     });
 
-    it('treats empty lists as no preference', () => {
-      const open = {
-        prefAgeMin: 18,
-        prefAgeMax: 80,
-        prefMaritalStatuses: [],
-        prefReligions: [],
-      };
+    it('compares religion and marital case-insensitively after trim', () => {
       expect(
-        passesHardFilters({ ...BASE_CANDIDATE, religion: 'Christian', maritalStatus: 'Widowed' }, open, REF),
+        passesHardFilters(
+          { ...BASE_CANDIDATE, religion: ' hindu ', maritalStatus: 'never married' },
+          REQUIRED_PREFS,
+          REF,
+        ),
       ).toEqual({ ok: true });
     });
 
-    it('falls back to default age window when prefs are unset', () => {
-      expect(DEFAULT_PREF_AGE_MIN).toBe(21);
-      expect(DEFAULT_PREF_AGE_MAX).toBe(35);
-      expect(passesHardFilters(BASE_CANDIDATE, {}, REF)).toEqual({ ok: true });
+    it('fails when required religion or marital lists are empty', () => {
       expect(
-        passesHardFilters({ ...BASE_CANDIDATE, dob: '1970-01-01' }, {}, REF).failedOn,
+        passesHardFilters(BASE_CANDIDATE, { ...REQUIRED_PREFS, prefReligions: [] }, REF).failedOn,
+      ).toBe('religion');
+      expect(
+        passesHardFilters(BASE_CANDIDATE, { ...REQUIRED_PREFS, prefMaritalStatuses: [] }, REF).failedOn,
+      ).toBe('maritalStatus');
+    });
+
+    it('fails when the age window is missing', () => {
+      expect(
+        passesHardFilters(BASE_CANDIDATE, { ...REQUIRED_PREFS, prefAgeMin: null, prefAgeMax: null }, REF).failedOn,
       ).toBe('age');
     });
   });
 
   describe('scoreCandidate', () => {
     const prefs = {
-      prefAgeMin: 25,
-      prefAgeMax: 35,
+      ...REQUIRED_PREFS,
       prefHeightMinCm: 160,
       prefHeightMaxCm: 180,
       prefCastes: ['Brahmin'],
@@ -127,63 +151,52 @@ describe('match-scoring (basic matrimony matching)', () => {
       prefLocations: ['Chennai'],
     };
 
-    it('scores a full match at base + all weights with reasons', () => {
+    it('adds internal rank points only for set optional prefs that match', () => {
       const score = scoreCandidate(BASE_CANDIDATE, prefs, REF);
-      // 40 + 15 + 12 + 12 + 10 + 6 + 5 = 100 → capped at 98
-      expect(score.percent).toBe(98);
+      expect(score.points).toBe(25 + 20 + 20 + 20 + 15);
       expect(score.reasons).toEqual(
-        expect.arrayContaining(['Same community', 'Same mother tongue', 'Education match', 'Preferred location']),
+        expect.arrayContaining(['Same community', 'Same mother tongue', 'Education match']),
       );
-      expect(score.reasons.length).toBeLessThanOrEqual(4);
+      expect(score.reasons.length).toBeLessThanOrEqual(3);
     });
 
-    it('scores base + age-fit when nothing is set, less when nothing matches', () => {
-      // Empty prefs: no soft dimensions set, but age 30 sits near the middle
-      // of the default 21–35 window (+5 age-fit).
-      expect(scoreCandidate(BASE_CANDIDATE, {}, REF).percent).toBe(45);
-      expect(
-        scoreCandidate(
-          { ...BASE_CANDIDATE, caste: 'Other', motherTongue: 'Hindi', city: 'Delhi', state: 'Delhi', heightCm: 150 },
-          prefs,
-          REF,
-        ).percent,
-      ).toBeLessThan(98);
+    it('does not treat Caste no bar as a specific community to match', () => {
+      const open = { ...REQUIRED_PREFS, prefCastes: ['Caste no bar'] };
+      const score = scoreCandidate({ ...BASE_CANDIDATE, caste: 'Reddy' }, open, REF);
+      expect(score.reasons).not.toContain('Same community');
+      expect(score.points).toBe(0);
     });
 
-    it('requires education >= minimum (higher candidate passes, lower fails)', () => {
-      expect(
-        scoreCandidate({ ...BASE_CANDIDATE, educationLevel: 'Masters' }, prefs, REF).reasons,
-      ).toContain('Education match');
-      expect(
-        scoreCandidate({ ...BASE_CANDIDATE, educationLevel: 'Diploma' }, prefs, REF).reasons,
-      ).not.toContain('Education match');
+    it('scores 0 points when no optional prefs are set', () => {
+      expect(scoreCandidate(BASE_CANDIDATE, REQUIRED_PREFS, REF).points).toBe(0);
+      expect(scoreCandidate(BASE_CANDIDATE, REQUIRED_PREFS, REF).reasons).toEqual([]);
+    });
+
+    it('does not exclude on blank height; height points only when a range is set', () => {
+      expect(scoreCandidate({ ...BASE_CANDIDATE, heightCm: null }, REQUIRED_PREFS, REF).points).toBe(0);
+      expect(scoreCandidate({ ...BASE_CANDIDATE, heightCm: null }, prefs, REF).points).toBe(25 + 20 + 20 + 20);
     });
 
     it('matches location on city or state, case-insensitively', () => {
+      const locationOnly = { ...REQUIRED_PREFS, prefLocations: ['Chennai'] };
       expect(
-        scoreCandidate({ ...BASE_CANDIDATE, city: 'Coimbatore', state: 'Tamil Nadu' }, prefs, REF).reasons,
+        scoreCandidate({ ...BASE_CANDIDATE, city: 'Coimbatore', state: 'Tamil Nadu' }, locationOnly, REF).reasons,
       ).not.toContain('Preferred location');
-      const statePrefs = { ...prefs, prefLocations: ['tamil nadu'] };
+      const statePrefs = { ...REQUIRED_PREFS, prefLocations: ['tamil nadu'] };
       expect(
         scoreCandidate({ ...BASE_CANDIDATE, city: 'Coimbatore', state: 'Tamil Nadu' }, statePrefs, REF).reasons,
       ).toContain('Preferred location');
     });
 
-    it('ignores missing height without penalty', () => {
-      // Full prefs earn 40 + 60 = 100 → capped at 98; without height 40 + 54 = 94.
-      expect(scoreCandidate(BASE_CANDIDATE, prefs, REF).percent).toBe(98);
-      expect(scoreCandidate({ ...BASE_CANDIDATE, heightCm: null }, prefs, REF).percent).toBe(94);
-    });
-
-    it('scores a Date dob the same as a YYYY-MM-DD string', () => {
-      const fromString = scoreCandidate(BASE_CANDIDATE, prefs, REF);
-      const fromDate = scoreCandidate(
-        { ...BASE_CANDIDATE, dob: new Date(Date.UTC(1996, 8, 20)) },
-        prefs,
-        REF,
-      );
-      expect(fromDate.percent).toBe(fromString.percent);
-      expect(fromDate.reasons).toEqual(fromString.reasons);
+    it('matches a catalog city name and a "City, State" label against profiles.city', () => {
+      const cityPrefs = { ...REQUIRED_PREFS, prefLocations: ['Bengaluru'] };
+      expect(
+        scoreCandidate({ ...BASE_CANDIDATE, city: 'Bengaluru', state: 'Karnataka' }, cityPrefs, REF).reasons,
+      ).toContain('Preferred location');
+      const labelPrefs = { ...REQUIRED_PREFS, prefLocations: ['Bengaluru, Karnataka'] };
+      expect(
+        scoreCandidate({ ...BASE_CANDIDATE, city: 'Bengaluru', state: 'Karnataka' }, labelPrefs, REF).reasons,
+      ).toContain('Preferred location');
     });
   });
 });

@@ -95,11 +95,28 @@ export function findCommunityByLabel(
 ): CommunityEntry | undefined {
   const normalized = label.trim().toLowerCase()
   const religionNorm = religion?.trim().toLowerCase()
-  return COMMUNITIES.find((c) => {
-    if (c.label.toLowerCase() !== normalized) return false
-    if (religionNorm && c.religion.toLowerCase() !== religionNorm) return false
-    return true
-  })
+  const matches = COMMUNITIES.filter((c) => c.label.toLowerCase() === normalized)
+  if (!religionNorm) return matches[0]
+  return (
+    matches.find((c) => c.religion.toLowerCase() === religionNorm) ||
+    matches.find((c) => c.religion === 'Other')
+  )
+}
+
+/** Labels that mean "any community" — they are not a caste to match against. */
+const OPEN_COMMUNITY_LABELS = new Set([
+  'caste no bar',
+  'inter-caste',
+  'intercaste',
+  'inter caste',
+  'no caste',
+])
+
+export function isOpenCommunityPreference(
+  values: readonly string[] | null | undefined,
+): boolean {
+  if (!values || values.length === 0) return true
+  return values.some((value) => OPEN_COMMUNITY_LABELS.has(value.trim().toLowerCase()))
 }
 
 export function getCommunitiesForReligion(religion: string): CommunityEntry[] {

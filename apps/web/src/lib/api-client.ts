@@ -240,6 +240,14 @@ class ApiClient {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+
+    downloadHoroscope: () =>
+      this.request<{ url: string; fileName: string | null }>('/media/horoscope'),
+
+    previewVerification: (purpose: 'selfie' | 'govt_id', s3Key: string) =>
+      this.request<{ url: string }>(
+        `/media/verification-preview?purpose=${purpose}&s3Key=${encodeURIComponent(s3Key)}`,
+      ),
   };
 
   // --- Profiles APIs ---

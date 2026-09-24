@@ -81,10 +81,10 @@ export default function AdminCreateProfilePage() {
       planId: "free",
       prefAgeMin: 21,
       prefAgeMax: 35,
-      prefHeightMinCm: 140,
-      prefHeightMaxCm: 200,
-      prefMaritalStatuses: ["Never Married"],
-      prefReligions: ["Hindu"],
+      prefHeightMinCm: undefined,
+      prefHeightMaxCm: undefined,
+      prefMaritalStatuses: [],
+      prefReligions: [],
       prefCastes: [],
       prefMotherTongues: ["Tamil"],
       prefLocations: [],
@@ -506,10 +506,10 @@ export default function AdminCreateProfilePage() {
         <div className="space-y-4">
           <h2 className="font-serif text-xl font-bold">Partner Preferences</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Min Age" error={form.formState.errors.prefAgeMin?.message}>
+            <Field label="Min Age" required error={form.formState.errors.prefAgeMin?.message}>
               <Input type="number" {...form.register("prefAgeMin", { valueAsNumber: true })} />
             </Field>
-            <Field label="Max Age" error={form.formState.errors.prefAgeMax?.message}>
+            <Field label="Max Age" required error={form.formState.errors.prefAgeMax?.message}>
               <Input type="number" {...form.register("prefAgeMax", { valueAsNumber: true })} />
             </Field>
 
@@ -520,7 +520,7 @@ export default function AdminCreateProfilePage() {
               <Input type="number" {...form.register("prefHeightMaxCm", { valueAsNumber: true })} />
             </Field>
 
-            <Field label="Preferred Marital Statuses" error={form.formState.errors.prefMaritalStatuses?.message}>
+            <Field label="Preferred Marital Statuses" required error={form.formState.errors.prefMaritalStatuses?.message}>
               <Controller
                 control={form.control}
                 name="prefMaritalStatuses"
@@ -529,12 +529,12 @@ export default function AdminCreateProfilePage() {
                     values={field.value || []}
                     onValuesChange={field.onChange}
                     options={MARITAL_STATUSES}
-                    placeholder="Select status"
+                    placeholder="Select marital status"
                   />
                 )}
               />
             </Field>
-            <Field label="Preferred Religions" error={form.formState.errors.prefReligions?.message}>
+            <Field label="Preferred Religions" required error={form.formState.errors.prefReligions?.message}>
               <Controller
                 control={form.control}
                 name="prefReligions"
@@ -659,15 +659,24 @@ export default function AdminCreateProfilePage() {
 function Field({
   label,
   error,
+  required,
   children,
 }: {
   label: string
   error?: string
+  required?: boolean
   children: React.ReactNode
 }) {
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label>
+        {label}
+        {required ? (
+          <span className="ml-0.5 text-destructive" aria-hidden="true">
+            *
+          </span>
+        ) : null}
+      </Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>

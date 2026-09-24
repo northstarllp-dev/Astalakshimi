@@ -86,7 +86,7 @@ describe("discover sub-tabs", () => {
   })
   it("DISCOVER_VIEWS exposes the matches and search tabs", () => {
     expect(DISCOVER_VIEWS.map((v) => v.id)).toEqual(["matches", "search"])
-    expect(DISCOVER_VIEWS.map((v) => v.label)).toEqual(["Your Top Matches", "Search & Filter"])
+    expect(DISCOVER_VIEWS.map((v) => v.label)).toEqual(["For you", "Browse"])
   })
   it("parseDiscoverView reads the search tab from the query param", () => {
     expect(parseDiscoverView("search")).toBe("search")

@@ -154,6 +154,7 @@ describe("inferSignupResumeStep", () => {
       caste: "Brahmin",
       motherTongue: "Hindi",
       prefReligion: ["Hindu"],
+      prefMaritalStatuses: ["Never Married"],
       prefAgeMin: 25,
       prefAgeMax: 33,
     }
@@ -177,6 +178,7 @@ describe("inferSignupResumeStep", () => {
       caste: "Brahmin",
       motherTongue: "Hindi",
       prefReligion: ["Hindu"],
+      prefMaritalStatuses: ["Never Married"],
       prefAgeMin: 25,
       prefAgeMax: 33,
       photos: ["x"],
@@ -260,19 +262,15 @@ describe("seedPreferenceDefaults", () => {
     expect(seed.prefCastes).toEqual(["Brahmin"])
     expect(seed.prefMotherTongues).toEqual(["Tamil"])
     expect(seed.prefLocations).toEqual(["Chennai"])
+    expect(seed.prefMaritalStatuses).toBeUndefined()
+    expect(seed.prefHeightMinCm).toBeUndefined()
+    expect(seed.prefHeightMaxCm).toBeUndefined()
   })
 
   it("seeds an age window around the member's own age", () => {
     const seed = seedPreferenceDefaults(community as SignupData, REF)
     expect(seed.prefAgeMin).toBe(29) // 31 - 2
     expect(seed.prefAgeMax).toBe(36) // 31 + 5
-  })
-
-  it("defaults marital status and a sensible height range", () => {
-    const seed = seedPreferenceDefaults(community as SignupData, REF)
-    expect(seed.prefMaritalStatuses).toEqual(["Never Married"])
-    expect(seed.prefHeightMinCm).toBe(140)
-    expect(seed.prefHeightMaxCm).toBe(200)
   })
 
   it("falls back to the engine age window when the dob is missing", () => {

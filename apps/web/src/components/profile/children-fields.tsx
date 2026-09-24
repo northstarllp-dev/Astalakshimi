@@ -46,7 +46,12 @@ export function ChildrenFields({
   return (
     <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
       <div className="space-y-2">
-        <Label>{prefix}Do they have children?</Label>
+        <Label>
+          {prefix}Do they have children?
+          <span className="ml-0.5 text-destructive" aria-hidden="true">
+            *
+          </span>
+        </Label>
         <div className="grid grid-cols-2 gap-2.5">
           <TapCard selected={hasChildren === true} onClick={() => onChange({ hasChildren: true })} title="Yes" />
           <TapCard
@@ -61,7 +66,12 @@ export function ChildrenFields({
       {hasChildren && (
         <>
           <div className="space-y-2">
-            <Label>Number of children</Label>
+            <Label>
+              Number of children
+              <span className="ml-0.5 text-destructive" aria-hidden="true">
+                *
+              </span>
+            </Label>
             <Select
               value={String(childrenCount || 1)}
               onValueChange={(value) => onChange({ childrenCount: Number(value) })}
@@ -80,7 +90,12 @@ export function ChildrenFields({
             {errors?.childrenCount && <p className="text-xs text-destructive">{errors.childrenCount}</p>}
           </div>
           <div className="space-y-2">
-            <Label>Do the children live with them?</Label>
+            <Label>
+              Do the children live with them?
+              <span className="ml-0.5 text-destructive" aria-hidden="true">
+                *
+              </span>
+            </Label>
             <div className="grid grid-cols-2 gap-2.5">
               <TapCard
                 selected={childrenLivingWithMe === true}

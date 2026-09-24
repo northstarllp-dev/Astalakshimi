@@ -6,11 +6,11 @@
  * mints an access token with the local JWT_SECRET — OTP login requires a real
  * SMS provider, so the browser tests authenticate via the BFF cookies instead.
  *
- * Deterministic scores (viewer prefs: age 25-35, Hindu, Brahmin, Tamil,
- * Bachelors+, Chennai, 150-190cm, Never Married):
- *   Candidate A → 40 base + 15 caste + 12 tongue + 12 education + 10 location
- *                 + 6 height + 5 age-fit = 100 → capped 98
- *   Candidate B → 40 base + 12 education + 6 height + 5 age-fit = 63
+ * Viewer prefs: age 25-35, Hindu, Never Married (plus optional community/tongue).
+ *   Candidate A → Hindu / Never Married / same community → For you and Browse
+ *   Candidate B → Hindu / Never Married / different city → For you and Browse
+ *   Candidate C → Muslim / Never Married → Browse only (wrong religion)
+ *   Candidate D → Hindu / Widowed → Browse only (wrong marital)
  *
  * All rows cascade from `users`, so cleanup deletes by phone.
  */
@@ -34,11 +34,21 @@ if (!JWT_SECRET) throw new Error('JWT_SECRET is not set — check the root .env'
 export const VIEWER_PHONE = '9100000091';
 export const CANDIDATE_A_PHONE = '9100000092';
 export const CANDIDATE_B_PHONE = '9100000093';
-const ALL_PHONES = [VIEWER_PHONE, CANDIDATE_A_PHONE, CANDIDATE_B_PHONE];
+export const CANDIDATE_C_PHONE = '9100000094';
+export const CANDIDATE_D_PHONE = '9100000095';
+const ALL_PHONES = [
+  VIEWER_PHONE,
+  CANDIDATE_A_PHONE,
+  CANDIDATE_B_PHONE,
+  CANDIDATE_C_PHONE,
+  CANDIDATE_D_PHONE,
+];
 
 export const VIEWER_NAME = 'E2E Match Viewer';
 export const CANDIDATE_A_NAME = 'E2E Candidate A';
 export const CANDIDATE_B_NAME = 'E2E Candidate B';
+export const CANDIDATE_C_NAME = 'E2E Candidate C';
+export const CANDIDATE_D_NAME = 'E2E Candidate D';
 
 let sql: ReturnType<typeof postgres> | null = null;
 
@@ -83,6 +93,8 @@ export interface MatchFixtures {
   viewerProfileId: string;
   candidateAProfileId: string;
   candidateBProfileId: string;
+  candidateCProfileId: string;
+  candidateDProfileId: string;
 }
 
 export async function cleanupMatchFixtures() {
@@ -123,21 +135,25 @@ async function seedProfile(opts: {
   caste: string;
   communitySlug: string;
   motherTongue: string;
+  religion?: string;
+  maritalStatus?: string;
 }) {
   const dbi = db();
+  const religion = opts.religion ?? 'Hindu';
+  const maritalStatus = opts.maritalStatus ?? 'Never Married';
   const [profile] = await dbi`
     INSERT INTO profiles (
       user_id, created_by, profile_for, full_name, gender, dob, marital_status,
       height_cm, about_me, city, state, country, city_slug,
       religion, caste, community_slug, mother_tongue,
       education_level, degree, college_name, employment_status, profession, company_name, company_sector, annual_income,
-      photo_privacy
+      photo_privacy, required_complete
     ) VALUES (
-      ${opts.userId}, 'self', 'Myself', ${opts.fullName}, ${opts.gender}, ${opts.dob}, 'Never Married',
+      ${opts.userId}, 'self', 'Myself', ${opts.fullName}, ${opts.gender}, ${opts.dob}, ${maritalStatus},
       ${opts.heightCm}, 'E2E fixture profile for matching tests.', ${opts.city}, 'Tamil Nadu', 'India', ${opts.citySlug},
-      'Hindu', ${opts.caste}, ${opts.communitySlug}, ${opts.motherTongue},
+      ${religion}, ${opts.caste}, ${opts.communitySlug}, ${opts.motherTongue},
       'Bachelors', 'B.Tech', 'E2E Institute', 'Employed', 'Software Engineer', 'E2E Corp', 'Private', '₹10 – 15 Lakh',
-      'visible'
+      'visible', true
     )
     RETURNING id
   `;
@@ -209,7 +225,7 @@ export async function seedMatchFixtures(): Promise<MatchFixtures> {
   `;
   // Verification is already inserted by seedProfile (unique on profile_id).
 
-  // --- Candidate A: every soft dimension matches → deterministic 98% ---
+  // --- Candidate A: Hindu / Never Married / same community ---
   const [aUser] = await dbi`
     INSERT INTO users (phone, is_phone_verified, consent_accepted, consent_timestamp, role, status)
     VALUES (${CANDIDATE_A_PHONE}, true, true, NOW(), 'member', 'active')
@@ -228,7 +244,7 @@ export async function seedMatchFixtures(): Promise<MatchFixtures> {
     motherTongue: 'Tamil',
   });
 
-  // --- Candidate B: partial match (63%) for a second data point ---
+  // --- Candidate B: still passes hard filters (Hindu / Never Married) ---
   const [bUser] = await dbi`
     INSERT INTO users (phone, is_phone_verified, consent_accepted, consent_timestamp, role, status)
     VALUES (${CANDIDATE_B_PHONE}, true, true, NOW(), 'member', 'active')
@@ -247,10 +263,52 @@ export async function seedMatchFixtures(): Promise<MatchFixtures> {
     motherTongue: 'Telugu',
   });
 
+  // --- Candidate C: wrong religion → Browse only ---
+  const [cUser] = await dbi`
+    INSERT INTO users (phone, is_phone_verified, consent_accepted, consent_timestamp, role, status)
+    VALUES (${CANDIDATE_C_PHONE}, true, true, NOW(), 'member', 'active')
+    RETURNING id, phone, role
+  `;
+  const candidateC = await seedProfile({
+    userId: cUser.id,
+    fullName: CANDIDATE_C_NAME,
+    gender: 'Female',
+    dob: '1998-08-12',
+    heightCm: 162,
+    city: 'Chennai',
+    citySlug: 'chennai-tamil-nadu',
+    caste: 'Syed',
+    communitySlug: 'muslim-syed',
+    motherTongue: 'Tamil',
+    religion: 'Muslim',
+  });
+
+  // --- Candidate D: wrong marital → Browse only ---
+  const [dUser] = await dbi`
+    INSERT INTO users (phone, is_phone_verified, consent_accepted, consent_timestamp, role, status)
+    VALUES (${CANDIDATE_D_PHONE}, true, true, NOW(), 'member', 'active')
+    RETURNING id, phone, role
+  `;
+  const candidateD = await seedProfile({
+    userId: dUser.id,
+    fullName: CANDIDATE_D_NAME,
+    gender: 'Female',
+    dob: '1996-11-02',
+    heightCm: 160,
+    city: 'Chennai',
+    citySlug: 'chennai-tamil-nadu',
+    caste: 'Brahmin',
+    communitySlug: 'hindu-brahmin',
+    motherTongue: 'Tamil',
+    maritalStatus: 'Widowed',
+  });
+
   return {
     token: mintAccessToken(viewerUser as { id: string; phone: string; role: string }),
     viewerProfileId: viewerProfile.id,
     candidateAProfileId: candidateA.id,
     candidateBProfileId: candidateB.id,
+    candidateCProfileId: candidateC.id,
+    candidateDProfileId: candidateD.id,
   };
 }

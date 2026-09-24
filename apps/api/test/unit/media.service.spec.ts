@@ -18,6 +18,7 @@ describe('MediaService (Unit Tests)', () => {
       generateUploadUrl: jest.fn(),
       deleteObject: jest.fn(),
       putObject: jest.fn(),
+      getAdminSignedViewUrl: jest.fn(),
     };
 
     mediaService = new MediaService(mockDb, mockS3Provider);
@@ -56,6 +57,72 @@ describe('MediaService (Unit Tests)', () => {
         }),
       ).rejects.toThrow(BadRequestException);
       expect(mockS3Provider.putObject).not.toHaveBeenCalled();
+    });
+
+    it('stores a captured selfie in the vault bucket', async () => {
+      const buffer = Buffer.from('selfie-jpeg');
+      mockS3Provider.generateUploadUrl.mockResolvedValue({
+        s3Key: 'verifications/user-1/selfie-1.jpg',
+        bucket: 'vault-bucket',
+      });
+
+      const result = await mediaService.uploadFileBuffer('user-1', buffer, {
+        purpose: 'selfie',
+        contentType: 'image/jpeg',
+        fileSize: buffer.length,
+      });
+
+      expect(result.s3Key).toBe('verifications/user-1/selfie-1.jpg');
+      expect(result.bucket).toBe('vault-bucket');
+      expect(mockS3Provider.putObject).toHaveBeenCalledWith(
+        'verifications/user-1/selfie-1.jpg',
+        buffer,
+        'image/jpeg',
+        'vault-bucket',
+      );
+    });
+
+    it('stores a government ID of any type in the vault bucket', async () => {
+      const buffer = Buffer.from('%PDF-1.4');
+      mockS3Provider.generateUploadUrl.mockResolvedValue({
+        s3Key: 'verifications/user-1/govt-id-1.pdf',
+        bucket: 'vault-bucket',
+      });
+
+      await mediaService.uploadFileBuffer('user-1', buffer, {
+        purpose: 'govt_id',
+        contentType: 'application/pdf',
+        fileSize: buffer.length,
+      });
+
+      expect(mockS3Provider.putObject).toHaveBeenCalledWith(
+        'verifications/user-1/govt-id-1.pdf',
+        buffer,
+        'application/pdf',
+        'vault-bucket',
+      );
+    });
+
+    it('stores a horoscope PDF in the media bucket', async () => {
+      const buffer = Buffer.from('%PDF-horoscope');
+      mockS3Provider.generateUploadUrl.mockResolvedValue({
+        s3Key: 'profiles/user-1/horoscopes/h.pdf',
+        bucket: 'media-bucket',
+      });
+
+      const result = await mediaService.uploadFileBuffer('user-1', buffer, {
+        purpose: 'horoscope',
+        contentType: 'application/pdf',
+        fileSize: buffer.length,
+      });
+
+      expect(result.bucket).toBe('media-bucket');
+      expect(mockS3Provider.putObject).toHaveBeenCalledWith(
+        'profiles/user-1/horoscopes/h.pdf',
+        buffer,
+        'application/pdf',
+        'media-bucket',
+      );
     });
   });
 
@@ -133,10 +200,46 @@ describe('MediaService (Unit Tests)', () => {
         [{ id: 'photo-1' }],
       ]);
       mockDb.insert = mockQueryBuilder([[{ id: 'ver-1' }]]);
-      
-      const result = await mediaService.confirmVerification('user-1', { method: 'govt_id' });
+
+      const result = await mediaService.confirmVerification('user-1', {
+        method: 'selfie',
+        selfieS3Key: 'verifications/user-1_selfie.jpg',
+        govtIdType: 'PAN card',
+        govtIdS3Key: 'verifications/user-1_pan.pdf',
+      });
       expect(result.success).toBe(true);
       expect(result.verification.id).toBe('ver-1');
+    });
+
+    it('should reject verification when either the selfie or the government ID is missing', async () => {
+      mockDb.select = mockQueryBuilder([
+        [
+          {
+            id: 'prof-1',
+            profileFor: 'Myself',
+            fullName: 'Test User',
+            gender: 'Male',
+            dob: '2000-01-01',
+            maritalStatus: 'Never Married',
+            city: 'Mumbai',
+            heightCm: 170,
+            religion: 'Hindu',
+            caste: 'Brahmin',
+            motherTongue: 'Hindi',
+            educationLevel: 'Bachelors',
+            employmentStatus: 'Employed',
+            annualIncome: '5-10',
+          },
+        ],
+        [{ diet: 'Vegetarian' }],
+        [{ star: 'Mula', rashi: 'Dhanu', manglik: 'No', birthTime: '01:15', birthPlace: 'Chennai' }],
+        [{ id: 'photo-1' }],
+        [],
+      ]);
+
+      await expect(
+        mediaService.confirmVerification('user-1', { method: 'selfie', selfieS3Key: 'verifications/user-1_selfie.jpg' }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -150,6 +253,34 @@ describe('MediaService (Unit Tests)', () => {
       const result = await mediaService.confirmHoroscope(userId, { horoscopeS3Key, fileName: 'test.pdf', fileSizeBytes: 100 });
       expect(result.success).toBe(true);
       expect(result.horoscope.id).toBe('horo-1');
+    });
+  });
+
+  describe('getHoroscopeDownloadUrl', () => {
+    it('returns a signed download URL for the saved horoscope', async () => {
+      mockDb.select = mockQueryBuilder([
+        [{ id: 'prof-1' }],
+        [{ horoscopeS3Key: 'profiles/user-1/horoscopes/h.pdf', horoscopeFileName: 'chart.pdf' }],
+      ]);
+      mockS3Provider.getAdminSignedViewUrl.mockResolvedValue('https://signed.example/chart.pdf');
+
+      const result = await mediaService.getHoroscopeDownloadUrl('user-1');
+
+      expect(mockS3Provider.getAdminSignedViewUrl).toHaveBeenCalledWith(
+        'profiles/user-1/horoscopes/h.pdf',
+        true,
+      );
+      expect(result).toEqual({
+        url: 'https://signed.example/chart.pdf',
+        fileName: 'chart.pdf',
+      });
+    });
+
+    it('rejects a download when no horoscope has been uploaded', async () => {
+      mockDb.select = mockQueryBuilder([[{ id: 'prof-1' }], []]);
+
+      await expect(mediaService.getHoroscopeDownloadUrl('user-1')).rejects.toThrow(NotFoundException);
+      expect(mockS3Provider.getAdminSignedViewUrl).not.toHaveBeenCalled();
     });
   });
 

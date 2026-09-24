@@ -287,28 +287,26 @@ export const step6VerificationSchema = z
     horoscopeFileSizeBytes: z.number().optional().nullable(),
   })
   .superRefine((data, ctx) => {
-    if (data.verificationMethod === 'selfie' && (!data.selfieS3Key || data.selfieS3Key.trim() === '')) {
+    if (!data.selfieS3Key || data.selfieS3Key.trim() === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['selfieS3Key'],
-        message: 'Live selfie photo is required when choosing selfie verification',
+        message: 'A live selfie is required',
       });
     }
-    if (data.verificationMethod === 'govt_id') {
-      if (!data.govtIdType || data.govtIdType.trim() === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['govtIdType'],
-          message: 'Government ID type is required',
-        });
-      }
-      if (!data.govtIdS3Key || data.govtIdS3Key.trim() === '') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['govtIdS3Key'],
-          message: 'Government ID photo is required',
-        });
-      }
+    if (!data.govtIdType || data.govtIdType.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['govtIdType'],
+        message: 'Government ID type is required',
+      });
+    }
+    if (!data.govtIdS3Key || data.govtIdS3Key.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['govtIdS3Key'],
+        message: 'A government ID document is required',
+      });
     }
   });
 
@@ -522,7 +520,7 @@ export const completeRegistrationSchema = step2IdentitySchema
       prefAgeMax: z.number().int().min(18).max(80),
       prefHeightMinCm: z.number().int().min(120).max(230).optional(),
       prefHeightMaxCm: z.number().int().min(120).max(230).optional(),
-      prefMaritalStatuses: z.array(z.string()).optional(),
+      prefMaritalStatuses: z.array(z.string()).min(1, 'Select at least one preferred marital status'),
       prefReligions: z.array(z.string()).min(1, 'Select at least one preferred religion'),
       prefCastes: z.array(z.string()).optional(),
       prefMotherTongues: z.array(z.string()).optional(),
@@ -563,6 +561,27 @@ export const completeRegistrationSchema = step2IdentitySchema
         code: z.ZodIssueCode.custom,
         path: ['prefHeightMaxCm'],
         message: 'Max height must be greater than or equal to min height',
+      });
+    }
+    if (!data.selfieS3Key || data.selfieS3Key.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['selfieS3Key'],
+        message: 'A live selfie is required',
+      });
+    }
+    if (!data.govtIdType) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['govtIdType'],
+        message: 'Government ID type is required',
+      });
+    }
+    if (!data.govtIdS3Key || data.govtIdS3Key.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['govtIdS3Key'],
+        message: 'A government ID document is required',
       });
     }
   });

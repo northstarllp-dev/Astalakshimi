@@ -151,9 +151,10 @@ describe("signupStepPreferencesSchema", () => {
     prefAgeMin: 25,
     prefAgeMax: 33,
     prefReligion: ["Hindu"],
+    prefMaritalStatuses: ["Never Married"],
   }
 
-  it("accepts the required minimum (age range + religion)", () => {
+  it("accepts the required minimum (age range + religion + marital status)", () => {
     expect(signupStepPreferencesSchema.safeParse(base).success).toBe(true)
   })
 
@@ -185,6 +186,14 @@ describe("signupStepPreferencesSchema", () => {
         prefLocations: ["Hyderabad"],
       }).success,
     ).toBe(true)
+  })
+
+  it("rejects a missing preferred marital status", () => {
+    const result = signupStepPreferencesSchema.safeParse({ ...base, prefMaritalStatuses: [] })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes("prefMaritalStatuses"))).toBe(true)
+    }
   })
 
   it("rejects a missing preferred religion", () => {
@@ -274,6 +283,7 @@ describe("profileEditSchema", () => {
     motherTongue: "Hindi",
     city: "Mumbai",
     prefReligion: ["Hindu"],
+    prefMaritalStatuses: ["Never Married"],
     aboutMe: "Hello",
     prefAgeMin: 24,
     prefAgeMax: 30,
@@ -289,6 +299,10 @@ describe("profileEditSchema", () => {
   })
   it("rejects empty prefReligion", () => {
     const r = profileEditSchema.safeParse({ ...base, prefReligion: [] })
+    expect(r.success).toBe(false)
+  })
+  it("rejects empty prefMaritalStatuses", () => {
+    const r = profileEditSchema.safeParse({ ...base, prefMaritalStatuses: [] })
     expect(r.success).toBe(false)
   })
   it("allows empty phone", () => {
@@ -368,19 +382,35 @@ describe("admin schemas", () => {
       profileFor: "Myself",
       phone: "9876543210",
       fullName: "Test User",
-      gender: "Male",
+      gender: "Male" as const,
       dobDay: "01",
       dobMonth: "01",
       dobYear: "2000",
-      maritalStatus: "Never Married",
+      maritalStatus: "Never Married" as const,
+      height: "170",
+      diet: "Vegetarian" as const,
       city: "Mumbai",
       religion: "Hindu",
       caste: "Brahmin",
       motherTongue: "Hindi",
+      educationLevel: "Bachelors",
+      employmentStatus: "Employed",
+      annualIncome: "Prefer not to say",
+      nakshatra: "Ashwini",
+      rashi: "Mesha",
+      manglik: "No" as const,
+      birthTime: "10:00 AM",
+      birthPlace: "Mumbai",
       brothersCount: 0,
       sistersCount: 0,
+      prefAgeMin: 25,
+      prefAgeMax: 32,
+      prefMaritalStatuses: ["Never Married"],
+      prefReligions: ["Hindu"],
     }
     expect(adminCreateProfileSchema.safeParse(base).success).toBe(true)
     expect(adminCreateProfileSchema.safeParse({ ...base, dobYear: "2015" }).success).toBe(false)
+    expect(adminCreateProfileSchema.safeParse({ ...base, prefMaritalStatuses: [] }).success).toBe(false)
+    expect(adminCreateProfileSchema.safeParse({ ...base, prefReligions: [] }).success).toBe(false)
   })
 })

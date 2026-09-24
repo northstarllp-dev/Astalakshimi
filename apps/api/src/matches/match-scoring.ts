@@ -1,17 +1,19 @@
 /**
  * Basic matrimony matching — pure functions (no DB), unit-tested.
  *
- * Canonical matching set (kept deliberately small):
- *   Hard filters (must pass): age range, marital status (if set), religion (if set).
- *     Gender is filtered in the service query, not here.
- *   Soft score, 60 pts on top of a 40 base:
- *     caste/community 15, mother tongue 12, education >= minimum 12,
- *     location 10, height in range 6, age near middle of range 5.
+ * Hard filters (For you must pass): age from DOB (inclusive whole years),
+ * marital status any-of, religion any-of. Empty religion or marital fails
+ * (those three prefs are required). Gender is filtered in the service query.
  *
- * Empty/unset preference = "no preference" (no filter, no points).
- * `pref_acceptable_incomes` and any future columns are intentionally
- * ignored by v1 scoring.
+ * Internal rank (For you sort only, never shown as a percent):
+ *   caste/community 25, mother tongue 20, education >= minimum 20,
+ *   location 20, height in range 15.
+ *
+ * Blank optional preference = no rank points and no exclusion.
+ * "Caste no bar" means any community can match.
  */
+
+import { isOpenCommunityPreference } from '@astalakshimi/reference';
 
 export interface BasicPrefs {
   prefAgeMin?: number | null;
@@ -38,20 +40,12 @@ export interface MatchCandidate {
   state?: string | null;
 }
 
-/** Fallback age window when the viewer never set preferences. */
-export const DEFAULT_PREF_AGE_MIN = 21;
-export const DEFAULT_PREF_AGE_MAX = 35;
-
-const BASE_SCORE = 40;
-const MAX_SCORE = 98;
-
-const WEIGHTS = {
-  caste: 15,
-  motherTongue: 12,
-  education: 12,
-  location: 10,
-  height: 6,
-  ageFit: 5,
+const RANK_WEIGHTS = {
+  caste: 25,
+  motherTongue: 20,
+  education: 20,
+  location: 20,
+  height: 15,
 } as const;
 
 const EDUCATION_RANK: Record<string, number> = {
@@ -113,29 +107,47 @@ export function candidateAge(
   return age;
 }
 
+/** Male↔Female. Other viewers see both. Unknown gender yields an empty list. */
+export function targetGenders(viewerGender?: string | null): string[] {
+  if (viewerGender === 'Male') return ['Female'];
+  if (viewerGender === 'Female') return ['Male'];
+  if (viewerGender === 'Other') return ['Male', 'Female'];
+  return [];
+}
+
+export function hasRequiredPartnerPrefs(prefs: BasicPrefs): boolean {
+  return (
+    prefs.prefAgeMin != null &&
+    prefs.prefAgeMax != null &&
+    normList(prefs.prefReligions).length > 0 &&
+    normList(prefs.prefMaritalStatuses).length > 0
+  );
+}
+
 export type HardFilterKey = 'age' | 'maritalStatus' | 'religion';
 
-/** Hard filters only. Returns ok=false with the first failing dimension. */
+/** Hard filters only. Empty required prefs fail. Returns ok=false with the first failing dimension. */
 export function passesHardFilters(
   candidate: MatchCandidate,
   prefs: BasicPrefs,
   ref: Date = new Date(),
 ): { ok: boolean; failedOn?: HardFilterKey } {
-  const ageMin = prefs.prefAgeMin ?? DEFAULT_PREF_AGE_MIN;
-  const ageMax = prefs.prefAgeMax ?? DEFAULT_PREF_AGE_MAX;
+  if (prefs.prefAgeMin == null || prefs.prefAgeMax == null) {
+    return { ok: false, failedOn: 'age' };
+  }
 
   const age = candidateAge(candidate.dob, ref);
-  if (age === null || age < ageMin || age > ageMax) {
+  if (age === null || age < prefs.prefAgeMin || age > prefs.prefAgeMax) {
     return { ok: false, failedOn: 'age' };
   }
 
   const marital = normList(prefs.prefMaritalStatuses);
-  if (marital.length > 0 && !marital.includes(norm(candidate.maritalStatus))) {
+  if (marital.length === 0 || !marital.includes(norm(candidate.maritalStatus))) {
     return { ok: false, failedOn: 'maritalStatus' };
   }
 
   const religions = normList(prefs.prefReligions);
-  if (religions.length > 0 && !religions.includes(norm(candidate.religion))) {
+  if (religions.length === 0 || !religions.includes(norm(candidate.religion))) {
     return { ok: false, failedOn: 'religion' };
   }
 
@@ -143,41 +155,56 @@ export function passesHardFilters(
 }
 
 export interface MatchScore {
-  percent: number;
+  points: number;
   reasons: string[];
 }
 
-/** Soft score for a candidate that already passed hard filters. */
-export function scoreCandidate(candidate: MatchCandidate, prefs: BasicPrefs, ref: Date = new Date()): MatchScore {
+/**
+ * A preferred location hits when it is the candidate's city, their state, or a
+ * catalog label that starts with the city ("Bengaluru, Karnataka"). City names
+ * from the identity picker are the values onboarding stores.
+ */
+function locationMatches(candidate: MatchCandidate, locations: string[]): boolean {
+  const city = norm(candidate.city);
+  const state = norm(candidate.state);
+  return locations.some((loc) => {
+    if (city && (loc === city || loc.startsWith(`${city},`))) return true;
+    if (state && loc === state) return true;
+    return false;
+  });
+}
+
+/** Internal rank for a candidate that already passed hard filters. Not a public percent. */
+export function scoreCandidate(
+  candidate: MatchCandidate,
+  prefs: BasicPrefs,
+  _ref: Date = new Date(),
+): MatchScore {
   let earned = 0;
   const reasons: string[] = [];
 
-  const castes = normList(prefs.prefCastes);
+  const castes = isOpenCommunityPreference(prefs.prefCastes) ? [] : normList(prefs.prefCastes);
   if (castes.length > 0 && castes.includes(norm(candidate.caste))) {
-    earned += WEIGHTS.caste;
+    earned += RANK_WEIGHTS.caste;
     reasons.push('Same community');
   }
 
   const tongues = normList(prefs.prefMotherTongues);
   if (tongues.length > 0 && tongues.includes(norm(candidate.motherTongue))) {
-    earned += WEIGHTS.motherTongue;
+    earned += RANK_WEIGHTS.motherTongue;
     reasons.push('Same mother tongue');
   }
 
   const minEdu = educationRank(prefs.prefMinEducation);
   if (minEdu > 0 && educationRank(candidate.educationLevel) >= minEdu) {
-    earned += WEIGHTS.education;
+    earned += RANK_WEIGHTS.education;
     reasons.push('Education match');
   }
 
   const locations = normList(prefs.prefLocations);
-  if (locations.length > 0) {
-    const city = norm(candidate.city);
-    const state = norm(candidate.state);
-    if ((city && locations.includes(city)) || (state && locations.includes(state))) {
-      earned += WEIGHTS.location;
-      reasons.push('Preferred location');
-    }
+  if (locations.length > 0 && locationMatches(candidate, locations)) {
+    earned += RANK_WEIGHTS.location;
+    reasons.push('Preferred location');
   }
 
   const hMin = prefs.prefHeightMinCm ?? null;
@@ -188,21 +215,9 @@ export function scoreCandidate(candidate: MatchCandidate, prefs: BasicPrefs, ref
     (hMin == null || candidate.heightCm >= hMin) &&
     (hMax == null || candidate.heightCm <= hMax)
   ) {
-    earned += WEIGHTS.height;
+    earned += RANK_WEIGHTS.height;
     reasons.push('Height match');
   }
 
-  const ageMin = prefs.prefAgeMin ?? DEFAULT_PREF_AGE_MIN;
-  const ageMax = prefs.prefAgeMax ?? DEFAULT_PREF_AGE_MAX;
-  const age = candidateAge(candidate.dob, ref);
-  if (age !== null) {
-    const mid = (ageMin + ageMax) / 2;
-    const half = (ageMax - ageMin) / 2;
-    if (half > 0 && Math.abs(age - mid) <= half / 2) {
-      earned += WEIGHTS.ageFit;
-      reasons.push('Age match');
-    }
-  }
-
-  return { percent: Math.min(MAX_SCORE, BASE_SCORE + earned), reasons: reasons.slice(0, 4) };
+  return { points: earned, reasons: reasons.slice(0, 3) };
 }

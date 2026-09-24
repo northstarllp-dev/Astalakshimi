@@ -1,21 +1,20 @@
 import type { Database } from '@astalakshimi/database';
-import { profiles, partnerPreferences } from '@astalakshimi/database';
-import { eq } from 'drizzle-orm';
-import { DEFAULT_PREF_AGE_MAX, DEFAULT_PREF_AGE_MIN, type BasicPrefs } from './match-scoring';
+import { profiles, partnerPreferences, subscriptions, plans } from '@astalakshimi/database';
+import { and, eq, gt, sql } from 'drizzle-orm';
+import { type BasicPrefs } from './match-scoring';
 
 export interface ViewerContext {
   profileId: string;
   gender: string | null;
   city: string | null;
   state: string | null;
+  viewerIsPaid: boolean;
   prefs: BasicPrefs;
 }
 
 /**
- * Shared viewer context for every scoring surface (top matches, profile view,
- * shortlists, search). Unset preferences = open matching (hard filters fall
- * back to age defaults, soft dimensions score nothing). Never fabricate-and-
- * persist here.
+ * Shared viewer context for For you and Browse. Unset required prefs
+ * (age / religion / marital) mean For you is empty — never fabricate them here.
  */
 export async function loadViewerContext(
   db: Database,
@@ -40,11 +39,25 @@ export async function loadViewerContext(
     .where(eq(partnerPreferences.profileId, viewer.id))
     .limit(1);
 
+  const [paidRow] = await db
+    .select({ slug: plans.slug })
+    .from(subscriptions)
+    .innerJoin(plans, eq(subscriptions.planId, plans.id))
+    .where(
+      and(
+        eq(subscriptions.userId, userId),
+        eq(subscriptions.status, 'active'),
+        gt(subscriptions.expiresAt, new Date()),
+      ),
+    )
+    .limit(1);
+
   return {
     profileId: viewer.id,
     gender: viewer.gender,
     city: viewer.city ?? null,
     state: viewer.state ?? null,
+    viewerIsPaid: Boolean(paidRow && paidRow.slug && paidRow.slug !== 'free'),
     prefs: {
       prefAgeMin: prefsRow?.prefAgeMin ?? null,
       prefAgeMax: prefsRow?.prefAgeMax ?? null,
@@ -73,19 +86,46 @@ function dobYearsAgo(years: number, ref: Date): string {
 }
 
 /**
- * SQL dob bounds for the age hard filter (same boundary math as the search
- * service): a candidate is `ageMin`+ iff dob <= today - ageMin years, and at
- * most `ageMax` iff dob >= today - (ageMax + 1) years. The Node-side
- * `passesHardFilters` remains the exact authority for boundary days.
+ * SQL dob bounds for the age hard filter: a candidate is `ageMin`+ iff
+ * dob <= today - ageMin years, and at most `ageMax` iff dob >= today - (ageMax + 1) years.
+ * Returns null when the age window is incomplete.
  */
 export function dobBoundsForAgeWindow(
   prefs: BasicPrefs,
   ref: Date = new Date(),
-): { dobUpper: string; dobLower: string } {
-  const ageMin = prefs.prefAgeMin ?? DEFAULT_PREF_AGE_MIN;
-  const ageMax = prefs.prefAgeMax ?? DEFAULT_PREF_AGE_MAX;
+): { dobUpper: string; dobLower: string } | null {
+  if (prefs.prefAgeMin == null || prefs.prefAgeMax == null) return null;
   return {
-    dobUpper: dobYearsAgo(ageMin, ref),
-    dobLower: dobYearsAgo(ageMax + 1, ref),
+    dobUpper: dobYearsAgo(prefs.prefAgeMin, ref),
+    dobLower: dobYearsAgo(prefs.prefAgeMax + 1, ref),
   };
+}
+
+/** Hidden (paused) profiles never appear. Premium-only profiles appear to paid viewers only. */
+export function visibilitySql(viewerIsPaid: boolean) {
+  if (viewerIsPaid) {
+    return sql`NOT EXISTS (
+      SELECT 1 FROM user_settings
+      WHERE user_settings.user_id = ${profiles.userId}
+        AND (user_settings.hide_profile = true OR user_settings.profile_visibility = 'hidden')
+    )`;
+  }
+  return sql`NOT EXISTS (
+    SELECT 1 FROM user_settings
+    WHERE user_settings.user_id = ${profiles.userId}
+      AND (
+        user_settings.hide_profile = true
+        OR user_settings.profile_visibility = 'hidden'
+        OR user_settings.profile_visibility = 'premium'
+      )
+  )`;
+}
+
+export function lowerIn(column: any, values: string[]) {
+  const cleaned = values.map((v) => v.trim().toLowerCase()).filter(Boolean);
+  if (cleaned.length === 0) return sql`false`;
+  return sql`lower(${column}) in (${sql.join(
+    cleaned.map((v) => sql`${v}`),
+    sql`, `,
+  )})`;
 }

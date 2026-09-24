@@ -184,9 +184,9 @@ export class MediaService {
     const nextGovtId = input.govtIdS3Key || existingVerification?.govtIdS3Key || null;
     const nextGovtType = input.govtIdType || existingVerification?.govtIdType || null;
 
-    if (!nextSelfie && !nextGovtId) {
+    if (!nextSelfie || !nextGovtId || !nextGovtType) {
       throw new BadRequestException(
-        'Upload a selfie or government ID before submitting for verification',
+        'Upload both a live selfie and a government ID before submitting for verification',
       );
     }
 
@@ -261,6 +261,39 @@ export class MediaService {
       success: true,
       horoscope,
     };
+  }
+
+  async getHoroscopeDownloadUrl(userId: string): Promise<{ url: string; fileName: string | null }> {
+    const [profile] = await this.db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .limit(1);
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    const [horoscope] = await this.db
+      .select()
+      .from(horoscopes)
+      .where(eq(horoscopes.profileId, profile.id))
+      .limit(1);
+
+    if (!horoscope?.horoscopeS3Key) {
+      throw new NotFoundException('No horoscope uploaded');
+    }
+
+    const url = await this.s3Provider.getAdminSignedViewUrl(horoscope.horoscopeS3Key, true);
+    return { url, fileName: horoscope.horoscopeFileName ?? null };
+  }
+
+  async getVerificationPreviewUrl(userId: string, purpose: 'selfie' | 'govt_id', s3Key: string) {
+    if (!isOwnedPhotoKey(s3Key, userId, purpose)) {
+      throw new BadRequestException('That file was not uploaded on this account');
+    }
+    const url = await this.s3Provider.getAdminSignedViewUrl(s3Key, false);
+    return { url };
   }
 
   async deletePhoto(userId: string, photoId: string) {

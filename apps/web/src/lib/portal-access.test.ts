@@ -40,6 +40,10 @@ function completeData(overrides: Partial<SignupData> = {}): SignupData {
     profession: "Engineer",
     annualIncome: "5-10",
     diet: "Vegetarian",
+    prefReligion: ["Hindu"],
+    prefMaritalStatuses: ["Never Married"],
+    prefAgeMin: 25,
+    prefAgeMax: 33,
     submittedAt: new Date().toISOString(),
     ...overrides,
   }

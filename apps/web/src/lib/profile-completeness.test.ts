@@ -13,7 +13,7 @@ import { emptySignupData, type SignupData } from "./profile-store"
 describe("PROFILE_DETAIL_FIELDS", () => {
   it("has exactly PROFILE_DETAIL_TOTAL entries", () => {
     expect(PROFILE_DETAIL_FIELDS.length).toBe(PROFILE_DETAIL_TOTAL)
-    expect(PROFILE_DETAIL_TOTAL).toBe(44)
+    expect(PROFILE_DETAIL_TOTAL).toBe(47)
   })
   it("every field has a unique id", () => {
     const ids = PROFILE_DETAIL_FIELDS.map((f) => f.id)
@@ -84,6 +84,10 @@ describe("getProfileCompletenessStats", () => {
       profession: "Engineer",
       annualIncome: "5-10",
       diet: "Vegetarian",
+      prefReligion: ["Hindu"],
+      prefMaritalStatuses: ["Never Married"],
+      prefAgeMin: 25,
+      prefAgeMax: 33,
       submittedAt: new Date().toISOString(),
     }
     const stats = getProfileCompletenessStats(data)
@@ -180,6 +184,10 @@ describe("getMissingRequiredFieldIds", () => {
       profession: "Engineer",
       annualIncome: "5-10",
       diet: "Vegetarian",
+      prefReligion: ["Hindu"],
+      prefMaritalStatuses: ["Never Married"],
+      prefAgeMin: 25,
+      prefAgeMax: 33,
       submittedAt: new Date().toISOString(),
     }
     expect(getMissingRequiredFieldIds(data).size).toBe(0)

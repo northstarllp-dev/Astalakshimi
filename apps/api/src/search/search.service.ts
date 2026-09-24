@@ -4,13 +4,9 @@ import type { Database } from '@astalakshimi/database';
 import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans, verifications } from '@astalakshimi/database';
 import { eq, and, ne, inArray, gte, lte, or, desc, sql, gt } from 'drizzle-orm';
 import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
-import { loadViewerContext } from '../matches/viewer-context';
-import { scoreCandidate } from '../matches/match-scoring';
+import { dobBoundsForAgeWindow, loadViewerContext, visibilitySql } from '../matches/viewer-context';
+import { candidateAge, targetGenders } from '../matches/match-scoring';
 import { EntitlementsService } from '../entitlements/entitlements.service';
-
-// Hard cap for the score-ranked default tab: we fetch + score the whole
-// filtered candidate set in Node (bounded), rank, then paginate in memory.
-const SCORE_POOL_CAP = 2000;
 
 @Injectable()
 export class SearchService {
@@ -60,22 +56,31 @@ export class SearchService {
     const viewer = await loadViewerContext(this.db, userId);
     const currentUser = viewer ? { id: viewer.profileId, gender: viewer.gender } : undefined;
 
-    const conditions: any[] = [ne(profiles.userId, userId)];
-
-    if (currentUser && currentUser.gender) {
-      const targetGender = currentUser.gender === 'Male' ? 'Female' : 'Male';
-      conditions.push(eq(profiles.gender, targetGender));
+    const genders = targetGenders(viewer?.gender);
+    if (genders.length === 0) {
+      return { profiles: [], totalCount: 0 };
     }
 
-    if (filters.ageMin) {
-       const minDob = new Date();
-       minDob.setFullYear(minDob.getFullYear() - parseInt(filters.ageMin, 10));
-       conditions.push(lte(profiles.dob, minDob.toISOString().split('T')[0]));
+    const conditions: any[] = [
+      ne(profiles.userId, userId),
+      inArray(profiles.gender, genders as Array<'Male' | 'Female'>),
+    ];
+
+    const ageMin =
+      filters.ageMin != null && filters.ageMin !== ''
+        ? parseInt(String(filters.ageMin), 10)
+        : null;
+    const ageMax =
+      filters.ageMax != null && filters.ageMax !== ''
+        ? parseInt(String(filters.ageMax), 10)
+        : null;
+    if (ageMin != null && Number.isFinite(ageMin)) {
+      const bounds = dobBoundsForAgeWindow({ prefAgeMin: ageMin, prefAgeMax: ageMin });
+      if (bounds) conditions.push(lte(profiles.dob, bounds.dobUpper));
     }
-    if (filters.ageMax) {
-       const maxDob = new Date();
-       maxDob.setFullYear(maxDob.getFullYear() - parseInt(filters.ageMax, 10) - 1); // up to end of age year
-       conditions.push(gte(profiles.dob, maxDob.toISOString().split('T')[0]));
+    if (ageMax != null && Number.isFinite(ageMax)) {
+      const bounds = dobBoundsForAgeWindow({ prefAgeMin: ageMax, prefAgeMax: ageMax });
+      if (bounds) conditions.push(gte(profiles.dob, bounds.dobLower));
     }
     if (filters.city) {
       conditions.push(eq(profiles.city, filters.city));
@@ -87,6 +92,7 @@ export class SearchService {
     // (denormalized as profiles.required_complete) to appear in Discover.
     conditions.push(sql`EXISTS (SELECT 1 FROM profile_photos WHERE profile_photos.profile_id = profiles.id AND profile_photos.is_primary = true)`);
     conditions.push(eq(profiles.requiredComplete, true));
+    conditions.push(visibilitySql(Boolean(viewer?.viewerIsPaid)));
 
     const tab = String(filters.tab || 'all');
     if (tab === 'nearby' && viewer?.city) {
@@ -165,8 +171,6 @@ export class SearchService {
     const limit = parseInt(filters.limit || '10', 10);
     const offset = (page - 1) * limit;
 
-    const isScoreRanked = tab !== 'new';
-
     const selectFields = {
       id: profiles.id,
       userId: profiles.userId,
@@ -192,50 +196,22 @@ export class SearchService {
     let result: Array<any>;
     let totalCount: number;
 
-    if (isScoreRanked) {
-      // Default tab: rank the whole (bounded) filtered set by compatibility,
-      // then paginate in memory. Newest first breaks score ties.
-      const candidates = await this.db
-        .select(selectFields)
-        .from(profiles)
-        .where(and(...conditions))
-        .orderBy(desc(profiles.createdAt))
-        .limit(SCORE_POOL_CAP);
+    const query: any = this.db
+      .select(selectFields)
+      .from(profiles)
+      .where(and(...conditions))
+      .orderBy(desc(profiles.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-      const scored = candidates.map((p) => ({
-        p,
-        score: viewer ? scoreCandidate(p as any, viewer.prefs) : null,
-      }));
-      scored.sort(
-        (a, b) =>
-          (b.score?.percent ?? 0) - (a.score?.percent ?? 0) ||
-          new Date(b.p.createdAt).getTime() - new Date(a.p.createdAt).getTime(),
-      );
-      totalCount = scored.length;
-      result = scored.slice(offset, offset + limit).map((s) => ({ ...s.p, score: s.score }));
-    } else {
-      // "New" tab: SQL ordering + pagination as-is, score the returned page.
-      let query: any = this.db
-        .select(selectFields)
-        .from(profiles)
-        .where(and(...conditions))
-        .limit(limit)
-        .offset(offset);
+    const countQuery = this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(profiles)
+      .where(and(...conditions));
 
-      query = query.orderBy(desc(profiles.createdAt));
-
-      const countQuery = this.db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(profiles)
-        .where(and(...conditions));
-
-      const [rows, countResult] = await Promise.all([query, countQuery]);
-      totalCount = countResult[0]?.count ?? 0;
-      result = rows.map((p: any) => ({
-        ...p,
-        score: viewer ? scoreCandidate(p as any, viewer.prefs) : null,
-      }));
-    }
+    const [rows, countResult] = await Promise.all([query, countQuery]);
+    totalCount = countResult[0]?.count ?? 0;
+    result = rows;
 
     const profileIds = result.map((p) => p.id);
     const userIds = result.map((p) => p.userId);
@@ -329,7 +305,7 @@ export class SearchService {
       verificationRows.map((v: any) => [v.profileId, v.status]),
     );
 
-    const mappedResult = result.map(({ score, ...profile }: any) => {
+    const mappedResult = result.map((profile: any) => {
       const primaryPhoto = photos.get(profile.id);
       const setting = settings.find((s) => s.userId === profile.userId);
       const userSub = activeSubs.find((s) => s.userId === profile.userId);
@@ -350,7 +326,7 @@ export class SearchService {
       return {
         ...profile,
         // map for frontend component compatibility
-        age: profile.dob ? new Date().getFullYear() - new Date(profile.dob).getFullYear() : 25,
+        age: candidateAge(profile.dob) ?? 0,
         // Key is withheld when blurred — the bucket is public, so sending it
         // would let anyone view the photo regardless of the blur flag.
         photos: withholdKey || !primaryPhoto ? [] : [primaryPhoto.s3Key],
@@ -368,8 +344,6 @@ export class SearchService {
         lastActive: 'Online now',
         community: profile.caste || 'Unknown',
         height: profile.heightCm ? `${profile.heightCm} cm` : 'Unknown',
-        matchPercent: score?.percent ?? null,
-        matchReasons: score?.reasons ?? [],
       };
     });
 

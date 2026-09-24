@@ -54,6 +54,7 @@ describe("HomeMatchRow", () => {
       city: "Chennai",
     })
     expect(screen.getByText("E2E Candidate A")).toBeInTheDocument()
+    expect(screen.queryByText(/98%/)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Verified$/)).not.toBeInTheDocument()
   })
 })

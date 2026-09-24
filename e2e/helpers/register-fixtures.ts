@@ -45,7 +45,7 @@ export const CHOSEN_PREFS = {
   prefReligions: ['Hindu', 'Jain'],
   prefCastes: ['Brahmin'],
   prefMotherTongues: ['Tamil'],
-  prefMaritalStatuses: ['Never Married'],
+  prefMaritalStatuses: ['Never Married', 'Divorced'],
   prefMinEducation: 'Masters',
   prefLocations: ['Chennai'],
   prefHeightMinCm: 150,
@@ -95,13 +95,13 @@ async function insertCandidate(opts: {
       height_cm, about_me, city, state, country, city_slug,
       religion, caste, community_slug, mother_tongue,
       education_level, degree, college_name, employment_status, profession, company_name, company_sector, annual_income,
-      photo_privacy
+      photo_privacy, required_complete
     ) VALUES (
       ${user.id}, 'self', 'Myself', ${opts.fullName}, 'Female', ${opts.dob}, 'Never Married',
       ${opts.heightCm}, 'E2E fixture profile for register-preference tests.', ${opts.city}, 'Tamil Nadu', 'India', ${opts.citySlug},
       ${opts.religion}, ${opts.caste}, ${opts.communitySlug}, ${opts.motherTongue},
       ${opts.educationLevel}, 'B.Tech', 'E2E Institute', 'Employed', 'Software Engineer', 'E2E Corp', 'Private', '₹10 – 15 Lakh',
-      'visible'
+      'visible', true
     )
     RETURNING id
   `;

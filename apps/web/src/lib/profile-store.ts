@@ -87,6 +87,7 @@ export type SignupData = {
   govtIdType: string
   govtIdPhoto: string
   govtIdS3Key?: string
+  govtIdFileName?: string
   horoscopeName: string
   horoscopeSize: number
   horoscopeS3Key?: string
@@ -170,16 +171,16 @@ export function inferSignupResumeStep(data: SignupData): number {
   // complete age range — without them the match engine would run on defaults.
   const preferencesOk =
     (data.prefReligion?.length ?? 0) > 0 &&
+    (data.prefMaritalStatuses?.length ?? 0) > 0 &&
     typeof data.prefAgeMin === "number" &&
     typeof data.prefAgeMax === "number"
   if (!preferencesOk) return 5
 
   const hasPhoto = (data.photos?.length ?? 0) >= 1 || (data.photoS3Keys?.length ?? 0) >= 1
   const identityReady =
-    (data.verificationMethod === "selfie" && Boolean(data.selfiePhoto || data.selfieS3Key)) ||
-    (data.verificationMethod === "govt_id" &&
-      Boolean(data.govtIdPhoto || data.govtIdS3Key) &&
-      Boolean(data.govtIdType))
+    Boolean(data.selfiePhoto || data.selfieS3Key) &&
+    Boolean(data.govtIdType) &&
+    Boolean(data.govtIdPhoto || data.govtIdS3Key)
   if (!hasPhoto || !identityReady) return 6
 
   return 6
@@ -230,14 +231,11 @@ export function seedPreferenceDefaults(
   if (typeof data.prefAgeMin !== "number") seed.prefAgeMin = ageRange.min
   if (typeof data.prefAgeMax !== "number") seed.prefAgeMax = ageRange.max
   if (!data.prefReligion?.length && data.religion) seed.prefReligion = [data.religion]
-  if (!data.prefMaritalStatuses?.length) seed.prefMaritalStatuses = ["Never Married"]
   if (!data.prefCastes?.length && data.caste) seed.prefCastes = [data.caste]
   if (!data.prefMotherTongues?.length && data.motherTongue) {
     seed.prefMotherTongues = [data.motherTongue]
   }
   if (!data.prefLocations?.length && data.city) seed.prefLocations = [data.city]
-  if (typeof data.prefHeightMinCm !== "number") seed.prefHeightMinCm = 140
-  if (typeof data.prefHeightMaxCm !== "number") seed.prefHeightMaxCm = 200
   return seed
 }
 

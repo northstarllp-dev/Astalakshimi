@@ -369,33 +369,41 @@ describe('Feature 2: Profile - Zod Validation Schemas', () => {
   });
 
   describe('step6VerificationSchema', () => {
-    it('should validate selfie verification with selfieS3Key and photos', () => {
+    const bothDocs = {
+      selfieS3Key: 'vault/selfie.jpg',
+      govtIdType: 'PAN card' as const,
+      govtIdS3Key: 'vault/pan.pdf',
+    };
+
+    it('should accept a profile photo plus both a selfie and a government ID', () => {
       const payload = {
         photoS3Keys: ['photos/1.jpg', 'photos/2.jpg'],
         photoPrivacy: 'blurred' as const,
         verificationMethod: 'selfie' as const,
-        selfieS3Key: 'vault/selfie.jpg',
+        ...bothDocs,
       };
 
       const result = step6VerificationSchema.safeParse(payload);
       expect(result.success).toBe(true);
     });
 
-    it('should reject selfie verification when selfieS3Key is missing', () => {
+    it('should reject when the selfie is missing', () => {
       const payload = {
         photoS3Keys: ['photos/1.jpg'],
         verificationMethod: 'selfie' as const,
         selfieS3Key: '',
+        govtIdType: 'Aadhaar' as const,
+        govtIdS3Key: 'vault/aadhaar.pdf',
       };
 
       const result = step6VerificationSchema.safeParse(payload);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues.some((i) => i.message.includes('Live selfie photo is required'))).toBe(true);
+        expect(result.error.issues.some((i) => i.message.includes('A live selfie is required'))).toBe(true);
       }
     });
 
-    it('should validate govt ID verification with govtIdType and govtIdS3Key', () => {
+    it('should reject a government ID without a selfie', () => {
       const payload = {
         photoS3Keys: ['photos/1.jpg'],
         verificationMethod: 'govt_id' as const,
@@ -404,13 +412,14 @@ describe('Feature 2: Profile - Zod Validation Schemas', () => {
       };
 
       const result = step6VerificationSchema.safeParse(payload);
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
     });
 
-    it('should reject govt ID verification when govtIdType or govtIdS3Key is missing', () => {
+    it('should reject when the government ID type or file is missing', () => {
       const payload = {
         photoS3Keys: ['photos/1.jpg'],
-        verificationMethod: 'govt_id' as const,
+        verificationMethod: 'selfie' as const,
+        selfieS3Key: 'vault/selfie.jpg',
         govtIdType: null,
         govtIdS3Key: null,
       };
@@ -964,6 +973,11 @@ describe('Feature 2: Profile - Zod Validation Schemas', () => {
         prefAgeMin: 25,
         prefAgeMax: 33,
         prefReligions: ['Hindu'],
+        prefMaritalStatuses: ['Never Married'],
+        verificationMethod: 'selfie',
+        selfieS3Key: 'verifications/selfie.jpg',
+        govtIdType: 'PAN card',
+        govtIdS3Key: 'verifications/pan.pdf',
         createdBy: 'staff',
       } as any);
       expect(result.success).toBe(true);
@@ -991,6 +1005,11 @@ describe('Feature 2: Profile - Zod Validation Schemas', () => {
       fatherOccupation: 'Employed',
       motherOccupation: 'Homemaker',
       diet: 'Vegetarian',
+      prefMaritalStatuses: ['Never Married'],
+      verificationMethod: 'selfie' as const,
+      selfieS3Key: 'verifications/selfie.jpg',
+      govtIdType: 'PAN card' as const,
+      govtIdS3Key: 'verifications/pan.pdf',
     };
 
     it('accepts registration with the member’s real preference set', () => {
@@ -1017,6 +1036,22 @@ describe('Feature 2: Profile - Zod Validation Schemas', () => {
         expect(result.data.prefCastes).toEqual(['Agarwal']);
         expect(result.data.prefMinEducation).toBe('Masters');
         expect(result.data.prefLocations).toEqual(['Mumbai', 'Pune']);
+      }
+    });
+
+    it('rejects registration with no preferred marital status', () => {
+      const result = completeRegistrationSchema.safeParse({
+        ...registrationBase,
+        prefAgeMin: 28,
+        prefAgeMax: 36,
+        prefReligions: ['Hindu'],
+        prefMaritalStatuses: [],
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(
+          result.error.issues.some((i) => i.path.includes('prefMaritalStatuses')),
+        ).toBe(true);
       }
     });
 

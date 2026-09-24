@@ -4,6 +4,19 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
   let matchesService: MatchesService;
   let mockDb: any;
 
+  const requiredPrefs = {
+    prefAgeMin: 25,
+    prefAgeMax: 35,
+    prefHeightMinCm: null,
+    prefHeightMaxCm: null,
+    prefMaritalStatuses: ['Never Married'],
+    prefReligions: ['Hindu'],
+    prefCastes: [],
+    prefMotherTongues: [],
+    prefMinEducation: null,
+    prefLocations: [],
+  };
+
   const mockQueryBuilder = (resolveValues: any[]) => {
     let callCount = 0;
     return jest.fn(() => {
@@ -54,14 +67,15 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
   });
 
   it('returns [] when the pool is empty', async () => {
-    mockDb.select = mockQueryBuilder([[viewer], [], []]);
+    mockDb.select = mockQueryBuilder([[viewer], [requiredPrefs], [], []]);
     await expect(matchesService.getTopMatches('user-2')).resolves.toEqual([]);
   });
 
-  it('scores a passing candidate with real matchPercent + reasons and blurs by default', async () => {
+  it('returns reasons without a match percent and blurs by default', async () => {
     mockDb.select = mockQueryBuilder([
       [viewer],
-      [], // no saved prefs → defaults (age 21–35, everything else open)
+      [requiredPrefs],
+      [], // paid
       [candidate],
       [], // photos
       [], // settings
@@ -74,13 +88,14 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('match-1');
     expect(result[0].blurPhoto).toBe(true);
-    expect(result[0].matchPercent).toBeGreaterThan(40);
+    expect((result[0] as { matchPercent?: number }).matchPercent).toBeUndefined();
     expect(result[0].matchReasons).toEqual(expect.any(Array));
   });
 
   it('adds display-ready fields matching the search response shape', async () => {
     mockDb.select = mockQueryBuilder([
       [viewer],
+      [requiredPrefs],
       [],
       [candidate],
       [],
@@ -109,6 +124,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
   it('caches the scored pool per user (second call skips the pool query, only re-enriches)', async () => {
     mockDb.select = mockQueryBuilder([
       [viewer],
+      [requiredPrefs],
       [],
       [candidate],
       [],
@@ -137,10 +153,16 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
       id: `match-${i}`,
       createdAt: new Date(2026, 0, i + 1),
     }));
-    mockDb.select = mockQueryBuilder([[viewer], [], many, [], [], [], [], []]);
+    mockDb.select = mockQueryBuilder([[viewer], [requiredPrefs], [], many, [], [], [], [], []]);
 
     const result = await matchesService.getTopMatches('user-cap');
     expect(result).toHaveLength(8);
+  });
+
+  it('returns [] when required partner prefs are missing', async () => {
+    const emptyMarital = { ...requiredPrefs, prefMaritalStatuses: [] };
+    mockDb.select = mockQueryBuilder([[viewer], [emptyMarital], []]);
+    await expect(matchesService.getTopMatches('user-empty-prefs')).resolves.toEqual([]);
   });
 
   it('hard-filters candidates outside the saved age window and religion', async () => {
@@ -149,7 +171,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
       prefAgeMax: 30,
       prefHeightMinCm: null,
       prefHeightMaxCm: null,
-      prefMaritalStatuses: [],
+      prefMaritalStatuses: ['Never Married'],
       prefReligions: ['Hindu'],
       prefCastes: [],
       prefMotherTongues: [],
@@ -162,6 +184,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     mockDb.select = mockQueryBuilder([
       [viewer],
       [prefs],
+      [],
       [candidate, tooOld, otherFaith],
       [],
       [],
@@ -174,11 +197,39 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
     expect(result.map((r) => r.id)).toEqual(['match-1']);
   });
 
+  it('hard-filters marital status that is not in the selected list', async () => {
+    const prefs = {
+      ...requiredPrefs,
+      prefMaritalStatuses: ['Never Married', 'Divorced'],
+    };
+    const widowed = {
+      ...candidate,
+      id: 'wid-1',
+      maritalStatus: 'Widowed',
+      createdAt: new Date('2026-01-04'),
+    };
+
+    mockDb.select = mockQueryBuilder([
+      [viewer],
+      [prefs],
+      [],
+      [candidate, widowed],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ]);
+
+    const result = await matchesService.getTopMatches('user-marital');
+    expect(result.map((r) => r.id)).toEqual(['match-1']);
+  });
+
   it('breaks score ties by recency (newest first)', async () => {
     const newer = { ...candidate, id: 'match-newer', fullName: 'Newer', createdAt: new Date('2026-06-01') };
     const older = { ...candidate, id: 'match-older', fullName: 'Older', createdAt: new Date('2025-06-01') };
 
-    mockDb.select = mockQueryBuilder([[viewer], [], [older, newer], [], [], [], [], []]);
+    mockDb.select = mockQueryBuilder([[viewer], [requiredPrefs], [], [older, newer], [], [], [], [], []]);
 
     const result = await matchesService.getTopMatches('user-6');
     expect(result.map((r) => r.id)).toEqual(['match-newer', 'match-older']);
@@ -190,6 +241,7 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
 
     mockDb.select = mockQueryBuilder([
       [viewer],
+      [requiredPrefs],
       [],
       [candidate],
       [],
@@ -205,9 +257,22 @@ describe('MatchesService.getTopMatches (prefs-based basic matching)', () => {
   });
 });
 
-describe('MatchesService.getPaginatedMatches (score-ranked pagination)', () => {
+describe('MatchesService.getPaginatedMatches (preference-gated pagination)', () => {
   let matchesService: MatchesService;
   let mockDb: any;
+
+  const requiredPrefs = {
+    prefAgeMin: 25,
+    prefAgeMax: 35,
+    prefHeightMinCm: null,
+    prefHeightMaxCm: null,
+    prefMaritalStatuses: ['Never Married'],
+    prefReligions: ['Hindu'],
+    prefCastes: [],
+    prefMotherTongues: [],
+    prefMinEducation: null,
+    prefLocations: [],
+  };
 
   const mockQueryBuilder = (resolveValues: any[]) => {
     let callCount = 0;
@@ -255,7 +320,7 @@ describe('MatchesService.getPaginatedMatches (score-ranked pagination)', () => {
 
   it('returns the requested page slice with the full pool length as totalCount', async () => {
     const candidates = [makeCandidate(1), makeCandidate(2), makeCandidate(3)];
-    mockDb.select = mockQueryBuilder([[viewer], [], candidates, [], [], [], [], []]);
+    mockDb.select = mockQueryBuilder([[viewer], [requiredPrefs], [], candidates, [], [], [], [], []]);
 
     const result = await matchesService.getPaginatedMatches('page-user-1', { page: 1, limit: 2 });
     expect(result.totalCount).toBe(3);
@@ -264,7 +329,7 @@ describe('MatchesService.getPaginatedMatches (score-ranked pagination)', () => {
 
   it('returns the second page slice', async () => {
     const candidates = [makeCandidate(1), makeCandidate(2), makeCandidate(3)];
-    mockDb.select = mockQueryBuilder([[viewer], [], candidates, [], [], [], [], []]);
+    mockDb.select = mockQueryBuilder([[viewer], [requiredPrefs], [], candidates, [], [], [], [], []]);
 
     const result = await matchesService.getPaginatedMatches('page-user-2', { page: 2, limit: 2 });
     expect(result.totalCount).toBe(3);
@@ -272,7 +337,7 @@ describe('MatchesService.getPaginatedMatches (score-ranked pagination)', () => {
   });
 
   it('returns an empty page with totalCount 0 when the pool is empty', async () => {
-    mockDb.select = mockQueryBuilder([[viewer], [], []]);
+    mockDb.select = mockQueryBuilder([[viewer], [requiredPrefs], [], []]);
 
     const result = await matchesService.getPaginatedMatches('page-user-3', { page: 1, limit: 10 });
     expect(result).toEqual({ matches: [], totalCount: 0 });
@@ -287,7 +352,7 @@ describe('MatchesService.getPaginatedMatches (score-ranked pagination)', () => {
 
   it('reuses the cached pool across pages of the same user', async () => {
     const candidates = [makeCandidate(1), makeCandidate(2), makeCandidate(3)];
-    mockDb.select = mockQueryBuilder([[viewer], [], candidates, [], [], [], [], []]);
+    mockDb.select = mockQueryBuilder([[viewer], [requiredPrefs], [], candidates, [], [], [], [], []]);
 
     await matchesService.getPaginatedMatches('page-user-5', { page: 1, limit: 2 });
     const callsAfterFirst = mockDb.select.mock.calls.length;

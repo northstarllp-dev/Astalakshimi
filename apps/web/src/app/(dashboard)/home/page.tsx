@@ -251,13 +251,20 @@ export default function HomePage() {
                 </div>
               ) : previewMatches.length === 0 ? (
                 <div className="px-4 py-10 text-center">
-                  <p className="text-sm font-semibold">No profiles found</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Finish a few details so we can show how your matches will appear here.
+                  <p className="text-sm font-semibold">
+                    {!(profile?.prefReligion?.length > 0) ||
+                    !(profile?.prefMaritalStatuses?.length > 0) ||
+                    typeof profile?.prefAgeMin !== "number" ||
+                    typeof profile?.prefAgeMax !== "number"
+                      ? "Set who you are looking for"
+                      : "No profiles found"}
                   </p>
-                  <Link href="/profile/edit" className="mt-4 inline-block">
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Choose an age range, religion, and marital status so we can show people who fit.
+                  </p>
+                  <Link href="/profile/edit#preferences" className="mt-4 inline-block">
                     <Button size="sm" className="rounded-md">
-                      Complete profile
+                      Edit preferences
                     </Button>
                   </Link>
                 </div>

@@ -102,6 +102,10 @@ describe("community catalog", () => {
     expect(findCommunityByLabel(first.label, first.religion)?.slug).toBe(first.slug)
     expect(findCommunityByLabel(first.label, "definitely-not-a-religion")).toBeUndefined()
   })
+  it("resolves Caste no bar for any religion", () => {
+    expect(findCommunityByLabel("Caste no bar", "Hindu")?.slug).toBe("other-caste-no-bar")
+    expect(findCommunityByLabel("Caste no bar", "Muslim")?.slug).toBe("other-caste-no-bar")
+  })
   it("getCommunitiesForReligion filters by religion", () => {
     const first = getCommunities()[0]
     const forReligion = getCommunitiesForReligion(first.religion)

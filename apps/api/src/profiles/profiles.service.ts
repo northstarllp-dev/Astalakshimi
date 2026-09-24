@@ -33,7 +33,6 @@ import {
 import { getApprovedPhotos, getOwnerPhotos, computeBlurDecision, isOwnedPhotoKey, photoPrivacyToBlur, photoBlurToPrivacy } from '../common/photo-access';
 import { LruCache } from '../common/cache/lru-cache';
 import { loadViewerContext } from '../matches/viewer-context';
-import { scoreCandidate } from '../matches/match-scoring';
 import { requiredFieldsComplete } from './required-fields-complete';
 import { refreshRequiredComplete } from './refresh-required-complete';
 
@@ -304,9 +303,7 @@ export class ProfilesService {
       prefReligions: payload.prefReligions ?? [],
       prefCastes: payload.prefCastes ?? [],
       prefMotherTongues: payload.prefMotherTongues ?? [],
-      prefMaritalStatuses: payload.prefMaritalStatuses?.length
-        ? payload.prefMaritalStatuses
-        : ['Never Married'],
+      prefMaritalStatuses: payload.prefMaritalStatuses ?? [],
       prefAcceptableIncomes: payload.prefAcceptableIncomes ?? [],
       prefLocations: payload.prefLocations ?? [],
       prefMinEducation: this.emptyToUndef(payload.prefMinEducation),
@@ -716,6 +713,12 @@ export class ProfilesService {
 
       if (govtIdS3Key && !isOwnedPhotoKey(govtIdS3Key, userId, 'govt_id')) {
         throw new BadRequestException('govtIdS3Key must be an ID uploaded through your own presigned URL');
+      }
+
+      if (!selfieS3Key || !govtIdS3Key || !govtIdType) {
+        throw new BadRequestException(
+          'Upload both a live selfie and a government ID before creating your profile',
+        );
       }
 
       // Store verification docs as `idle` — not yet in the admin review queue.
@@ -1224,11 +1227,11 @@ export class ProfilesService {
           .insert(partnerPreferences)
           .values({
             profileId,
-            prefAgeMin: partnerPreferencesUpdate.prefAgeMin ?? 21,
-            prefAgeMax: partnerPreferencesUpdate.prefAgeMax ?? 35,
-            prefHeightMinCm: partnerPreferencesUpdate.prefHeightMinCm ?? 140,
-            prefHeightMaxCm: partnerPreferencesUpdate.prefHeightMaxCm ?? 200,
-            prefMaritalStatuses: partnerPreferencesUpdate.prefMaritalStatuses ?? ['Never Married'],
+            prefAgeMin: partnerPreferencesUpdate.prefAgeMin ?? null,
+            prefAgeMax: partnerPreferencesUpdate.prefAgeMax ?? null,
+            prefHeightMinCm: partnerPreferencesUpdate.prefHeightMinCm ?? null,
+            prefHeightMaxCm: partnerPreferencesUpdate.prefHeightMaxCm ?? null,
+            prefMaritalStatuses: partnerPreferencesUpdate.prefMaritalStatuses ?? [],
             prefReligions: partnerPreferencesUpdate.prefReligions ?? [],
             prefCastes: partnerPreferencesUpdate.prefCastes ?? [],
             prefMotherTongues: partnerPreferencesUpdate.prefMotherTongues ?? [],
@@ -1536,10 +1539,6 @@ export class ProfilesService {
 
     const isOwnProfile = Boolean(viewerUserId && viewerUserId === profile.userId);
 
-    // Compatibility score for this viewer (null on own profile — the UI hides
-    // the badge rather than fabricating a number). Not part of the base cache.
-    const score = viewer && !isOwnProfile ? scoreCandidate(profile as any, viewer.prefs) : null;
-
     const contactAccess = viewerUserId
       ? await this.entitlementsService.getContactUnlockStatus(
           viewerUserId,
@@ -1620,8 +1619,6 @@ export class ProfilesService {
       contactPhone: visiblePhone,
       hasHoroscope: Boolean(horoscopeRowObj?.horoscopeS3Key),
       contactAccess,
-      matchPercent: score?.percent ?? null,
-      matchReasons: score?.reasons ?? [],
     };
   }
 

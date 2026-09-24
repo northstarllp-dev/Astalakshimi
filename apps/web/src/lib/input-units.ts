@@ -130,9 +130,20 @@ export function formatWeightFromKg(kg: number | null | undefined): string {
   return formatWeight(String(kg), "kg")
 }
 
-/** Mask typed digits into feet'inches" as the user types (e.g. 511 → 5'11"). */
-export function maskHeightInput(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 3)
+/**
+ * Mask typed digits into feet'inches" (e.g. 511 → 5'11").
+ * Pass the previous display value so backspace after the closing quote
+ * deletes the last digit instead of immediately putting the quote back.
+ */
+export function maskHeightInput(raw: string, previous?: string): string {
+  let digits = raw.replace(/\D/g, "").slice(0, 3)
+  const prev = previous ?? ""
+  const prevDigits = prev.replace(/\D/g, "")
+  const deletedTrailingQuote =
+    prev.endsWith('"') && !raw.endsWith('"') && digits === prevDigits && raw.length < prev.length
+  if (deletedTrailingQuote) {
+    digits = digits.slice(0, -1)
+  }
   if (!digits) return ""
 
   const feet = digits[0]

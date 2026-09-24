@@ -24,7 +24,6 @@ import {
   MoreVertical,
   Phone,
   Sparkles,
-  Star,
   Users,
   X,
 } from "lucide-react"
@@ -460,10 +459,10 @@ export function MatchListCard({
             {/* Top Photo Badges */}
             <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-2.5">
               <div className="flex flex-col items-start gap-1">
-                {typeof match.matchPercent === "number" && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/95 px-2.5 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-xs">
-                    <Star className="h-3 w-3 fill-current" /> {match.matchPercent}% match
-                  </span>
+                {Array.isArray(match.matchReasons) && match.matchReasons.length > 0 && (
+                  <p className="mt-1 line-clamp-1 text-[11px] text-white/90">
+                    {match.matchReasons.slice(0, 3).join(" · ")}
+                  </p>
                 )}
               </div>
 

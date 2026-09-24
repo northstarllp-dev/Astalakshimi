@@ -185,7 +185,7 @@ const PHOTO_KEY_PATTERNS: Record<PhotoKeyPurpose, RegExp> = {
   profile_photo: /^profiles\/[0-9a-fA-F-]{36}\/photos\/[0-9a-fA-F-]{36}\.(jpeg|jpg|png|webp)$/,
   horoscope: /^profiles\/[0-9a-fA-F-]{36}\/horoscopes\/[0-9a-fA-F-]{36}\.pdf$/,
   selfie: /^verifications\/[0-9a-fA-F-]{36}\/selfie-[0-9a-fA-F-]{36}\.(jpeg|jpg|png|webp)$/,
-  govt_id: /^verifications\/[0-9a-fA-F-]{36}\/govt-id-[0-9a-fA-F-]{36}\.(jpeg|jpg|png|webp)$/,
+  govt_id: /^verifications\/[0-9a-fA-F-]{36}\/govt-id-[0-9a-fA-F-]{36}\.[a-z0-9]{1,16}$/i,
 };
 
 export function isOwnedPhotoKey(

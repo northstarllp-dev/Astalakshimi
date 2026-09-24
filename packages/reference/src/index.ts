@@ -23,6 +23,7 @@ export {
   isValidMotherTongue,
   findCommunityBySlug,
   findCommunityByLabel,
+  isOpenCommunityPreference,
   getCommunitiesForReligion,
   getCommunityLabelsForReligion,
   findCityBySlug,

@@ -28,6 +28,24 @@ export class S3Provider {
     );
   }
 
+  private extensionFor(contentType: string): string {
+    const known: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/gif': 'gif',
+      'image/heic': 'heic',
+      'application/pdf': 'pdf',
+      'application/msword': 'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    };
+    if (known[contentType]) return known[contentType];
+    const subtype = contentType.split('/')[1]?.split(';')[0]?.replace(/[^a-z0-9]/gi, '') || '';
+    if (subtype && subtype.length <= 8) return subtype.toLowerCase();
+    return 'bin';
+  }
+
   private normalizeImageContentType(contentType: string): string {
     if (!contentType || contentType === 'application/octet-stream') return 'image/jpeg';
     if (contentType === 'image/jpg') return 'image/jpeg';
@@ -41,20 +59,24 @@ export class S3Provider {
     fileSize: number,
   ): Promise<PresignedUploadResponse> {
     const allowedImages = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const normalizedType = purpose === 'horoscope' ? contentType : this.normalizeImageContentType(contentType);
-    const isPdf = normalizedType === 'application/pdf';
+    const isPdf = contentType === 'application/pdf';
+    const isGovtId = purpose === 'govt_id';
 
     if (purpose === 'horoscope') {
       if (!isPdf || fileSize > 10 * 1024 * 1024) {
         throw new BadRequestException('Horoscope must be a PDF file under 10 MB.');
       }
-    } else if (!allowedImages.includes(normalizedType) || fileSize > 5 * 1024 * 1024) {
+    } else if (isGovtId) {
+      if (!contentType || fileSize > 15 * 1024 * 1024) {
+        throw new BadRequestException('Government ID must be a file under 15 MB.');
+      }
+    } else if (!allowedImages.includes(contentType) || fileSize > 5 * 1024 * 1024) {
       throw new BadRequestException('Photos must be JPG, PNG, or WEBP under 5 MB.');
     }
 
     let bucket = this.mediaBucket;
     let s3Key = '';
-    const ext = isPdf ? 'pdf' : normalizedType.split('/')[1] === 'jpg' ? 'jpeg' : normalizedType.split('/')[1] || 'jpg';
+    const ext = this.extensionFor(contentType);
     const uniqueId = uuidv4();
 
     switch (purpose) {
@@ -115,7 +137,8 @@ export class S3Provider {
   }
 
   async putObject(s3Key: string, body: Buffer, contentType: string, bucket?: string): Promise<void> {
-    const normalizedType = this.normalizeImageContentType(contentType);
+    const storedType =
+      contentType === 'image/jpg' ? 'image/jpeg' : contentType || 'application/octet-stream';
 
     try {
       await this.s3Client.send(
@@ -123,7 +146,7 @@ export class S3Provider {
           Bucket: bucket || this.mediaBucket,
           Key: s3Key,
           Body: body,
-          ContentType: normalizedType,
+          ContentType: storedType,
         }),
       );
     } catch (error) {

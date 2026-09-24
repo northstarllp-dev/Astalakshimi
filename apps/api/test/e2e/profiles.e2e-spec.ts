@@ -431,6 +431,8 @@ describe('Profiles HTTP e2e (validation + routing)', () => {
       ],
       verificationMethod: 'selfie',
       selfieS3Key: `verifications/${USER_ID}/selfie-33333333-3333-4333-8333-333333333333.jpeg`,
+      govtIdType: 'PAN card',
+      govtIdS3Key: `verifications/${USER_ID}/govt-id-44444444-4444-4444-8444-444444444444.pdf`,
     };
 
     await request(app.getHttpServer())

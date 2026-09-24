@@ -1,9 +1,11 @@
 import {
   Controller,
   Post,
+  Get,
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   UploadedFile,
   UseInterceptors,
@@ -36,6 +38,22 @@ type UploadedMediaFile = {
   originalname: string;
 };
 
+function contentTypeForUpload(file: UploadedMediaFile, purpose: string): string {
+  if (file.mimetype === 'image/jpg') return 'image/jpeg';
+  if (purpose === 'govt_id') {
+    if (file.mimetype && file.mimetype !== 'application/octet-stream') return file.mimetype;
+    const name = (file.originalname || '').toLowerCase();
+    if (name.endsWith('.pdf')) return 'application/pdf';
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.webp')) return 'image/webp';
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+    return file.mimetype || 'application/octet-stream';
+  }
+  if (file.mimetype && file.mimetype !== 'application/octet-stream') return file.mimetype;
+  if (purpose === 'horoscope') return 'application/pdf';
+  return 'image/jpeg';
+}
+
 @UseGuards(JwtAuthGuard)
 @Controller('media')
 export class MediaController {
@@ -53,7 +71,7 @@ export class MediaController {
 
   @AllowIncomplete()
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 15 * 1024 * 1024 } }))
   async uploadFile(
     @CurrentUser() user: UserSession,
     @UploadedFile() file: UploadedMediaFile,
@@ -68,18 +86,18 @@ export class MediaController {
       throw new BadRequestException('Invalid upload purpose');
     }
 
-    const contentType =
-      file.mimetype === 'image/jpg'
-        ? 'image/jpeg'
-        : file.mimetype || (parsedPurpose.data === 'horoscope' ? 'application/pdf' : 'image/jpeg');
+    const contentType = contentTypeForUpload(file, parsedPurpose.data);
 
-    const input = presignedUploadSchema.parse({
+    const parsed = presignedUploadSchema.safeParse({
       purpose: parsedPurpose.data,
       contentType,
       fileSize: file.size,
     });
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.issues[0]?.message || 'This file cannot be uploaded');
+    }
 
-    return this.mediaService.uploadFileBuffer(user.userId, file.buffer, input);
+    return this.mediaService.uploadFileBuffer(user.userId, file.buffer, parsed.data);
   }
 
   @AllowIncomplete()
@@ -107,6 +125,28 @@ export class MediaController {
     @Body(new ZodValidationPipe(confirmHoroscopeSchema)) input: ConfirmHoroscopeInput,
   ) {
     return this.mediaService.confirmHoroscope(user.userId, input);
+  }
+
+  @AllowIncomplete()
+  @Get('verification-preview')
+  async verificationPreview(
+    @CurrentUser() user: UserSession,
+    @Query('purpose') purpose: string,
+    @Query('s3Key') s3Key: string,
+  ) {
+    if (purpose !== 'selfie' && purpose !== 'govt_id') {
+      throw new BadRequestException('Preview is only available for a selfie or government ID');
+    }
+    if (!s3Key) {
+      throw new BadRequestException('Missing file location');
+    }
+    return this.mediaService.getVerificationPreviewUrl(user.userId, purpose, s3Key);
+  }
+
+  @AllowIncomplete()
+  @Get('horoscope')
+  async downloadHoroscope(@CurrentUser() user: UserSession) {
+    return this.mediaService.getHoroscopeDownloadUrl(user.userId);
   }
 
   @AllowIncomplete()

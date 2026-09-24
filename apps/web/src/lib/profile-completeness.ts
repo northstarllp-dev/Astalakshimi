@@ -15,7 +15,7 @@ import { emptySignupData, type SignupData } from "@/lib/profile-store"
 
 const EMPTY = emptySignupData()
 
-export const PROFILE_DETAIL_TOTAL = 44
+export const PROFILE_DETAIL_TOTAL = 47
 
 export type ProfileDetailGroup =
   | "basics"
@@ -237,6 +237,30 @@ export const PROFILE_DETAIL_FIELDS: ProfileDetailField[] = [
     filled: (d) => filledCustom(d.willingToRelocate, EMPTY.willingToRelocate),
   },
   {
+    id: "prefReligion",
+    label: "Preferred religions",
+    group: "preferences",
+    signup: true,
+    required: true,
+    filled: (d) => (d.prefReligion?.length ?? 0) > 0,
+  },
+  {
+    id: "prefMaritalStatuses",
+    label: "Preferred marital status",
+    group: "preferences",
+    signup: true,
+    required: true,
+    filled: (d) => (d.prefMaritalStatuses?.length ?? 0) > 0,
+  },
+  {
+    id: "prefAge",
+    label: "Preferred age range",
+    group: "preferences",
+    signup: true,
+    required: true,
+    filled: (d) => typeof d.prefAgeMin === "number" && typeof d.prefAgeMax === "number",
+  },
+  {
     id: "prefCastes",
     label: "Preferred communities",
     group: "preferences",
@@ -319,6 +343,7 @@ export function getRequiredFieldEditHash(field: ProfileDetailField): string {
   if (field.group === "photos") return "#photos"
   if (field.group === "career") return "#career"
   if (field.group === "horoscope") return "#horoscope"
+  if (field.group === "preferences") return "#preferences"
   if (field.group === "community") return "#community"
   return "#basics"
 }

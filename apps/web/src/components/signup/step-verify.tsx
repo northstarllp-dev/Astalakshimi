@@ -11,15 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { StepHeading, TapCard } from "@/components/signup/shared"
+import { StepHeading } from "@/components/signup/shared"
 import { cn } from "@/lib/utils"
-import type { SignupData, VerificationMethod } from "@/lib/profile-store"
+import type { SignupData } from "@/lib/profile-store"
 import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import { apiClient } from "@/lib/api-client"
 import { hashFile } from "@/lib/file-hash"
 
 const MAX_PHOTOS = 6
 const MAX_IMAGE_MB = 5
+const MAX_DOC_MB = 15
 const MAX_PDF_MB = 10
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"]
 const ID_TYPES = ["Aadhaar", "PAN card", "Passport", "Driving licence", "Voter ID"]
@@ -36,6 +37,22 @@ function readFileAsDataUrl(file: File | Blob): Promise<string> {
   })
 }
 
+function validateDocument(file: File) {
+  if (file.size > MAX_DOC_MB * 1024 * 1024) {
+    return `The file must be under ${MAX_DOC_MB} MB.`
+  }
+  return null
+}
+
+async function uploadOwnedFile(file: File, purpose: "selfie" | "govt_id" | "horoscope") {
+  if (!apiClient.getToken()) {
+    throw new Error("Verify your phone before uploading. The file was not saved.")
+  }
+  const { s3Key } = await apiClient.media.uploadMediaFile(file, purpose)
+  if (!s3Key) throw new Error("Upload did not return a file location.")
+  return s3Key
+}
+
 function validateImage(file: File) {
   if (!IMAGE_TYPES.includes(file.type) && !file.type.startsWith("image/")) {
     return "Please choose a JPG, PNG, or WEBP photo."
@@ -44,6 +61,10 @@ function validateImage(file: File) {
     return `Each photo must be under ${MAX_IMAGE_MB} MB.`
   }
   return null
+}
+
+function isImagePreview(value: string) {
+  return value.startsWith("blob:") || value.startsWith("data:image/")
 }
 
 export function Step6Verify({
@@ -64,7 +85,9 @@ export function Step6Verify({
   const [cameraOpen, setCameraOpen] = React.useState(false)
   const [cameraReady, setCameraReady] = React.useState(false)
   const [cameraLoading, setCameraLoading] = React.useState(false)
-  const [uploading, setUploading] = React.useState(false)
+  const [busy, setBusy] = React.useState<null | "photos" | "selfie" | "id" | "horoscope">(null)
+  const [selfiePreview, setSelfiePreview] = React.useState("")
+  const [idPreview, setIdPreview] = React.useState("")
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const streamRef = React.useRef<MediaStream | null>(null)
   const photoInputRef = React.useRef<HTMLInputElement>(null)
@@ -109,7 +132,7 @@ export function Step6Verify({
 
     if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setCameraLoading(false)
-      setCameraError("Camera is not supported on this browser or device. Please upload a government ID instead.")
+      setCameraError("Camera is not supported on this browser. A live selfie is still required, so try another device or browser.")
       return
     }
 
@@ -139,8 +162,8 @@ export function Step6Verify({
       const isDenied = err.name === "NotAllowedError" || err.name === "PermissionDeniedError"
       setCameraError(
         isDenied
-          ? "Camera permission was denied. Please allow camera access in your browser settings to take a live selfie, or switch to Government ID."
-          : "Could not start camera. Please verify your camera connection or switch to Government ID."
+          ? "Camera permission was denied. Allow camera access in your browser settings, then retry. A live selfie is required along with your government ID."
+          : "Could not start the camera. Check the camera connection and try again. A live selfie is required along with your government ID."
       )
     }
   }
@@ -165,53 +188,45 @@ export function Step6Verify({
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
     ctx.restore()
 
-    const selfiePhoto = canvas.toDataURL("image/jpeg", 0.92)
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((next) => resolve(next), "image/jpeg", 0.92)
+    )
+    if (!blob) {
+      setError("Unable to capture image from camera.")
+      return
+    }
 
-    setUploading(true)
+    const selfiePhoto =
+      typeof URL.createObjectURL === "function"
+        ? URL.createObjectURL(blob)
+        : canvas.toDataURL("image/jpeg", 0.92)
+
+    setBusy("selfie")
     setError("")
     try {
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92)
-      )
-
-      if (!blob) {
-        throw new Error("Unable to capture image from camera.")
-      }
-
-      let key = `verifications/${Date.now()}_selfie.jpg`
-
-      // If user is authenticated, upload directly to S3
-      if (apiClient.getToken()) {
-        try {
-          const file = new File([blob], "selfie.jpg", { type: "image/jpeg" })
-          const { s3Key } = await apiClient.media.uploadMediaFile(file, "selfie")
-          key = s3Key
-        } catch (uploadErr) {
-          console.warn("[Media] Upload fallback to mock key:", uploadErr)
-        }
-      }
+      const file = new File([blob], "selfie.jpg", { type: "image/jpeg" })
+      const key = await uploadOwnedFile(file, "selfie")
 
       stopCamera()
+      setSelfiePreview(selfiePhoto)
 
       updateData({
         selfiePhoto,
         selfieS3Key: key,
         verificationMethod: "selfie",
-        govtIdPhoto: "",
-        govtIdS3Key: "",
-        govtIdType: "",
       })
     } catch (err: any) {
+      if (selfiePhoto.startsWith("blob:")) URL.revokeObjectURL(selfiePhoto)
       setError(err.message || "Failed to capture selfie. Please try again.")
     } finally {
-      setUploading(false)
+      setBusy(null)
     }
   }
 
   const addPhotos = async (files: FileList | null) => {
     if (!files?.length) return
     setError("")
-    setUploading(true)
+    setBusy("photos")
     const remaining = MAX_PHOTOS - data.photos.length
     const nextPhotos = [...data.photos]
     const nextKeys = [...(data.photoS3Keys || [])]
@@ -255,41 +270,33 @@ export function Step6Verify({
     } catch (err: any) {
       setError(err.message || "Failed to upload photo. Please try again.")
     } finally {
-      setUploading(false)
+      setBusy(null)
     }
   }
 
   const addGovtId = async (file: File | undefined) => {
     if (!file) return
-    const invalid = validateImage(file)
+    const invalid = validateDocument(file)
     if (invalid) {
       setError(invalid)
       return
     }
     setError("")
-    setUploading(true)
+    setBusy("id")
     try {
-      const previewUrl = await readFileAsDataUrl(file)
-      let key = `verifications/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
-
-      try {
-        const { s3Key } = await apiClient.media.uploadMediaFile(file, "govt_id")
-        key = s3Key
-      } catch (uploadErr) {
-        console.warn("[Media] Upload fallback to mock key:", uploadErr)
-      }
+      const previewUrl = file.type.startsWith("image/") ? await readFileAsDataUrl(file) : ""
+      const key = await uploadOwnedFile(file, "govt_id")
+      if (previewUrl) setIdPreview(previewUrl)
 
       updateData({
         govtIdPhoto: previewUrl,
         govtIdS3Key: key,
-        verificationMethod: "govt_id",
-        selfiePhoto: "",
-        selfieS3Key: "",
+        govtIdFileName: file.name,
       })
     } catch (err: any) {
       setError(err.message || "Failed to upload government ID. Please try again.")
     } finally {
-      setUploading(false)
+      setBusy(null)
     }
   }
 
@@ -304,16 +311,9 @@ export function Step6Verify({
       return
     }
     setError("")
-    setUploading(true)
+    setBusy("horoscope")
     try {
-      let key = `horoscopes/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
-
-      try {
-        const { s3Key } = await apiClient.media.uploadMediaFile(file, "horoscope")
-        key = s3Key
-      } catch (uploadErr) {
-        console.warn("[Media] Upload fallback to mock key:", uploadErr)
-      }
+      const key = await uploadOwnedFile(file, "horoscope")
 
       updateData({
         horoscopeName: file.name,
@@ -323,7 +323,7 @@ export function Step6Verify({
     } catch (err: any) {
       setError(err.message || "Failed to upload horoscope PDF.")
     } finally {
-      setUploading(false)
+      setBusy(null)
     }
   }
 
@@ -339,31 +339,52 @@ export function Step6Verify({
     })
   }
 
-  const identityReady =
-    (data.verificationMethod === "selfie" && Boolean(data.selfiePhoto || data.selfieS3Key)) ||
-    (data.verificationMethod === "govt_id" && Boolean(data.govtIdPhoto || data.govtIdS3Key) && Boolean(data.govtIdType))
+  const shownSelfie = selfiePreview || (isImagePreview(data.selfiePhoto) ? data.selfiePhoto : "")
+  const shownId = idPreview || (isImagePreview(data.govtIdPhoto) ? data.govtIdPhoto : "")
 
-  const canSubmit = data.photos.length >= 1 && identityReady && !uploading && !isSubmitting
-
-  const chooseMethod = (method: VerificationMethod) => {
-    setError("")
-    setCameraError("")
-    if (method === "selfie") {
-      updateData({ verificationMethod: "selfie" })
-      if (!data.selfiePhoto) {
-        void startCamera()
-      }
-      return
+  React.useEffect(() => {
+    if (shownSelfie || !data.selfieS3Key) return
+    let cancelled = false
+    void apiClient.media.previewVerification("selfie", data.selfieS3Key).then(
+      ({ url }) => {
+        if (!cancelled && url) setSelfiePreview(url)
+      },
+      () => {
+        /* keep the captured label even if the private preview cannot be signed */
+      },
+    )
+    return () => {
+      cancelled = true
     }
-    stopCamera()
-    updateData({ verificationMethod: "govt_id" })
-  }
+  }, [shownSelfie, data.selfieS3Key])
+
+  React.useEffect(() => {
+    if (shownId || !data.govtIdS3Key) return
+    const name = (data.govtIdFileName || data.govtIdS3Key).toLowerCase()
+    const looksLikeImage = /\.(jpe?g|png|webp|gif|heic)$/.test(name)
+    if (!looksLikeImage && data.govtIdFileName) return
+    let cancelled = false
+    void apiClient.media.previewVerification("govt_id", data.govtIdS3Key).then(
+      ({ url }) => {
+        if (!cancelled && url && looksLikeImage) setIdPreview(url)
+      },
+      () => {},
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [shownId, data.govtIdS3Key, data.govtIdFileName])
+
+  const identityReady =
+    Boolean(data.selfieS3Key) && Boolean(data.govtIdType) && Boolean(data.govtIdS3Key)
+
+  const canSubmit = data.photos.length >= 1 && identityReady && !busy && !isSubmitting
 
   return (
     <div className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8 pb-8">
       <StepHeading
         title="Photos & verification"
-        subtitle="Add clear photos, verify with a live selfie or government ID, and optionally upload your horoscope. Photos stay hidden until our team approves them  usually within 12 hours."
+        subtitle="Add clear photos, then a live selfie and a government ID. Both are required. A horoscope PDF is optional. Photos stay hidden until our team approves them, usually within 12 hours."
       />
 
       {/* Profile Photos */}
@@ -409,12 +430,12 @@ export function Step6Verify({
                 ) : (
                   <button
                     type="button"
-                    disabled={uploading}
+                    disabled={busy === "photos"}
                     className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
                     onClick={() => photoInputRef.current?.click()}
                   >
-                    {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-                    <span className="text-[11px] font-medium">{uploading ? "Uploading…" : "Add"}</span>
+                    {busy === "photos" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+                    <span className="text-[11px] font-medium">{busy === "photos" ? "Uploading…" : "Add"}</span>
                   </button>
                 )}
               </div>
@@ -438,53 +459,29 @@ export function Step6Verify({
         </p>
       </section>
 
-      {/* Verification */}
-      <section className="space-y-3">
+      {/* Verification — selfie and government ID are both required */}
+      <section className="space-y-4">
         <div>
           <h2 className="text-sm font-semibold">Verify it&apos;s you</h2>
           <p className="text-xs text-muted-foreground">
-            Take an instant live selfie, or upload a government ID if the camera is not available.
+            Take a live selfie and upload a government ID. Both are saved securely and reviewed together.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <TapCard
-            selected={data.verificationMethod === "selfie"}
-            onClick={() => chooseMethod("selfie")}
-            icon={<Camera className="h-5 w-5" />}
-            title="Take a selfie"
-            subtitle="Preferred"
-          />
-          <TapCard
-            selected={data.verificationMethod === "govt_id"}
-            onClick={() => chooseMethod("govt_id")}
-            icon={<IdCard className="h-5 w-5" />}
-            title="Government ID"
-            subtitle="If camera fails"
-          />
-        </div>
 
-        {cameraError && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
-            <p>{cameraError}</p>
-            <div className="flex gap-2">
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-3">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Camera className="h-4 w-4" />
+            Live selfie
+            <span className="text-xs font-medium text-muted-foreground">Required</span>
+          </div>
+          {cameraError && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
+              <p>{cameraError}</p>
               <Button type="button" size="sm" variant="outline" onClick={() => void startCamera()} className="h-7 text-xs">
                 Retry camera
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => chooseMethod("govt_id")}
-                className="h-7 text-xs text-amber-950"
-              >
-                Switch to Government ID
-              </Button>
             </div>
-          </div>
-        )}
-
-        {data.verificationMethod === "selfie" && (
-          <div className="space-y-3 rounded-2xl border border-border bg-card p-3">
+          )}
             {cameraOpen ? (
               <div className="relative overflow-hidden rounded-2xl bg-black">
                 <video
@@ -516,10 +513,10 @@ export function Step6Verify({
                     type="button"
                     size="sm"
                     onClick={() => void captureSelfie()}
-                    disabled={!cameraReady || uploading}
+                    disabled={!cameraReady || busy === "selfie"}
                     className="shadow-lg"
                   >
-                    {uploading ? (
+                    {busy === "selfie" ? (
                       <>
                         <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Saving…
                       </>
@@ -531,10 +528,16 @@ export function Step6Verify({
                   </Button>
                 </div>
               </div>
-            ) : data.selfiePhoto ? (
+            ) : shownSelfie || data.selfieS3Key ? (
               <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={data.selfiePhoto} alt="Selfie preview" className="h-24 w-20 rounded-xl object-cover border border-border" />
+                {shownSelfie ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={shownSelfie} alt="Selfie preview" className="h-24 w-20 rounded-xl object-cover border border-border bg-muted" />
+                ) : (
+                  <div className="flex h-24 w-20 items-center justify-center rounded-xl border border-border bg-muted">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                )}
                 <div className="flex-1 text-sm">
                   <div className="flex items-center gap-1.5 font-semibold text-emerald-700">
                     <CheckCircle2 className="h-4 w-4" /> Live selfie captured
@@ -567,10 +570,13 @@ export function Step6Verify({
               </div>
             )}
           </div>
-        )}
 
-        {data.verificationMethod === "govt_id" && (
           <div className="space-y-4 rounded-2xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <IdCard className="h-4 w-4" />
+              Government ID
+              <span className="text-xs font-medium text-muted-foreground">Required</span>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="govt-id-type">ID type</Label>
               <Select
@@ -589,33 +595,46 @@ export function Step6Verify({
                 </SelectContent>
               </Select>
             </div>
-            {data.govtIdPhoto ? (
+            {data.govtIdS3Key ? (
               <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={data.govtIdPhoto} alt="Government ID preview" className="h-24 w-36 rounded-xl object-cover" />
-                <button
-                  type="button"
-                  className="text-xs font-semibold text-primary hover:underline"
-                  onClick={() => idInputRef.current?.click()}
-                >
-                  Replace ID photo
-                </button>
+                {shownId ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={shownId} alt="Government ID preview" className="h-24 w-36 rounded-xl object-cover" />
+                ) : (
+                  <div className="flex h-24 w-36 items-center justify-center rounded-xl border border-border bg-muted/40 text-muted-foreground">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1 text-sm">
+                  <div className="flex items-center gap-1.5 font-semibold text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" /> ID uploaded
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {data.govtIdFileName || "Saved to secure storage"}
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 text-xs font-semibold text-primary hover:underline"
+                    onClick={() => idInputRef.current?.click()}
+                  >
+                    Replace document
+                  </button>
+                </div>
               </div>
             ) : (
               <button
                 type="button"
-                disabled={uploading}
+                disabled={busy === "id"}
                 className="flex w-full flex-col items-center gap-2 rounded-2xl border border-dashed border-border py-8 text-sm text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
                 onClick={() => idInputRef.current?.click()}
               >
-                {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-                {uploading ? "Uploading ID…" : "Upload a clear photo of your ID"}
+                {busy === "id" ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+                {busy === "id" ? "Uploading ID…" : "Upload your ID (image, PDF, or other file)"}
               </button>
             )}
             <input
               ref={idInputRef}
               type="file"
-              accept="image/*"
               className="hidden"
               onChange={(e) => {
                 void addGovtId(e.target.files?.[0])
@@ -623,7 +642,6 @@ export function Step6Verify({
               }}
             />
           </div>
-        )}
       </section>
 
       {/* Horoscope PDF */}
@@ -634,12 +652,12 @@ export function Step6Verify({
         </div>
         <button
           type="button"
-          disabled={uploading}
+          disabled={busy === "horoscope"}
           className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-border bg-card p-4 text-left hover:border-primary/50 transition-colors"
           onClick={() => horoscopeInputRef.current?.click()}
         >
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileText className="h-5 w-5" />}
+            {busy === "horoscope" ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileText className="h-5 w-5" />}
           </div>
           <div className="min-w-0 flex-1">
             {data.horoscopeName ? (

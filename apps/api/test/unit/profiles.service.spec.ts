@@ -127,6 +127,8 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
     photoPrivacy: 'blurred',
     verificationMethod: 'selfie',
     selfieS3Key: 'verifications/11111111-1111-4111-8111-111111111111/selfie-44444444-4444-4444-8444-444444444444.jpeg',
+    govtIdType: 'PAN card',
+    govtIdS3Key: 'verifications/11111111-1111-4111-8111-111111111111/govt-id-55555555-5555-4555-8555-555555555555.pdf',
   };
 
   describe('completeRegistration', () => {
@@ -1163,6 +1165,7 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
           return {
             from: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([{ id: 'prof-1', maritalStatus: 'Never Married' }]),
             orderBy: jest.fn().mockResolvedValue([]),
           };
         }
@@ -1170,6 +1173,11 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
 
       const mockValues = jest.fn().mockResolvedValue(undefined);
       mockDb.insert.mockReturnValue({ values: mockValues });
+      mockDb.update.mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
+        }),
+      });
 
       jest.spyOn(profilesService, 'getMyProfile').mockResolvedValue({
         profile: { id: 'prof-1' } as any,
@@ -1206,6 +1214,7 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
         return {
           from: jest.fn().mockReturnThis(),
           where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([{ id: 'prof-1' }]),
           orderBy: jest.fn().mockResolvedValue([{ id: 'p1', s3Key: 'other.jpeg', contentHash }]),
         };
       });
@@ -1238,6 +1247,7 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
           return {
             from: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([{ id: 'prof-1', maritalStatus: 'Never Married' }]),
             orderBy: jest.fn().mockResolvedValue([{ id: 'photo-2', profileId: 'prof-1', isPrimary: false }]),
           };
         }
@@ -1345,6 +1355,7 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
         selectCall++;
         const resolveLimit = (value: unknown) => ({
           from: jest.fn().mockReturnThis(),
+          innerJoin: jest.fn().mockReturnThis(),
           where: jest.fn().mockReturnValue({
             limit: jest.fn().mockResolvedValue(value),
             orderBy: jest.fn().mockResolvedValue(value),
@@ -1397,6 +1408,7 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
         selectCall++;
         const resolveLimit = (value: unknown) => ({
           from: jest.fn().mockReturnThis(),
+          innerJoin: jest.fn().mockReturnThis(),
           where: jest.fn().mockReturnValue({
             limit: jest.fn().mockResolvedValue(value),
             orderBy: jest.fn().mockResolvedValue(value),

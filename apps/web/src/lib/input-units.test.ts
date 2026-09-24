@@ -202,4 +202,9 @@ describe("maskHeightInput", () => {
   it("returns empty for blank", () => {
     expect(maskHeightInput("")).toBe("")
   })
+  it("backspace after the closing quote removes the last digit", () => {
+    expect(maskHeightInput("5'2", `5'2"`)).toBe("5")
+    expect(maskHeightInput("5'11", `5'11"`)).toBe(`5'1"`)
+    expect(maskHeightInput("", "5")).toBe("")
+  })
 })

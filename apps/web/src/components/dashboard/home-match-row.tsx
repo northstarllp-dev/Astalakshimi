@@ -68,11 +68,6 @@ export function HomeMatchRow({
         ) : (
           <LockedPhoto compact src={photo} label="Photo hidden" />
         )}
-        {typeof match.matchPercent === "number" ? (
-          <span className="absolute right-1.5 top-1.5 inline-flex items-center rounded-full bg-emerald-500/95 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-xs sm:text-[10px]">
-            {match.matchPercent}%
-          </span>
-        ) : null}
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col justify-between gap-1.5 sm:gap-2">
@@ -92,6 +87,11 @@ export function HomeMatchRow({
           {community ? <p className="mt-0.5 truncate text-xs text-foreground/85 sm:mt-1 sm:text-sm">{community}</p> : null}
           {place ? <p className="truncate text-xs text-muted-foreground sm:text-sm">{place}</p> : null}
           {work ? <p className="truncate text-xs text-muted-foreground sm:text-sm">{work}</p> : null}
+          {Array.isArray(match.matchReasons) && match.matchReasons.length > 0 ? (
+            <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground sm:text-xs">
+              {match.matchReasons.slice(0, 3).join(" · ")}
+            </p>
+          ) : null}
           {match.maritalStatus && match.maritalStatus !== "Never Married" ? (
             <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">{match.maritalStatus}</p>
           ) : null}

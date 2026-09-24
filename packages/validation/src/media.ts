@@ -27,6 +27,14 @@ export const presignedUploadSchema = z
           message: 'Horoscope PDF must be under 10 MB',
         });
       }
+    } else if (data.purpose === 'govt_id') {
+      if (data.fileSize > 15 * 1024 * 1024) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['fileSize'],
+          message: 'Government ID must be under 15 MB',
+        });
+      }
     } else {
       if (!ALLOWED_IMAGE_TYPES.includes(data.contentType)) {
         ctx.addIssue({

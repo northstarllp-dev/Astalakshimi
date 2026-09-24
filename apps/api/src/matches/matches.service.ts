@@ -12,12 +12,22 @@ import {
 import { eq, ne, and, inArray, or, desc, gte, lte, gt, sql } from 'drizzle-orm';
 import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
 import {
+  candidateAge,
+  hasRequiredPartnerPrefs,
   passesHardFilters,
   scoreCandidate,
+  targetGenders,
   type BasicPrefs,
   type MatchScore,
 } from './match-scoring';
-import { cleanList, dobBoundsForAgeWindow, loadViewerContext, type ViewerContext } from './viewer-context';
+import {
+  cleanList,
+  dobBoundsForAgeWindow,
+  loadViewerContext,
+  lowerIn,
+  visibilitySql,
+  type ViewerContext,
+} from './viewer-context';
 
 const POOL_LIMIT = 200;
 const TOP_N = 8;
@@ -78,47 +88,43 @@ export class MatchesService {
     if (!viewer) return null;
 
     const prefs: BasicPrefs = viewer.prefs;
-
-    // 2. Candidate pool: opposite gender, not self. Hard filters (age window,
-    //    religion, marital status) are pushed into SQL so we rank the best of
-    //    the catalog instead of an arbitrary slice; the Node-side hard filter
-    //    below stays as the exact boundary authority. Hidden profiles never
-    //    enter the pool.
-    const conditions: any[] = [ne(profiles.userId, userId)];
-    if (viewer.gender) {
-      const targetGender = viewer.gender === 'Male' ? 'Female' : 'Male';
-      conditions.push(eq(profiles.gender, targetGender));
+    if (!hasRequiredPartnerPrefs(prefs)) {
+      return { viewer, ranked: [] };
     }
 
-    const { dobUpper, dobLower } = dobBoundsForAgeWindow(prefs);
-    conditions.push(lte(profiles.dob, dobUpper));
-    conditions.push(gte(profiles.dob, dobLower));
+    const genders = targetGenders(viewer.gender);
+    if (genders.length === 0) {
+      return { viewer, ranked: [] };
+    }
 
-    // Discover-ready candidates need Layer-B completeness + a primary photo.
-    conditions.push(eq(profiles.requiredComplete, true));
-    conditions.push(
+    const ageBounds = dobBoundsForAgeWindow(prefs);
+    if (!ageBounds) {
+      return { viewer, ranked: [] };
+    }
+
+    const religions = cleanList(prefs.prefReligions);
+    const maritalStatuses = cleanList(prefs.prefMaritalStatuses);
+
+    // 2. Candidate pool: opposite gender, not self. Hard filters (age window,
+    //    religion any-of, marital any-of) are pushed into SQL so we rank the
+    //    best of the catalog instead of an arbitrary slice; the Node-side hard
+    //    filter below stays as the exact boundary authority. Hidden / premium-
+    //    gated profiles never enter the pool.
+    const conditions: any[] = [
+      ne(profiles.userId, userId),
+      inArray(profiles.gender, genders as Array<'Male' | 'Female'>),
+      lte(profiles.dob, ageBounds.dobUpper),
+      gte(profiles.dob, ageBounds.dobLower),
+      eq(profiles.requiredComplete, true),
       sql`EXISTS (
         SELECT 1 FROM profile_photos
         WHERE profile_photos.profile_id = profiles.id
           AND profile_photos.is_primary = true
       )`,
-    );
-
-    const religions = cleanList(prefs.prefReligions);
-    if (religions.length > 0) conditions.push(inArray(profiles.religion, religions));
-
-    const maritalStatuses: any[] = cleanList(prefs.prefMaritalStatuses);
-    if (maritalStatuses.length > 0) {
-      conditions.push(inArray(profiles.maritalStatus, maritalStatuses));
-    }
-
-    conditions.push(
-      sql`NOT EXISTS (
-        SELECT 1 FROM user_settings
-        WHERE user_settings.user_id = ${profiles.userId}
-          AND (user_settings.hide_profile = true OR user_settings.profile_visibility = 'hidden')
-      )`,
-    );
+      lowerIn(profiles.religion, religions),
+      lowerIn(profiles.maritalStatus, maritalStatuses),
+      visibilitySql(viewer.viewerIsPaid),
+    ];
 
     const pool = await this.db
       .select({
@@ -153,7 +159,7 @@ export class MatchesService {
       .map((p) => ({ profile: p, score: scoreCandidate(p as any, prefs) }))
       .sort(
         (a, b) =>
-          b.score.percent - a.score.percent ||
+          b.score.points - a.score.points ||
           new Date(b.profile.createdAt).getTime() - new Date(a.profile.createdAt).getTime(),
       );
 
@@ -227,7 +233,7 @@ export class MatchesService {
         id: p.id,
         fullName: p.fullName,
         gender: p.gender,
-        age: p.dob ? new Date().getFullYear() - new Date(p.dob).getFullYear() : 25,
+        age: candidateAge(p.dob) ?? 0,
         heightCm: p.heightCm,
         city: p.city,
         state: p.state,
@@ -259,7 +265,6 @@ export class MatchesService {
         lastActive: 'Online now',
         community: p.caste || 'Unknown',
         height: p.heightCm ? `${p.heightCm} cm` : 'Unknown',
-        matchPercent: score?.percent ?? 40,
         matchReasons: score?.reasons ?? [],
       };
     });

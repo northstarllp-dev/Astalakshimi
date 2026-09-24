@@ -204,7 +204,7 @@ function DiscoverPage() {
           <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Search & browse</p>
           <h1 className="mt-0.5 font-serif text-2xl font-bold tracking-tight md:text-3xl">Discover</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Namaste, {firstName}. Ranked matches from your partner preferences, or search the full community.
+            Namaste, {firstName}. People who match who you are looking for, or browse everyone.
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 sm:flex">
@@ -258,6 +258,7 @@ function DiscoverPage() {
 
       {view === "matches" ? (
         <TopMatchesPanel
+          profile={profile}
           interactionsLocked={interactionsLocked}
           skipped={skipped}
           onSkip={handleSkip}
@@ -275,13 +276,15 @@ function DiscoverPage() {
   )
 }
 
-/** "Your Top Matches" — score-ranked, paginated list from partner preferences. */
+/** For you — profiles that pass age, religion, and marital preferences. */
 function TopMatchesPanel({
+  profile,
   interactionsLocked,
   skipped,
   onSkip,
   onConnect,
 }: {
+  profile: any
   interactionsLocked: boolean
   skipped: string[]
   onSkip: (id: string) => void
@@ -293,6 +296,11 @@ function TopMatchesPanel({
   const matches = (data?.matches || []).filter((match) => !skipped.includes(match.id))
   const totalCount = data?.totalCount || 0
   const totalPages = Math.max(1, Math.ceil(totalCount / MATCHES_PAGE_SIZE))
+  const prefsIncomplete =
+    !(profile?.prefReligion?.length > 0) ||
+    !(profile?.prefMaritalStatuses?.length > 0) ||
+    typeof profile?.prefAgeMin !== "number" ||
+    typeof profile?.prefAgeMax !== "number"
 
   return (
     <div
@@ -304,10 +312,16 @@ function TopMatchesPanel({
       <div className="shrink-0">
         <p className="mb-3 text-sm text-muted-foreground">
           {isLoading ? (
-            <span>Loading your top matches...</span>
+            <span>Loading people who fit your preferences…</span>
           ) : (
             <>
-              <span className="font-semibold text-primary">{totalCount}</span> top matches ranked by your partner preferences
+              People who fit the age, religion, and marital status you set
+              {totalCount > 0 ? (
+                <>
+                  {" "}
+                  · <span className="font-semibold text-primary">{totalCount}</span>
+                </>
+              ) : null}
             </>
           )}
         </p>
@@ -331,13 +345,22 @@ function TopMatchesPanel({
         {!isLoading && totalCount === 0 && (
           <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
             <Sparkles className="mx-auto h-8 w-8 text-muted-foreground" />
-            <p className="mt-3 font-semibold">No top matches yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Set your partner preferences, or search and filter the full community.
+            <p className="mt-3 font-semibold">
+              {prefsIncomplete ? "Set who you are looking for" : "No profiles fit those preferences yet"}
             </p>
-            <Link href="/dashboard?view=search" className="mt-4 inline-block">
-              <Button>Search & filter</Button>
-            </Link>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {prefsIncomplete
+                ? "Choose an age range, at least one religion, and at least one marital status."
+                : "Widen your partner preferences, or browse the full community."}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Link href="/profile/edit#preferences">
+                <Button>Edit preferences</Button>
+              </Link>
+              <Link href="/dashboard?view=search">
+                <Button variant="outline">Browse all profiles</Button>
+              </Link>
+            </div>
           </div>
         )}
       </MatchSnapFeed>
@@ -359,7 +382,7 @@ function TopMatchesPanel({
   )
 }
 
-/** "Search & Filter" — the full browse + filter experience. */
+/** Browse — every eligible profile. Saved partner preferences do not hide anyone. */
 function SearchFilterPanel({
   interactionsLocked,
   skipped,
@@ -485,6 +508,65 @@ function SearchFilterPanel({
   return (
     <>
       {/* Compact Filters Button Bar */}
+      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <CityAutocomplete
+          city={query.city}
+          onCityChange={({ city }) => setQuick({ city })}
+          placeholder="Any city"
+          searchPlaceholder="Search city…"
+          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm"
+        />
+        <SearchableSelect
+          value={query.community}
+          onValueChange={(community) => setQuick({ community })}
+          options={communityOptions}
+          placeholder="Any community"
+          searchPlaceholder="Search community…"
+          emptyText="No matching community found."
+          allowCustom={true}
+          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm"
+        />
+      </div>
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <input
+          type="number"
+          min={18}
+          max={80}
+          inputMode="numeric"
+          aria-label="Minimum age"
+          placeholder="Min age"
+          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm"
+          value={query.ageFilterEnabled ? String(query.ageMin) : ""}
+          onChange={(e) => {
+            const raw = e.target.value
+            if (raw === "") {
+              setQuery((q) => ({ ...q, ageFilterEnabled: false }))
+              setPage(1)
+              return
+            }
+            setQuick({ ageMin: Number(raw) })
+          }}
+        />
+        <input
+          type="number"
+          min={18}
+          max={80}
+          inputMode="numeric"
+          aria-label="Maximum age"
+          placeholder="Max age"
+          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm"
+          value={query.ageFilterEnabled ? String(query.ageMax) : ""}
+          onChange={(e) => {
+            const raw = e.target.value
+            if (raw === "") {
+              setQuery((q) => ({ ...q, ageFilterEnabled: false }))
+              setPage(1)
+              return
+            }
+            setQuick({ ageMax: Number(raw) })
+          }}
+        />
+      </div>
       <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
           {/* Small Filters Button */}
@@ -495,7 +577,7 @@ function SearchFilterPanel({
             className="h-10 rounded-full px-4 text-sm font-semibold shadow-xs transition"
           >
             <SlidersHorizontal className="mr-2 h-4 w-4" />
-            <span>Filters</span>
+            <span>Age & filters</span>
             {activeFilterCount > 0 ? (
               <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-secondary-foreground">
                 {activeFilterCount}
@@ -691,7 +773,7 @@ function SearchFilterPanel({
             <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
               <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
               <p className="mt-3 font-semibold">No profiles for this search</p>
-              <p className="mt-1 text-sm text-muted-foreground">Widen age, city, or community  results update as you adjust.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Widen or reset filters — empty Browse shows every eligible profile.</p>
               <Button
                 className="mt-4"
                 onClick={() => {

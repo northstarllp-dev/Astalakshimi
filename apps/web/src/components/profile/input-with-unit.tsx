@@ -13,11 +13,13 @@ import {
   convertWeightAmount,
   displayHeight,
   formatBirthTime,
+  formatHeightFromCm,
   formatWeight,
   maskClockInput,
   maskHeightInput,
   maskWeightInput,
   parseBirthTime,
+  parseHeightToCm,
   parseWeight,
   type Meridiem,
   type WeightUnit,
@@ -37,6 +39,7 @@ type InputWithUnitProps = {
   autoComplete?: string
   "aria-label"?: string
   className?: string
+  onBlur?: () => void
 }
 
 export function InputWithUnit({
@@ -53,6 +56,7 @@ export function InputWithUnit({
   autoComplete = "off",
   "aria-label": ariaLabel,
   className,
+  onBlur,
 }: InputWithUnitProps) {
   const selectable = Boolean(onUnitChange && units && units.length > 1)
 
@@ -74,6 +78,7 @@ export function InputWithUnit({
         maxLength={maxLength}
         autoComplete={autoComplete}
         aria-label={ariaLabel}
+        onBlur={onBlur}
         className="min-w-0 flex-1 bg-transparent px-4 text-base outline-none placeholder:text-muted-foreground/60 md:text-sm"
       />
       <div className="my-2.5 w-px shrink-0 bg-border" aria-hidden />
@@ -172,11 +177,50 @@ export function HeightInput({
   return (
     <InputWithUnit
       value={shown}
-      onChange={(next) => onChange(maskHeightInput(next))}
+      onChange={(next) => onChange(maskHeightInput(next, shown))}
       placeholder={`5'11"`}
       inputMode="numeric"
       maxLength={6}
       aria-label="Height"
+      unit={`ft'in"`}
+      className={className}
+    />
+  )
+}
+
+/** Feet/inches field backed by a centimetre integer (partner height range). */
+export function HeightCmInput({
+  valueCm,
+  onChangeCm,
+  ariaLabel,
+  className,
+}: {
+  valueCm?: number
+  onChangeCm: (cm: number | undefined) => void
+  ariaLabel: string
+  className?: string
+}) {
+  const [draft, setDraft] = React.useState<string | null>(null)
+  const shown = draft ?? (typeof valueCm === "number" ? formatHeightFromCm(valueCm) : "")
+
+  return (
+    <InputWithUnit
+      value={shown}
+      onChange={(next) => {
+        const masked = maskHeightInput(next, shown)
+        setDraft(masked)
+        if (!masked) {
+          onChangeCm(undefined)
+          return
+        }
+        const cm = parseHeightToCm(masked)
+        if (cm != null) onChangeCm(cm)
+      }}
+      onBlur={() => setDraft(null)}
+      placeholder={`5'4"`}
+      inputMode="numeric"
+      maxLength={6}
+      aria-label={ariaLabel}
       unit={`ft'in"`}
       className={className}
     />
