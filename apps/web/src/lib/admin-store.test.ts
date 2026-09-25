@@ -13,7 +13,7 @@ describe("Admin Store - Revenue Calculation", () => {
     vi.useRealTimers()
   })
 
-  const baseProfile: AdminProfile = {
+  const baseProfile = {
     id: "prof-1",
     userId: "user-1",
     fullName: "Test User",
@@ -29,18 +29,18 @@ describe("Admin Store - Revenue Calculation", () => {
     plan: "Silver",
     photos: [],
     reviewedAt: "2026-09-20T00:00:00Z",
-  }
+  } as unknown as AdminProfile
 
   it("should not add revenue for Silver plan bought during launch offer", () => {
     const silverPlan = MEMBERSHIP_PLANS.find(p => p.id === "silver")!
     
-    const profile: AdminProfile = {
+    const profile = {
       ...baseProfile,
       plan: "Silver",
       planExpiry: new Date(
         new Date("2026-09-20T00:00:00Z").getTime() + silverPlan.durationDays * 24 * 60 * 60 * 1000
       ).toISOString(), // Bought on 2026-09-20 (during launch offer)
-    }
+    } as unknown as AdminProfile
 
     const stats = getAdminStats([profile])
     expect(stats.totalRevenue).toBe(0)
@@ -49,13 +49,13 @@ describe("Admin Store - Revenue Calculation", () => {
   it("should add revenue for Gold plan bought during launch offer", () => {
     const goldPlan = MEMBERSHIP_PLANS.find(p => p.id === "gold")!
     
-    const profile: AdminProfile = {
+    const profile = {
       ...baseProfile,
       plan: "Gold",
       planExpiry: new Date(
         new Date("2026-09-20T00:00:00Z").getTime() + goldPlan.durationDays * 24 * 60 * 60 * 1000
       ).toISOString(), // Bought on 2026-09-20 (during launch offer)
-    }
+    } as unknown as AdminProfile
 
     const stats = getAdminStats([profile])
     expect(stats.totalRevenue).toBe(Math.round(goldPlan.priceInPaise / 100))
@@ -64,13 +64,13 @@ describe("Admin Store - Revenue Calculation", () => {
   it("should add revenue for Silver plan bought after launch offer expiry", () => {
     const silverPlan = MEMBERSHIP_PLANS.find(p => p.id === "silver")!
     
-    const profile: AdminProfile = {
+    const profile = {
       ...baseProfile,
       plan: "Silver",
       planExpiry: new Date(
         new Date("2027-01-01T00:00:00Z").getTime() + silverPlan.durationDays * 24 * 60 * 60 * 1000
       ).toISOString(), // Bought on 2027-01-01 (after launch offer)
-    }
+    } as unknown as AdminProfile
 
     const stats = getAdminStats([profile])
     expect(stats.totalRevenue).toBe(Math.round(silverPlan.priceInPaise / 100))
@@ -79,13 +79,13 @@ describe("Admin Store - Revenue Calculation", () => {
   it("should add revenue for any plan bought after launch offer expiry", () => {
     const platinumPlan = MEMBERSHIP_PLANS.find(p => p.id === "platinum")!
     
-    const profile: AdminProfile = {
+    const profile = {
       ...baseProfile,
       plan: "Platinum",
       planExpiry: new Date(
         new Date("2027-01-01T00:00:00Z").getTime() + platinumPlan.durationDays * 24 * 60 * 60 * 1000
       ).toISOString(), // Bought on 2027-01-01 (after launch offer)
-    }
+    } as unknown as AdminProfile
 
     const stats = getAdminStats([profile])
     expect(stats.totalRevenue).toBe(Math.round(platinumPlan.priceInPaise / 100))
