@@ -182,11 +182,11 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
   }
 
   return (
-    <div className="relative mx-auto max-w-6xl px-3 pb-28 pt-4 sm:px-4 sm:pb-32 md:pt-6 lg:h-[calc(100dvh-10rem)] lg:overflow-hidden lg:pb-0 lg:pt-6">
-      <div className="grid gap-5 lg:h-full lg:min-h-0 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start lg:gap-8 lg:overflow-hidden">
-        {/* LEFT: frame follows the photo — the picture is not cropped to fill the column */}
-        <div className="min-w-0 lg:max-w-[440px] lg:self-start">
-          <div className="relative mx-auto w-fit max-w-full overflow-hidden rounded-2xl border border-border/70 shadow-md sm:rounded-3xl lg:mx-0">
+    <div className="relative mx-auto max-w-6xl px-3 pt-4 sm:px-4 md:pt-6 lg:h-[calc(100dvh-10rem)] lg:overflow-hidden lg:pt-6">
+      <div className="grid gap-5 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-stretch lg:gap-8 lg:overflow-hidden">
+        {/* Photo slot: the whole picture fits between the header and the action bar */}
+        <div className="flex h-[calc(100svh-10.5rem)] min-h-0 w-full items-center justify-center lg:h-full">
+          <div className="h-full w-full">
             <ProfileGallery
               name={profile.fullName}
               age={profile.age}
@@ -203,7 +203,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
 
 
         {/* RIGHT: the only scrollable column on desktop */}
-        <div className="min-w-0 space-y-4 sm:space-y-5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pb-6 lg:pr-2 [scrollbar-gutter:stable]">
+        <div className="min-w-0 space-y-4 pb-28 sm:space-y-5 sm:pb-32 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pb-6 lg:pr-2 [scrollbar-gutter:stable]">
           <ProfileAboutSection
             profileId={profile.id}
             aboutText={profile.about}

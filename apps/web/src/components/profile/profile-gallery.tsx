@@ -38,6 +38,8 @@ export function ProfileGallery({
   const [lightboxOpen, setLightboxOpen] = React.useState(false)
   const [horoscopePopupOpen, setHoroscopePopupOpen] = React.useState(false)
   const [naturalSize, setNaturalSize] = React.useState<{ width: number; height: number } | null>(null)
+  const [slot, setSlot] = React.useState({ width: 0, height: 0 })
+  const slotRef = React.useRef<HTMLDivElement>(null)
   const hero = photos[activeIndex] ?? photos[0]
   const extra = photos.slice(1)
   const hasMany = photos.length > 1
@@ -57,6 +59,28 @@ export function ProfileGallery({
     e?.stopPropagation()
     setActiveIndex((i) => (i + 1) % photos.length)
   }
+
+  React.useEffect(() => {
+    const el = slotRef.current
+    if (!el) return
+    const update = () => {
+      const rect = el.getBoundingClientRect()
+      setSlot({ width: Math.floor(rect.width), height: Math.floor(rect.height) })
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const fitted = React.useMemo(() => {
+    if (!naturalSize || slot.width < 8 || slot.height < 8) return null
+    const scale = Math.min(slot.width / naturalSize.width, slot.height / naturalSize.height, 1)
+    return {
+      width: Math.max(1, Math.floor(naturalSize.width * scale)),
+      height: Math.max(1, Math.floor(naturalSize.height * scale)),
+    }
+  }, [naturalSize, slot])
 
   React.useEffect(() => {
     setNaturalSize(null)
@@ -91,13 +115,14 @@ export function ProfileGallery({
   }, [lightboxOpen, horoscopePopupOpen, hasMany, photos.length])
   return (
     <>
-      <div className="relative w-fit max-w-full">
-        <div className="group relative w-fit max-w-full overflow-hidden bg-muted">
+      <div ref={slotRef} className="flex h-full w-full items-center justify-center">
+        <div
+          className="group relative overflow-hidden rounded-2xl border border-border/70 bg-muted shadow-md sm:rounded-3xl"
+          style={fitted ? { width: fitted.width, height: fitted.height } : { width: "100%", height: "100%" }}
+        >
           {isHidden ? (
-            <div className="relative aspect-[3/4] w-[min(100%,440px)]">
-              <LockedPhoto src={hero} label={`${name}'s photo is hidden`} />
-            </div>
-          ) : naturalSize ? (
+            <LockedPhoto src={hero} label={`${name}'s photo is hidden`} />
+          ) : fitted && naturalSize ? (
             <Image
               src={getMediaUrl(hero)}
               alt={`${name}, ${age}`}
@@ -106,16 +131,11 @@ export function ProfileGallery({
               quality={100}
               unoptimized
               priority
-              className={cn("block", blurPhoto ? "blur-xl" : "")}
-              style={{
-                width: "auto",
-                height: "auto",
-                maxWidth: "min(100%, 440px)",
-                maxHeight: "min(78vh, 920px)",
-              }}
+              className={cn("block h-full w-full object-contain", blurPhoto ? "blur-xl" : "")}
+              style={{ width: "100%", height: "100%", objectFit: "contain" }}
             />
           ) : (
-            <div className="aspect-[3/4] w-[min(100%,440px)] bg-muted" aria-hidden />
+            <div className="h-full w-full bg-muted" aria-hidden />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/15" />
 
