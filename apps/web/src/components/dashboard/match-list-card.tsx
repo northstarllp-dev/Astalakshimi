@@ -193,7 +193,7 @@ export function MatchListCard({
       className={cn(
         "overflow-hidden rounded-2xl md:rounded-3xl border bg-card shadow-sm transition-shadow hover:shadow-md",
         featured ? "border-secondary/60 ring-2 ring-secondary/25" : "border-secondary/20",
-        fillViewport && "flex h-full min-h-0 flex-col",
+        fillViewport && "max-md:flex max-md:h-full max-md:min-h-0 max-md:flex-col",
         className,
       )}
       onMouseEnter={() => setPaused(true)}
@@ -419,10 +419,10 @@ export function MatchListCard({
       {/* ────────────────────────────────────────────────────────────────
           DESKTOP VIEW: High-end, spacious 2-column showcase layout
           ──────────────────────────────────────────────────────────────── */}
-      <div className={cn("hidden md:flex md:flex-row items-stretch", fillViewport && "md:min-h-0 md:flex-1")}>
+      <div className="hidden md:flex md:flex-row md:items-stretch">
         {/* Left: Photo Showcase Column */}
-        <div className="w-[280px] lg:w-[310px] xl:w-[325px] shrink-0 p-3.5 sm:p-4 flex flex-col justify-between border-r border-border/40 bg-secondary/[0.02]">
-          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-neutral-900 shadow-sm border border-border/50">
+        <div className="flex w-[240px] shrink-0 flex-col justify-between border-r border-border/40 bg-secondary/[0.02] p-3.5 lg:w-[280px] xl:w-[300px] sm:p-4">
+          <div className="relative aspect-[3/4] max-h-[min(46vh,380px)] w-full overflow-hidden rounded-2xl border border-border/50 bg-neutral-900 shadow-sm">
             <Link href={`/profiles/${match.id}`} className="absolute inset-0 block">
               {isHidden ? (
                 <LockedPhoto src={photos[activePhoto] ?? photos[0]} label="Photo hidden" />

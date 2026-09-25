@@ -28,6 +28,7 @@ import {
   MARITAL_STATUSES,
   DIETS,
   EDUCATION_LEVELS,
+  INCOME_BANDS,
   FAMILY_TYPES,
   FAMILY_STATUS,
   FAMILY_VALUES,
@@ -1103,6 +1104,7 @@ function Step6Preferences({
       prefCastes: data.prefCastes ?? [],
       prefMotherTongues: data.prefMotherTongues ?? [],
       prefMinEducation: data.prefMinEducation ?? "",
+      prefAcceptableIncomes: data.prefAcceptableIncomes ?? [],
       prefLocations: data.prefLocations ?? [],
       prefHeightMinCm: data.prefHeightMinCm,
       prefHeightMaxCm: data.prefHeightMaxCm,
@@ -1129,7 +1131,7 @@ function Step6Preferences({
     <form className="space-y-8" onSubmit={onContinue}>
       <StepHeading
         title="Who are you looking for?"
-        subtitle="Required fields decide who can appear. Everything else only changes the order. You can edit this later from your profile."
+        subtitle="Required fields decide who can appear. Ranking fields only change the order. Preferred income is saved and does not change For you. You can edit this later from your profile."
       />
 
       <section
@@ -1345,6 +1347,25 @@ function Step6Preferences({
           {errors.prefHeightMinCm && (
             <p className="text-xs text-destructive">{errors.prefHeightMinCm.message}</p>
           )}
+        </div>
+
+        <p className="pt-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Optional — saved on your profile
+        </p>
+
+        <div className="space-y-2">
+          <Label>Preferred income</Label>
+          <MultiSelect
+            values={data.prefAcceptableIncomes ?? []}
+            onValuesChange={(values) => updateData({ prefAcceptableIncomes: values })}
+            options={INCOME_BANDS}
+            placeholder="Any income"
+            searchPlaceholder="Search income…"
+            ariaLabel="Preferred income"
+          />
+          <p className="text-xs text-muted-foreground">
+            Leave empty for any income. This is saved with your preferences and does not change who appears in For you or how they are ordered.
+          </p>
         </div>
       </div>
 

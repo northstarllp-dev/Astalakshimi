@@ -38,6 +38,7 @@ export function useProfileQuery() {
         try {
           const authMe = await apiClient.auth.getMe();
           base.phone = authMe.user.phone;
+          base.consentAccepted = authMe.user.consentAccepted === true;
           
           if (authMe.hasProfile) {
             const fullProfile = await apiClient.profiles.getMyProfile();
@@ -108,6 +109,7 @@ export function useProfileQuery() {
                 .filter((key): key is string => Boolean(key)),
               photoObjects: fullProfile.photos,
               verificationStatus: fullProfile.verificationStatus as any,
+              ...mapVerificationDocs(fullProfile.verification),
               prefAgeMin: fullProfile.preferences?.prefAgeMin ?? undefined,
               prefAgeMax: fullProfile.preferences?.prefAgeMax ?? undefined,
               prefHeightMinCm: fullProfile.preferences?.prefHeightMinCm ?? undefined,
@@ -444,6 +446,26 @@ function buildProfileUpdatePayload(data: Partial<SignupData>) {
   return payload
 }
 
+function mapVerificationDocs(verification: {
+  selfieS3Key?: string | null
+  govtIdS3Key?: string | null
+  govtIdType?: string | null
+  method?: SignupData["verificationMethod"] | null
+  rejectionReason?: string | null
+} | null | undefined) {
+  const selfie = verification?.selfieS3Key || ""
+  const govtId = verification?.govtIdS3Key || ""
+  return {
+    selfieS3Key: selfie,
+    selfiePhoto: selfie,
+    govtIdS3Key: govtId,
+    govtIdPhoto: govtId,
+    govtIdType: verification?.govtIdType || "",
+    verificationMethod: (verification?.method || "") as SignupData["verificationMethod"],
+    rejectionReason: verification?.rejectionReason || undefined,
+  }
+}
+
 function mapFullProfileToSignupData(
   base: SignupData,
   fullProfile: Awaited<ReturnType<typeof apiClient.profiles.getMyProfile>>,
@@ -526,6 +548,7 @@ function mapFullProfileToSignupData(
       .filter((key): key is string => Boolean(key)),
     photoObjects: fullProfile.photos,
     verificationStatus: fullProfile.verificationStatus as SignupData["verificationStatus"],
+    ...mapVerificationDocs(fullProfile.verification),
     // Treat any saved profile as submitted so signup-default selects count as filled.
     submittedAt: base.submittedAt || fullProfile.profile.createdAt || new Date().toISOString(),
   }

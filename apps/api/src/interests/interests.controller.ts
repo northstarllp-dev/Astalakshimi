@@ -89,8 +89,16 @@ export class InterestsController {
   }
 
   @Put(':id/status')
+  updateInterestStatusPut(
+    @CurrentUser() user: UserSession,
+    @Param('id', UuidValidationPipe) interestId: string,
+    @Body(new ZodValidationPipe(updateInterestStatusSchema)) body: UpdateInterestStatusInput,
+  ) {
+    return this.interestsService.updateInterestStatus(user.userId, interestId, body.status);
+  }
+
   @Patch(':id/status')
-  updateInterestStatus(
+  updateInterestStatusPatch(
     @CurrentUser() user: UserSession,
     @Param('id', UuidValidationPipe) interestId: string,
     @Body(new ZodValidationPipe(updateInterestStatusSchema)) body: UpdateInterestStatusInput,

@@ -479,7 +479,7 @@ export default function ProfileEditPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 px-3 py-5 sm:px-4 md:py-8">
+    <main className="mx-auto max-w-5xl space-y-6 px-3 py-5 sm:px-4 md:py-8">
       <div className="flex items-center gap-3">
         <Link
           href="/profile"
@@ -514,12 +514,20 @@ export default function ProfileEditPage() {
         </div>
       ) : null}
 
-      <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-        <TabsList aria-label="Profile sections">
+      <Tabs
+        value={activeTab}
+        onValueChange={onTabChange}
+        className="md:grid md:grid-cols-[13rem_minmax(0,1fr)] md:items-start md:gap-8"
+      >
+        <div className="relative md:contents">
+        <TabsList
+          aria-label="Profile sections"
+          className="md:sticky md:top-24 md:flex-col md:gap-1 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:p-0"
+        >
           {EDIT_TABS.map((tab) => {
             const missing = missingCountForTab(tab.id, missingIds)
             return (
-              <TabsTrigger key={tab.id} value={tab.id}>
+              <TabsTrigger key={tab.id} value={tab.id} className="md:min-h-11 md:w-full md:justify-start md:px-3">
                 {tab.label}
                 {missing > 0 && (
                   <span
@@ -533,6 +541,11 @@ export default function ProfileEditPage() {
             )
           })}
         </TabsList>
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent md:hidden"
+          aria-hidden="true"
+        />
+        </div>
 
         <TabsContent value="basics">
       <EditSection id="basics" title="Basic info">
@@ -1042,6 +1055,15 @@ export default function ProfileEditPage() {
             searchPlaceholder="Search education…"
           />
         </Field>
+        <Field label="Preferred income">
+          <MultiSelect
+            values={data.prefAcceptableIncomes || []}
+            onValuesChange={(values) => update({ prefAcceptableIncomes: values })}
+            options={INCOME_BANDS}
+            placeholder="Any income"
+            searchPlaceholder="Search income…"
+          />
+        </Field>
         <Field label="Preferred locations">
           <CityMultiSelect
             values={data.prefLocations || []}
@@ -1324,13 +1346,12 @@ export default function ProfileEditPage() {
         </div>
       </EditSection>
       </TabsContent>
-      </Tabs>
 
-      <div className="sticky bottom-20 z-20 flex gap-3 bg-background/90 py-3 backdrop-blur md:static md:bottom-auto md:bg-transparent md:py-0">
-        <Button variant="outline" className="flex-1" onClick={() => router.push("/profile")}>
+      <div className="sticky bottom-20 z-20 flex gap-3 bg-background/90 py-3 backdrop-blur md:static md:bottom-auto md:col-start-2 md:bg-transparent md:py-0">
+        <Button variant="outline" className="h-11 flex-1" onClick={() => router.push("/profile")}>
           Cancel
         </Button>
-        <Button className="flex-[1.4]" onClick={onSave} disabled={updateMutation.isPending}>
+        <Button className="h-11 flex-[1.6]" onClick={onSave} disabled={updateMutation.isPending}>
           {saved ? (
             <>
               <Check className="mr-1.5 h-4 w-4" /> Saved
@@ -1342,6 +1363,7 @@ export default function ProfileEditPage() {
           )}
         </Button>
       </div>
+      </Tabs>
     </main>
   )
 }

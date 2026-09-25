@@ -7,6 +7,7 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
   let mockDb: any;
   let mockEntitlementsService: any;
   let mockNotificationsService: any;
+  let mockBlocksService: any;
 
   const senderProfile = {
     id: 'sender-prof-id',
@@ -22,6 +23,14 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
     fullName: 'Ananya Sharma',
     dob: '1998-08-20',
     city: 'Bangalore',
+  };
+
+  const bystanderProfile = {
+    id: 'bystander-prof-id',
+    userId: 'bystander-user-id',
+    fullName: 'Bystander User',
+    dob: '1994-01-01',
+    city: 'Madurai',
   };
 
   beforeEach(() => {
@@ -42,10 +51,10 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
       createNotification: jest.fn().mockResolvedValue({}),
     };
 
-    const mockBlocksService = {
+    mockBlocksService = {
       isBlocked: jest.fn().mockResolvedValue(false),
       getBlockedProfiles: jest.fn().mockResolvedValue([]),
-    } as any;
+    };
 
     interestsService = new InterestsService(
       mockDb,
@@ -390,6 +399,159 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
         })
       );
     });
+
+    it('should reject send when either party has blocked the other', async () => {
+      mockBlocksService.isBlocked.mockResolvedValue(true);
+
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue(selectCount === 1 ? [senderProfile] : [targetProfile]),
+        };
+      });
+
+      await expect(
+        interestsService.sendInterest('sender-user-id', { targetProfileId: targetProfile.id }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockBlocksService.isBlocked).toHaveBeenCalledWith(senderProfile.id, targetProfile.id);
+    });
+
+    it('should return already connected when reverse interest is already accepted', async () => {
+      const reverseAccepted = {
+        id: 'rev-accepted-1',
+        senderProfileId: targetProfile.id,
+        receiverProfileId: senderProfile.id,
+        status: 'accepted',
+      };
+
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([senderProfile]),
+          };
+        }
+        if (selectCount === 2) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([targetProfile]),
+          };
+        }
+        if (selectCount === 3) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockResolvedValue([{ count: 0 }]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([reverseAccepted]),
+        };
+      });
+
+      const result = await interestsService.sendInterest('sender-user-id', {
+        targetProfileId: targetProfile.id,
+      });
+
+      expect(result.status).toBe('accepted');
+      expect(result.isMutual).toBe(true);
+      expect(result.message).toBe('Already connected.');
+      expect(mockDb.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject re-send after a previous decline', async () => {
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([senderProfile]),
+          };
+        }
+        if (selectCount === 2) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([targetProfile]),
+          };
+        }
+        if (selectCount === 3) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockResolvedValue([{ count: 0 }]),
+          };
+        }
+        if (selectCount === 4) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([{ status: 'declined' }]),
+        };
+      });
+
+      await expect(
+        interestsService.sendInterest('sender-user-id', { targetProfileId: targetProfile.id }),
+      ).rejects.toThrow('Your previous interest was declined');
+    });
+
+    it('should reject re-send when already connected', async () => {
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([senderProfile]),
+          };
+        }
+        if (selectCount === 2) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([targetProfile]),
+          };
+        }
+        if (selectCount === 3) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockResolvedValue([{ count: 0 }]),
+          };
+        }
+        if (selectCount === 4) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([{ status: 'accepted' }]),
+        };
+      });
+
+      await expect(
+        interestsService.sendInterest('sender-user-id', { targetProfileId: targetProfile.id }),
+      ).rejects.toThrow('You are already connected with this profile');
+    });
   });
 
   describe('updateInterestStatus & actions', () => {
@@ -568,8 +730,194 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
 
       expect(result.status).toBe('withdrawn');
     });
+
+    it('should reject a third party accepting someone else\'s interest (IDOR)', async () => {
+      const interestRow = {
+        id: 'int-1',
+        senderProfileId: senderProfile.id,
+        receiverProfileId: targetProfile.id,
+        status: 'pending',
+      };
+
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([bystanderProfile]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([interestRow]),
+        };
+      });
+
+      await expect(
+        interestsService.updateInterestStatus('bystander-user-id', 'int-1', 'accepted'),
+      ).rejects.toThrow('Only receiver can accept/decline interest');
+    });
+
+    it('should accept by sender profile id when interest UUID is not used', async () => {
+      const interestRow = {
+        id: 'int-1',
+        senderProfileId: senderProfile.id,
+        receiverProfileId: targetProfile.id,
+        status: 'pending',
+      };
+
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([targetProfile]),
+          };
+        }
+        if (selectCount === 2) {
+          // lookup by interest id misses
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([]),
+          };
+        }
+        if (selectCount === 3) {
+          // lookup by sender profile id hits
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([interestRow]),
+          };
+        }
+        if (selectCount === 4) {
+          // updateInterestStatus: current user profile
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([targetProfile]),
+          };
+        }
+        if (selectCount === 5) {
+          // updateInterestStatus: interest row
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([interestRow]),
+          };
+        }
+        // sender lookup for notification
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([senderProfile]),
+        };
+      });
+
+      mockDb.update.mockReturnValue({
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ ...interestRow, status: 'accepted' }]),
+        }),
+      });
+
+      const result = await interestsService.acceptInterest('target-user-id', senderProfile.id);
+      expect(result.status).toBe('accepted');
+    });
+
+    it('should allow receiver to decline a pending interest', async () => {
+      const interestRow = {
+        id: 'int-1',
+        senderProfileId: senderProfile.id,
+        receiverProfileId: targetProfile.id,
+        status: 'pending',
+      };
+
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([targetProfile]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([interestRow]),
+        };
+      });
+
+      mockDb.update.mockReturnValue({
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ ...interestRow, status: 'declined' }]),
+        }),
+      });
+
+      const result = await interestsService.updateInterestStatus(
+        'target-user-id',
+        'int-1',
+        'declined',
+      );
+      expect(result.status).toBe('declined');
+      expect(mockNotificationsService.createNotification).not.toHaveBeenCalled();
+    });
   });
 
+  describe('getUsage', () => {
+    it('returns plan quota usage for pending + accepted sent interests', async () => {
+      mockEntitlementsService.getUserPlan.mockResolvedValue({
+        slug: 'free',
+        interestQuota: 30,
+      });
+
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([{ id: senderProfile.id }]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue([{ count: 7 }]),
+        };
+      });
+
+      await expect(interestsService.getUsage('sender-user-id')).resolves.toEqual({
+        planSlug: 'free',
+        limit: 30,
+        used: 7,
+        remaining: 23,
+      });
+    });
+
+    it('returns zero usage when the user has no profile yet', async () => {
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      });
+
+      await expect(interestsService.getUsage('unknown-user')).resolves.toEqual({
+        planSlug: 'free',
+        limit: 30,
+        used: 0,
+        remaining: 30,
+      });
+    });
+  });
   describe('getSummary & list methods', () => {
     it('should compute summary with received, sent, mutual counts', async () => {
       jest.spyOn(interestsService, 'getReceivedInterests').mockResolvedValue([

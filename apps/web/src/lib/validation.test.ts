@@ -167,11 +167,13 @@ describe("signupStepPreferencesSchema", () => {
       prefCastes: ["Iyer"],
       prefMotherTongues: ["Tamil"],
       prefMinEducation: "Bachelors",
+      prefAcceptableIncomes: ["₹10 – 15 Lakh"],
       prefLocations: ["Chennai", "Bengaluru"],
     })
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.prefCastes).toEqual(["Iyer"])
+      expect(result.data.prefAcceptableIncomes).toEqual(["₹10 – 15 Lakh"])
       expect(result.data.prefLocations).toEqual(["Chennai", "Bengaluru"])
     }
   })

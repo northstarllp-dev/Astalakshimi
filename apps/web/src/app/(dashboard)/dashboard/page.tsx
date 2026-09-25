@@ -47,6 +47,7 @@ import {
   ChevronDown,
   Clock3,
   Crown,
+  ArrowUp,
   Filter,
   Heart,
   Lock,
@@ -139,6 +140,31 @@ function toggle(arr: string[], val: string) {
   return arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]
 }
 
+function BackToTop() {
+  const [visible, setVisible] = React.useState(false)
+
+  React.useEffect(() => {
+    const onScroll = () => setVisible(window.scrollY > 280)
+    onScroll()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  if (!visible) return null
+
+  return (
+    <button
+      type="button"
+      aria-label="Back to top"
+      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      className="fixed bottom-24 right-4 z-40 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2.5 text-sm font-semibold text-primary shadow-lg transition hover:bg-primary hover:text-primary-foreground md:bottom-6 md:right-6"
+    >
+      <ArrowUp className="h-4 w-4" />
+      Top
+    </button>
+  )
+}
+
 export default function DashboardPage() {
   return (
     <RequireFullPortal>
@@ -228,7 +254,7 @@ function DiscoverPage() {
   }
 
   return (
-    <main className="mx-auto flex h-[calc(100dvh-3.5rem)] max-w-7xl flex-col overflow-hidden px-3 pt-4 sm:px-4 md:h-[calc(100dvh-4rem)] md:pt-8">
+    <main className="mx-auto w-full max-w-7xl px-3 pb-10 pt-4 sm:px-4 md:pt-8">
       <div className="mb-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold tracking-[0.2em] text-gold uppercase">Search & browse</p>
@@ -282,6 +308,7 @@ function DiscoverPage() {
           onConnect={handleConnect}
         />
       )}
+      <BackToTop />
     </main>
   )
 }
@@ -337,7 +364,7 @@ function TopMatchesPanel({
         </p>
       </div>
 
-      <MatchSnapFeed className="pb-24 md:pb-2">
+      <MatchSnapFeed>
         {matches.map((match, index) => (
           <MatchSnapSlide key={match.id}>
             <MatchListCard
@@ -712,7 +739,7 @@ function SearchFilterPanel({
           </p>
         </div>
 
-        <MatchSnapFeed className="pb-24 md:pb-2">
+        <MatchSnapFeed>
           {visibleMatches.map((match: any, index: any) => (
             <MatchSnapSlide key={match.id}>
               <MatchListCard

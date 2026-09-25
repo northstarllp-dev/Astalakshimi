@@ -35,7 +35,7 @@ Six steps, progress bar, saves to `sessionStorage` via `saveProfile()`. Kept sho
 1. Profile for + mobile + terms
 2. Identity  name, gender, DOB, marital status, city
 3. Community  religion, caste, mother tongue, family type/status, **brothers count**, **sisters count**
-4. **Partner preferences**  "Who are you looking for?" Age range + preferred religion are required; community, mother tongue, marital status, minimum education, locations and height range are optional. Opens pre-filled "same as me" from the community step (own religion / caste / mother tongue / city, plus an age window around the member's own age) and offers a **Same as me** reset. Collected here — not later — because these drive the match engine's hard filters and soft score.
+4. **Partner preferences**  "Who are you looking for?" Age range, preferred religion, and preferred marital status are required; community, mother tongue, minimum education, locations, and height range are optional and only change For you order. Preferred income is optional, saved as `pref_acceptable_incomes`, and does not filter or rank For you. Opens pre-filled "same as me" from the community step (own religion / caste / mother tongue / city, plus an age window around the member's own age) and offers a **Copy my details** action. Age, religion, and marital status drive the match engine's hard filters; the other ranking fields drive the soft score.
 5. Photos, selfie or govt ID, optional horoscope PDF  [`step-verify.tsx`](../apps/web/src/components/signup/step-verify.tsx)
 6. OTP
 

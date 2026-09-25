@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
 import { InterestsController } from '../../src/interests/interests.controller';
 import { InterestsService } from '../../src/interests/interests.service';
+import { ALLOW_UNVERIFIED_KEY } from '../../src/common/decorators/allow-unverified.decorator';
 import type { UserSession } from '@astalakshimi/types';
 
 describe('Feature 3: Interest System - InterestsController (Integration Tests)', () => {
@@ -17,6 +19,7 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
     const mockInterestsService = {
       sendInterest: jest.fn(),
       getSummary: jest.fn(),
+      getUsage: jest.fn(),
       getReceivedInterests: jest.fn(),
       getSentInterests: jest.fn(),
       getMutualInterests: jest.fn(),
@@ -81,6 +84,18 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
     });
   });
 
+  describe('GET /interests/usage', () => {
+    it('should return quota usage', async () => {
+      const expected = { planSlug: 'free', limit: 30, used: 2, remaining: 28 };
+      interestsService.getUsage.mockResolvedValue(expected);
+
+      const result = await controller.getUsage(mockUserSession);
+
+      expect(interestsService.getUsage).toHaveBeenCalledWith(mockUserSession.userId);
+      expect(result).toEqual(expected);
+    });
+  });
+
   describe('GET /interests/received, /sent, /mutual', () => {
     it('should get received interests with status filter', async () => {
       interestsService.getReceivedInterests.mockResolvedValue([]);
@@ -89,7 +104,7 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
 
       expect(interestsService.getReceivedInterests).toHaveBeenCalledWith(
         mockUserSession.userId,
-        'pending'
+        'pending',
       );
     });
 
@@ -118,7 +133,7 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
 
       expect(interestsService.acceptInterest).toHaveBeenCalledWith(
         mockUserSession.userId,
-        'int-123'
+        'int-123',
       );
       expect(result).toEqual({ status: 'accepted' });
     });
@@ -130,7 +145,7 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
 
       expect(interestsService.declineInterest).toHaveBeenCalledWith(
         mockUserSession.userId,
-        'int-123'
+        'int-123',
       );
       expect(result).toEqual({ status: 'declined' });
     });
@@ -142,9 +157,41 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
 
       expect(interestsService.withdrawInterest).toHaveBeenCalledWith(
         mockUserSession.userId,
-        'int-123'
+        'int-123',
       );
       expect(result).toEqual({ status: 'withdrawn' });
+    });
+  });
+
+  describe('PUT/PATCH /interests/:id/status', () => {
+    it('should forward status updates via PUT handler', async () => {
+      interestsService.updateInterestStatus.mockResolvedValue({ status: 'accepted' } as any);
+
+      const result = await controller.updateInterestStatusPut(mockUserSession, 'int-123', {
+        status: 'accepted',
+      });
+
+      expect(interestsService.updateInterestStatus).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        'int-123',
+        'accepted',
+      );
+      expect(result).toEqual({ status: 'accepted' });
+    });
+
+    it('should forward status updates via PATCH handler', async () => {
+      interestsService.updateInterestStatus.mockResolvedValue({ status: 'declined' } as any);
+
+      const result = await controller.updateInterestStatusPatch(mockUserSession, 'int-123', {
+        status: 'declined',
+      });
+
+      expect(interestsService.updateInterestStatus).toHaveBeenCalledWith(
+        mockUserSession.userId,
+        'int-123',
+        'declined',
+      );
+      expect(result).toEqual({ status: 'declined' });
     });
   });
 
@@ -156,7 +203,7 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
 
       expect(interestsService.acceptByProfileId).toHaveBeenCalledWith(
         mockUserSession.userId,
-        'prof-target'
+        'prof-target',
       );
     });
 
@@ -167,7 +214,7 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
 
       expect(interestsService.declineByProfileId).toHaveBeenCalledWith(
         mockUserSession.userId,
-        'prof-target'
+        'prof-target',
       );
     });
 
@@ -178,8 +225,44 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
 
       expect(interestsService.withdrawByProfileId).toHaveBeenCalledWith(
         mockUserSession.userId,
-        'prof-target'
+        'prof-target',
       );
+    });
+  });
+
+  describe('route security metadata', () => {
+    const reflector = new Reflector();
+
+    it('allows unverified members on read endpoints', () => {
+      expect(reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.getUsage)).toBe(true);
+      expect(reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.getSummary)).toBe(true);
+      expect(reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.getReceivedInterests)).toBe(
+        true,
+      );
+      expect(reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.getSentInterests)).toBe(true);
+      expect(reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.getMutualInterests)).toBe(true);
+    });
+
+    it('keeps mutations verification-gated (no @AllowUnverified)', () => {
+      expect(reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.sendInterest)).toBeUndefined();
+      expect(reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.patchAccept)).toBeUndefined();
+      expect(reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.patchDecline)).toBeUndefined();
+      expect(reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.patchWithdraw)).toBeUndefined();
+      expect(
+        reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.updateInterestStatusPut),
+      ).toBeUndefined();
+      expect(
+        reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.updateInterestStatusPatch),
+      ).toBeUndefined();
+      expect(
+        reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.acceptByProfileId),
+      ).toBeUndefined();
+      expect(
+        reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.declineByProfileId),
+      ).toBeUndefined();
+      expect(
+        reflector.get<boolean>(ALLOW_UNVERIFIED_KEY, controller.withdrawByProfileId),
+      ).toBeUndefined();
     });
   });
 });

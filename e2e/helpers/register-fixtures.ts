@@ -47,6 +47,7 @@ export const CHOSEN_PREFS = {
   prefMotherTongues: ['Tamil'],
   prefMaritalStatuses: ['Never Married', 'Divorced'],
   prefMinEducation: 'Masters',
+  prefAcceptableIncomes: ['₹10 – 15 Lakh', '₹15 – 20 Lakh'],
   prefLocations: ['Chennai'],
   prefHeightMinCm: 150,
   prefHeightMaxCm: 190,

@@ -16,14 +16,11 @@ const updateSettingsSchema = z
       }, z.enum(['always', 'when_not_connected', 'never']))
       .optional(),
     profileVisibility: z.string().max(40).optional(),
-    hidePhone: z.boolean().optional(),
     hideProfile: z.boolean().optional(),
     showLastSeen: z.boolean().optional(),
     notifyEmail: z.boolean().optional(),
     notifySms: z.boolean().optional(),
     notifyPush: z.boolean().optional(),
-    hideFromUsers: z.array(z.string().uuid()).max(500).optional(),
-    hideFromCities: z.array(z.string().uuid()).max(500).optional(),
   })
   // Strip unknown keys (id/userId/timestamps from the client) instead of 400ing.
   .strip();

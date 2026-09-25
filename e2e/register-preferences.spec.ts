@@ -84,6 +84,7 @@ test('preferences step opens with "same as me" pre-filled from the community ste
   await expect(page.getByText('Brahmin', { exact: true })).toBeVisible();
   await expect(page.getByText('Tamil', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Preferred locations')).toHaveValue('Chennai');
+  await expect(page.getByLabel('Preferred income')).toContainText('Any income');
 
   // Marital status is required and is not same-as-me / defaulted.
   await expect(page.getByText('Never Married', { exact: true })).toHaveCount(0);
@@ -116,6 +117,11 @@ test('editing the preferences writes the member’s real choices to the draft', 
   await page.getByRole('option', { name: CHOSEN_PREFS.prefMinEducation }).click();
   await page.keyboard.press('Escape');
 
+  await page.getByLabel('Preferred income').click();
+  await page.getByRole('option', { name: '₹10 – 15 Lakh' }).click();
+  await page.getByRole('option', { name: '₹15 – 20 Lakh' }).click();
+  await page.keyboard.press('Escape');
+
   await page.getByRole('button', { name: /continue/i }).click();
 
   // Advanced to the photos/verification step.
@@ -127,6 +133,7 @@ test('editing the preferences writes the member’s real choices to the draft', 
   expect(draft.data.prefReligion).toEqual(expect.arrayContaining(['Hindu', 'Jain']));
   expect(draft.data.prefMaritalStatuses).toEqual(expect.arrayContaining(['Never Married', 'Divorced']));
   expect(draft.data.prefMinEducation).toBe(CHOSEN_PREFS.prefMinEducation);
+  expect(draft.data.prefAcceptableIncomes).toEqual(CHOSEN_PREFS.prefAcceptableIncomes);
   expect(draft.data.prefCastes).toEqual(['Brahmin']);
   expect(draft.data.prefMotherTongues).toEqual(['Tamil']);
   expect(draft.data.prefLocations).toEqual(['Chennai']);
@@ -231,6 +238,7 @@ test('registering stores the chosen preferences and they drive the matches', asy
   expect(prefs.prefCastes).toEqual(expect.arrayContaining(CHOSEN_PREFS.prefCastes));
   expect(prefs.prefMotherTongues).toEqual(expect.arrayContaining(CHOSEN_PREFS.prefMotherTongues));
   expect(prefs.prefMinEducation).toBe(CHOSEN_PREFS.prefMinEducation);
+  expect(prefs.prefAcceptableIncomes).toEqual(CHOSEN_PREFS.prefAcceptableIncomes);
   expect(prefs.prefReligions).not.toEqual(['Hindu']);
   expect(prefs.prefMaritalStatuses).not.toEqual(['Never Married']);
   expect(prefs.prefAgeMin).not.toBe(24);

@@ -1,10 +1,7 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -13,21 +10,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { usePaidQuery, useProfileQuery, useSaveSettingsMutation, useSettingsQuery } from "@/hooks/queries"
-import { CityAutocomplete } from "@/components/profile/city-autocomplete"
-import { ArrowLeft, Lock, LogOut, MapPin, UserX, X } from "lucide-react"
+import { useProfileQuery, useSaveSettingsMutation, useSettingsQuery } from "@/hooks/queries"
+import { ArrowLeft, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type UserSettings = any;
 
 export default function SettingsPage() {
-  const router = useRouter()
   const { data: settings } = useSettingsQuery()
   const { data: profile } = useProfileQuery()
-  const { data: paid = false } = usePaidQuery()
   const saveMutation = useSaveSettingsMutation()
   const phone = profile?.phone || ""
-  const [hideUserInput, setHideUserInput] = React.useState("")
 
   const update = (partial: Partial<UserSettings>) => {
     if (!settings) return
@@ -106,111 +99,6 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Hide from specific user (paid) */}
-      <section className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <div className="flex items-center gap-2">
-          <UserX className="h-4 w-4 text-primary" />
-          <h2 className="font-serif text-lg font-bold">Hide from specific user</h2>
-          {!paid && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
-        </div>
-        {!paid && (
-          <p className="text-xs text-muted-foreground">Premium feature  enter a profile ID to hide your profile from that person.</p>
-        )}
-        {paid ? (
-          <div className="space-y-3">
-            <div className="flex gap-2">
-              <Input
-                value={hideUserInput}
-                onChange={(e) => setHideUserInput(e.target.value)}
-                placeholder="e.g. ps-26-chennai"
-                className="flex-1"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!hideUserInput.trim()}
-                onClick={() => {
-                  if (!hideUserInput.trim() || settings.hideFromUsers.includes(hideUserInput.trim())) return
-                  update({ hideFromUsers: [...settings.hideFromUsers, hideUserInput.trim()] })
-                  setHideUserInput("")
-                }}
-              >
-                Add
-              </Button>
-            </div>
-            {settings.hideFromUsers.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {settings.hideFromUsers.map((id: any) => (
-                  <span key={id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
-                    {id}
-                    <button
-                      type="button"
-                      onClick={() => update({ hideFromUsers: settings.hideFromUsers.filter((u: any) => u !== id) })}
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label={`Remove ${id}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <Link href="/plans">
-            <Button variant="soft" size="sm">Upgrade to unlock</Button>
-          </Link>
-        )}
-      </section>
-
-      {/* Hide from city (paid) */}
-      <section className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-primary" />
-          <h2 className="font-serif text-lg font-bold">Hide from city</h2>
-          {!paid && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
-        </div>
-        {!paid && (
-          <p className="text-xs text-muted-foreground">Premium feature  hide your profile from members in a specific city.</p>
-        )}
-        {paid ? (
-          <div className="space-y-3">
-            <CityAutocomplete
-              city=""
-              placeholder="Search city to hide from…"
-              searchPlaceholder="Type city name (e.g. Bengaluru)…"
-              onCityChange={({ city }) => {
-                const trimmed = city?.trim()
-                if (!trimmed || settings.hideFromCities.includes(trimmed)) return
-                update({ hideFromCities: [...settings.hideFromCities, trimmed] })
-              }}
-            />
-            {settings.hideFromCities.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {settings.hideFromCities.map((city: any) => (
-                  <span key={city} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
-                    {city}
-                    <button
-                      type="button"
-                      onClick={() => update({ hideFromCities: settings.hideFromCities.filter((c: any) => c !== city) })}
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label={`Remove ${city}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <Link href="/plans">
-            <Button variant="soft" size="sm">Upgrade to unlock</Button>
-          </Link>
-        )}
-      </section>
-
       {/* Show last seen */}
       <section className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h2 className="font-serif text-lg font-bold">Activity</h2>
@@ -235,8 +123,7 @@ export default function SettingsPage() {
         <h2 className="font-serif text-lg font-bold">Account</h2>
         <div>
           <p className="text-sm text-muted-foreground">Phone</p>
-          <p className="font-medium mb-4">{phone ? `+91 ${phone}` : "Not set"}</p>
-          <Toggle label="Hide my phone number" hint="Don't show my phone number to other users" checked={settings.hidePhone} onChange={(v) => update({ hidePhone: v })} />
+          <p className="font-medium">{phone ? `+91 ${phone}` : "Not set"}</p>
         </div>
         <Button
           variant="outline"

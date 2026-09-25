@@ -125,6 +125,7 @@ export const signupStepPreferencesSchema = z
     prefCastes: z.array(z.string()).optional(),
     prefMotherTongues: z.array(z.string()).optional(),
     prefMinEducation: z.string().optional(),
+    prefAcceptableIncomes: z.array(z.string()).optional(),
     prefLocations: z.array(z.string()).optional(),
     prefHeightMinCm: optionalInt(120, 230),
     prefHeightMaxCm: optionalInt(120, 230),
@@ -322,11 +323,6 @@ export const checkoutSchema = z
       })
     }
   })
-
-export const settingsListsSchema = z.object({
-  hideFromUsers: z.array(z.string()),
-  hideFromCities: z.array(z.string()),
-})
 
 export const adminLoginSchema = z.object({
   email: z.string().email("Enter a valid staff email."),

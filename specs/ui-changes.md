@@ -10,7 +10,7 @@ Running log of product UI shipped in `apps/web` (frontend-only, mock `sessionSto
 **Files:** [`register/page.tsx`](../apps/web/src/app/(auth)/register/page.tsx), [`profile-store.ts`](../apps/web/src/lib/profile-store.ts), [`validation.ts`](../apps/web/src/lib/validation.ts), [`queries.ts`](../apps/web/src/hooks/queries.ts)
 
 - Signup is now **six steps**: Partner preferences sits between Community and Photos/verification
-- **Who are you looking for?** — age range + preferred religion required; community, mother tongue, marital status, minimum education, locations, height range optional
+- **Who are you looking for?** — age range, preferred religion, and preferred marital status required; community, mother tongue, minimum education, locations, and height range optional (order only). Preferred income is optional and saved; it does not change For you.
 - Opens pre-filled **“same as me”** from the community step (own religion / caste / mother tongue / city, plus an age window around the member's own age) with a **Same as me** reset
 - Previously `partner_preferences` was created from **fabricated defaults** (age 24-32, `['Hindu']`, `['Never Married']`) and the wizard never asked — matches therefore ran on criteria nobody chose. The wizard now sends the member's real answers, and `completeRegistrationSchema` requires age range + religion so the API rejects a registration without them
 - Refinements later still live at `/profile/edit#preferences`

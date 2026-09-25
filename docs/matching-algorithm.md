@@ -24,7 +24,7 @@ Required on signup page 5, profile edit → Preferences, and admin create:
 - Religion: at least one value (multi-select)
 - Marital status: at least one value (Never Married, Divorced, Widowed, Awaiting Divorce)
 
-Optional: communities, mother tongues, minimum education, locations, height. Blank optional means Any. Never persist `['Never Married']` or height `140–200` when the member left them empty.
+Optional: communities, mother tongues, minimum education, locations, height. Preferred income is also collected on signup and profile edit and stored as `pref_acceptable_incomes`. Blank optional means Any. Income is not a For you filter or rank. Never persist `['Never Married']` or height `140–200` when the member left them empty.
 
 Same-as-me copies religion, community, tongue, and city. It does not copy marital status.
 
