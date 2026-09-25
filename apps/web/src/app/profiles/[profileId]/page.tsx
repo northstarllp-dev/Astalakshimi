@@ -183,10 +183,10 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
 
   return (
     <div className="relative mx-auto max-w-6xl px-3 pb-28 pt-4 sm:px-4 sm:pb-32 md:pt-6 lg:h-[calc(100dvh-10rem)] lg:overflow-hidden lg:pb-0 lg:pt-6">
-      <div className="grid gap-5 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-8 lg:overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-        {/* LEFT: fixed portrait — fills the left side, no scroll */}
-        <div className="min-h-0 lg:h-full lg:min-h-0 lg:overflow-hidden">
-          <div className="relative mx-auto aspect-[3/4] w-full max-w-[440px] overflow-hidden rounded-2xl border border-border/70 shadow-md sm:rounded-3xl lg:mx-0 lg:aspect-auto lg:h-full lg:max-w-none lg:rounded-3xl">
+      <div className="grid gap-5 lg:h-full lg:min-h-0 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start lg:gap-8 lg:overflow-hidden">
+        {/* LEFT: frame follows the photo — the picture is not cropped to fill the column */}
+        <div className="min-w-0 lg:max-w-[440px] lg:self-start">
+          <div className="relative mx-auto w-fit max-w-full overflow-hidden rounded-2xl border border-border/70 shadow-md sm:rounded-3xl lg:mx-0">
             <ProfileGallery
               name={profile.fullName}
               age={profile.age}

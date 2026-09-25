@@ -37,6 +37,7 @@ export function ProfileGallery({
   const [activeIndex, setActiveIndex] = React.useState(0)
   const [lightboxOpen, setLightboxOpen] = React.useState(false)
   const [horoscopePopupOpen, setHoroscopePopupOpen] = React.useState(false)
+  const [naturalSize, setNaturalSize] = React.useState<{ width: number; height: number } | null>(null)
   const hero = photos[activeIndex] ?? photos[0]
   const extra = photos.slice(1)
   const hasMany = photos.length > 1
@@ -58,6 +59,22 @@ export function ProfileGallery({
   }
 
   React.useEffect(() => {
+    setNaturalSize(null)
+    if (!hero || isHidden) return
+    const probe = new window.Image()
+    let cancelled = false
+    probe.onload = () => {
+      if (!cancelled && probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+        setNaturalSize({ width: probe.naturalWidth, height: probe.naturalHeight })
+      }
+    }
+    probe.src = getMediaUrl(hero)
+    return () => {
+      cancelled = true
+    }
+  }, [hero, isHidden])
+
+  React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (horoscopePopupOpen) {
@@ -74,22 +91,31 @@ export function ProfileGallery({
   }, [lightboxOpen, horoscopePopupOpen, hasMany, photos.length])
   return (
     <>
-      <div className="flex h-full flex-col">
-        <div className="group relative h-full min-h-0 w-full overflow-hidden bg-muted">
+      <div className="relative w-fit max-w-full">
+        <div className="group relative w-fit max-w-full overflow-hidden bg-muted">
           {isHidden ? (
-            <LockedPhoto src={hero} label={`${name}'s photo is hidden`} />
-          ) : (
+            <div className="relative aspect-[3/4] w-[min(100%,440px)]">
+              <LockedPhoto src={hero} label={`${name}'s photo is hidden`} />
+            </div>
+          ) : naturalSize ? (
             <Image
               src={getMediaUrl(hero)}
               alt={`${name}, ${age}`}
-              fill
+              width={naturalSize.width}
+              height={naturalSize.height}
+              quality={100}
+              unoptimized
               priority
-              className={cn(
-                "object-cover object-[center_12%] transition-transform duration-300 group-hover:scale-[1.02]",
-                blurPhoto ? "blur-xl scale-110" : ""
-              )}
-              sizes="(max-width: 1024px) 90vw, 40vw"
+              className={cn("block", blurPhoto ? "blur-xl" : "")}
+              style={{
+                width: "auto",
+                height: "auto",
+                maxWidth: "min(100%, 440px)",
+                maxHeight: "min(78vh, 920px)",
+              }}
             />
+          ) : (
+            <div className="aspect-[3/4] w-[min(100%,440px)] bg-muted" aria-hidden />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/15" />
 
