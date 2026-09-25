@@ -51,6 +51,7 @@ const RANK_WEIGHTS = {
 const EDUCATION_RANK: Record<string, number> = {
   'high school': 1,
   diploma: 2,
+  professional: 3,
   bachelors: 3,
   masters: 4,
   doctorate: 5,

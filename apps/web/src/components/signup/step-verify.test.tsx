@@ -140,11 +140,26 @@ describe("Step6Verify uploads", () => {
     expect(updates.some((fields) => fields.govtIdS3Key)).toBe(false)
   })
 
+  it("uploads a horoscope JPG to S3", async () => {
+    const user = userEvent.setup()
+    const { updates } = renderStep()
+
+    const horoscopeInput = document.querySelector('input[accept*="image/jpeg"]') as HTMLInputElement
+    const jpg = new File(["jpeg"], "kundli.jpg", { type: "image/jpeg" })
+    await user.upload(horoscopeInput, jpg)
+
+    await waitFor(() => {
+      expect(uploadMediaFile).toHaveBeenCalledWith(expect.any(File), "horoscope")
+    })
+    expect(updates.some((fields) => fields.horoscopeS3Key === "profiles/user/horoscopes/chart.pdf")).toBe(true)
+    expect(screen.getByText("kundli.jpg")).toBeInTheDocument()
+  })
+
   it("uploads a horoscope PDF to S3", async () => {
     const user = userEvent.setup()
     const { updates } = renderStep()
 
-    const horoscopeInput = document.querySelector('input[accept="application/pdf"]') as HTMLInputElement
+    const horoscopeInput = document.querySelector('input[accept*="application/pdf"]') as HTMLInputElement
     const pdf = new File(["%PDF"], "kundli.pdf", { type: "application/pdf" })
     await user.upload(horoscopeInput, pdf)
 

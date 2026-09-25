@@ -50,7 +50,12 @@ function contentTypeForUpload(file: UploadedMediaFile, purpose: string): string 
     return file.mimetype || 'application/octet-stream';
   }
   if (file.mimetype && file.mimetype !== 'application/octet-stream') return file.mimetype;
-  if (purpose === 'horoscope') return 'application/pdf';
+  if (purpose === 'horoscope') {
+    const name = (file.originalname || '').toLowerCase();
+    if (name.endsWith('.pdf')) return 'application/pdf';
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+    return 'application/pdf';
+  }
   return 'image/jpeg';
 }
 

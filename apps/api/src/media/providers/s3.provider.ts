@@ -59,12 +59,13 @@ export class S3Provider {
     fileSize: number,
   ): Promise<PresignedUploadResponse> {
     const allowedImages = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const isPdf = contentType === 'application/pdf';
+    const allowedHoroscope = ['application/pdf', 'image/jpeg', 'image/jpg'];
+    const isHoroscope = purpose === 'horoscope';
     const isGovtId = purpose === 'govt_id';
 
-    if (purpose === 'horoscope') {
-      if (!isPdf || fileSize > 10 * 1024 * 1024) {
-        throw new BadRequestException('Horoscope must be a PDF file under 10 MB.');
+    if (isHoroscope) {
+      if (!allowedHoroscope.includes(contentType) || fileSize > 10 * 1024 * 1024) {
+        throw new BadRequestException('Horoscope must be a PDF or JPG file under 10 MB.');
       }
     } else if (isGovtId) {
       if (!contentType || fileSize > 15 * 1024 * 1024) {
@@ -86,7 +87,7 @@ export class S3Provider {
         break;
       case 'horoscope':
         bucket = this.mediaBucket;
-        s3Key = `profiles/${userId}/horoscopes/${uniqueId}.pdf`;
+        s3Key = `profiles/${userId}/horoscopes/${uniqueId}.${ext}`;
         break;
       case 'selfie':
         bucket = this.vaultBucket;

@@ -143,9 +143,17 @@ describe('S3Provider verification uploads', () => {
     );
   });
 
-  it('rejects a horoscope that is not a PDF', async () => {
+  it('stores a horoscope JPG in the media bucket', async () => {
+    const s3 = provider();
+    const planned = await s3.generateUploadUrl(userId, 'horoscope', 'image/jpeg', 4096);
+    expect(planned.s3Key).toMatch(
+      new RegExp(`^profiles/${userId}/horoscopes/[0-9a-f-]{36}\\.jpg$`),
+    );
+  });
+
+  it('rejects a horoscope with an unsupported type', async () => {
     await expect(
-      provider().generateUploadUrl(userId, 'horoscope', 'image/jpeg', 1000),
+      provider().generateUploadUrl(userId, 'horoscope', 'image/png', 1000),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

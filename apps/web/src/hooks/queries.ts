@@ -457,9 +457,9 @@ function mapVerificationDocs(verification: {
   const govtId = verification?.govtIdS3Key || ""
   return {
     selfieS3Key: selfie,
-    selfiePhoto: selfie,
+    selfiePhoto: "",
     govtIdS3Key: govtId,
-    govtIdPhoto: govtId,
+    govtIdPhoto: "",
     govtIdType: verification?.govtIdType || "",
     verificationMethod: (verification?.method || "") as SignupData["verificationMethod"],
     rejectionReason: verification?.rejectionReason || undefined,

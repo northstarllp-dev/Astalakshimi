@@ -12,16 +12,20 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { StepHeading } from "@/components/signup/shared"
-import { cn } from "@/lib/utils"
+import { cn, getMediaUrl } from "@/lib/utils"
 import type { SignupData } from "@/lib/profile-store"
 import { VERIFICATION_SLA_HOURS } from "@/lib/profile-store"
 import { apiClient } from "@/lib/api-client"
 import { hashFile } from "@/lib/file-hash"
+import {
+  HOROSCOPE_ACCEPT,
+  MAX_HOROSCOPE_MB,
+  validateHoroscopeFile,
+} from "@/lib/horoscope-file"
 
 const MAX_PHOTOS = 6
 const MAX_IMAGE_MB = 5
 const MAX_DOC_MB = 15
-const MAX_PDF_MB = 10
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"]
 const ID_TYPES = ["Aadhaar", "PAN card", "Passport", "Driving licence", "Voter ID"]
 
@@ -63,8 +67,18 @@ function validateImage(file: File) {
   return null
 }
 
-function isImagePreview(value: string) {
+function isLocalImagePreview(value: string) {
   return value.startsWith("blob:") || value.startsWith("data:image/")
+}
+
+function isImagePreview(value: string) {
+  return isLocalImagePreview(value) || value.startsWith("http://") || value.startsWith("https://")
+}
+
+function resolveProfilePhotoSrc(photo: string | undefined, s3Key: string | undefined) {
+  if (photo && isImagePreview(photo)) return photo
+  const key = s3Key || (photo && !isImagePreview(photo) ? photo : "")
+  return key ? getMediaUrl(key) : ""
 }
 
 export function Step6Verify({
@@ -302,12 +316,9 @@ export function Step6Verify({
 
   const addHoroscope = async (file: File | undefined) => {
     if (!file) return
-    if (file.type !== "application/pdf") {
-      setError("Horoscope must be a PDF file.")
-      return
-    }
-    if (file.size > MAX_PDF_MB * 1024 * 1024) {
-      setError(`Horoscope PDF must be under ${MAX_PDF_MB} MB.`)
+    const invalid = validateHoroscopeFile(file)
+    if (invalid) {
+      setError(invalid)
       return
     }
     setError("")
@@ -321,7 +332,7 @@ export function Step6Verify({
         horoscopeS3Key: key,
       })
     } catch (err: any) {
-      setError(err.message || "Failed to upload horoscope PDF.")
+      setError(err.message || "Failed to upload horoscope file.")
     } finally {
       setBusy(null)
     }
@@ -339,11 +350,15 @@ export function Step6Verify({
     })
   }
 
-  const shownSelfie = selfiePreview || (isImagePreview(data.selfiePhoto) ? data.selfiePhoto : "")
-  const shownId = idPreview || (isImagePreview(data.govtIdPhoto) ? data.govtIdPhoto : "")
+  const shownSelfie = selfiePreview || (isLocalImagePreview(data.selfiePhoto) ? data.selfiePhoto : "")
+  const shownId = idPreview || (isLocalImagePreview(data.govtIdPhoto) ? data.govtIdPhoto : "")
 
   React.useEffect(() => {
-    if (shownSelfie || !data.selfieS3Key) return
+    if (!data.selfieS3Key) {
+      setSelfiePreview("")
+      return
+    }
+    if (isLocalImagePreview(data.selfiePhoto)) return
     let cancelled = false
     void apiClient.media.previewVerification("selfie", data.selfieS3Key).then(
       ({ url }) => {
@@ -356,10 +371,14 @@ export function Step6Verify({
     return () => {
       cancelled = true
     }
-  }, [shownSelfie, data.selfieS3Key])
+  }, [data.selfieS3Key, data.selfiePhoto])
 
   React.useEffect(() => {
-    if (shownId || !data.govtIdS3Key) return
+    if (!data.govtIdS3Key) {
+      setIdPreview("")
+      return
+    }
+    if (isLocalImagePreview(data.govtIdPhoto)) return
     const name = (data.govtIdFileName || data.govtIdS3Key).toLowerCase()
     const looksLikeImage = /\.(jpe?g|png|webp|gif|heic)$/.test(name)
     if (!looksLikeImage && data.govtIdFileName) return
@@ -373,7 +392,7 @@ export function Step6Verify({
     return () => {
       cancelled = true
     }
-  }, [shownId, data.govtIdS3Key, data.govtIdFileName])
+  }, [data.govtIdS3Key, data.govtIdPhoto, data.govtIdFileName])
 
   const identityReady =
     Boolean(data.selfieS3Key) && Boolean(data.govtIdType) && Boolean(data.govtIdS3Key)
@@ -384,7 +403,7 @@ export function Step6Verify({
     <div className="flex flex-col flex-1 min-h-[calc(100vh-140px)] md:min-h-0 space-y-8 pb-8">
       <StepHeading
         title="Photos & verification"
-        subtitle="Add clear photos, then a live selfie and a government ID. Both are required. A horoscope PDF is optional. Photos stay hidden until our team approves them, usually within 12 hours."
+        subtitle="Add clear photos, then a live selfie and a government ID. Both are required. A horoscope PDF or JPG is optional. Photos stay hidden until our team approves them, usually within 12 hours."
       />
 
       {/* Profile Photos */}
@@ -401,6 +420,8 @@ export function Step6Verify({
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {Array.from({ length: MAX_PHOTOS }).map((_, index) => {
             const photo = data.photos[index]
+            const photoKey = data.photoS3Keys?.[index]
+            const photoSrc = resolveProfilePhotoSrc(photo, photoKey)
             return (
               <div
                 key={index}
@@ -409,10 +430,10 @@ export function Step6Verify({
                   photo ? "border-transparent" : "border-border bg-muted/60"
                 )}
               >
-                {photo ? (
+                {photoSrc ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photo} alt={`Profile photo ${index + 1}`} className="h-full w-full object-cover" />
+                    <img src={photoSrc} alt={`Profile photo ${index + 1}`} className="h-full w-full object-cover" />
                     {index === 0 && (
                       <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                         Profile
@@ -648,7 +669,7 @@ export function Step6Verify({
       <section className="space-y-3">
         <div>
           <h2 className="text-sm font-semibold">Horoscope / Kundli</h2>
-          <p className="text-xs text-muted-foreground">Optional, but recommended. Upload a PDF only (max {MAX_PDF_MB} MB).</p>
+          <p className="text-xs text-muted-foreground">Optional, but recommended. Upload a PDF or JPG (max {MAX_HOROSCOPE_MB} MB).</p>
         </div>
         <button
           type="button"
@@ -664,12 +685,12 @@ export function Step6Verify({
               <>
                 <p className="truncate text-sm font-semibold">{data.horoscopeName}</p>
                 <p className="text-xs text-muted-foreground">
-                  {(data.horoscopeSize / 1024 / 1024).toFixed(1)} MB · PDF uploaded to S3
+                  {(data.horoscopeSize / 1024 / 1024).toFixed(1)} MB · Uploaded to secure storage
                 </p>
               </>
             ) : (
               <>
-                <p className="text-sm font-semibold">Upload horoscope PDF</p>
+                <p className="text-sm font-semibold">Upload horoscope PDF or JPG</p>
                 <p className="text-xs text-muted-foreground">Accepted by many families during matching</p>
               </>
             )}
@@ -691,7 +712,7 @@ export function Step6Verify({
         <input
           ref={horoscopeInputRef}
           type="file"
-          accept="application/pdf"
+          accept={HOROSCOPE_ACCEPT}
           className="hidden"
           onChange={(e) => {
             void addHoroscope(e.target.files?.[0])

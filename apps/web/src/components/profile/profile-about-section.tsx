@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { Sparkles, Phone, FileText, Eye, Download, Lock } from "lucide-react"
 import { cn, getMediaUrl } from "@/lib/utils"
+import { HoroscopePreview } from "@/components/profile/horoscope-preview"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -134,7 +135,7 @@ export function ProfileAboutSection({
   }
 
   const horoscopeUrl = horoscopeS3Key ? getMediaUrl(horoscopeS3Key) : null
-  const horoscopeTitle = horoscopeFileName || "Horoscope PDF"
+  const horoscopeTitle = horoscopeFileName || "Horoscope file"
 
   return (
     <>
@@ -241,11 +242,7 @@ export function ProfileAboutSection({
                         <DialogHeader className="border-b border-border px-4 py-3">
                           <DialogTitle>{horoscopeTitle}</DialogTitle>
                         </DialogHeader>
-                        <iframe
-                          src={horoscopeUrl}
-                          title={horoscopeTitle}
-                          className="h-[min(70vh,640px)] w-full border-0"
-                        />
+                        <HoroscopePreview src={horoscopeUrl} title={horoscopeTitle} />
                       </DialogContent>
                     </Dialog>
                     <Button type="button" variant="outline" size="sm" asChild>

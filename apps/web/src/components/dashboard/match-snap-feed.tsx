@@ -9,13 +9,7 @@ export function MatchSnapFeed({
   className?: string
 }) {
   return (
-    <div
-      className={cn(
-        "min-h-0 flex-1 snap-y snap-mandatory overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]",
-        "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
-        className,
-      )}
-    >
+    <div className={cn("flex flex-col gap-2", className)}>
       {children}
     </div>
   )
@@ -29,7 +23,7 @@ export function MatchSnapSlide({
   className?: string
 }) {
   return (
-    <div className={cn("flex snap-start snap-always flex-col py-2", className)}>
+    <div className={cn("flex flex-col py-2", className)}>
       {children}
     </div>
   )

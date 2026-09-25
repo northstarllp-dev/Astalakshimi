@@ -6,6 +6,8 @@ import Link from "next/link"
 import { getMediaUrl } from "@/lib/utils"
 import { apiClient } from "@/lib/api-client"
 import { startHoroscopeDownload } from "@/lib/horoscope-download"
+import { HOROSCOPE_ACCEPT, validateHoroscopeFile } from "@/lib/horoscope-file"
+import { HoroscopePreview } from "@/components/profile/horoscope-preview"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -411,8 +413,9 @@ export default function ProfileEditPage() {
   const onHoroscopeFile = async (files: FileList | null) => {
     const file = files?.[0]
     if (!file) return
-    if (file.type !== "application/pdf") {
-      alert("Please upload a PDF file.")
+    const invalid = validateHoroscopeFile(file)
+    if (invalid) {
+      alert(invalid)
       return
     }
     try {
@@ -424,7 +427,7 @@ export default function ProfileEditPage() {
       })
     } catch (err) {
       console.error("[Media] Horoscope upload failed:", err)
-      alert("Failed to upload horoscope PDF.")
+      alert("Failed to upload horoscope file.")
     }
   }
 
@@ -1261,7 +1264,7 @@ export default function ProfileEditPage() {
         <input
           ref={horoscopeRef}
           type="file"
-          accept="application/pdf"
+          accept={HOROSCOPE_ACCEPT}
           className="hidden"
           onChange={(e) => onHoroscopeFile(e.target.files)}
         />
@@ -1269,7 +1272,7 @@ export default function ProfileEditPage() {
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-muted-foreground" />
             <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Horoscope PDF · optional
+              Horoscope file · optional
             </span>
           </div>
           {data.horoscopeName ? (
@@ -1300,11 +1303,7 @@ export default function ProfileEditPage() {
                       <DialogHeader className="border-b border-border px-4 py-3">
                         <DialogTitle>{data.horoscopeName}</DialogTitle>
                       </DialogHeader>
-                      <iframe
-                        src={pdfPreviewUrl}
-                        title={data.horoscopeName}
-                        className="h-[min(70vh,640px)] w-full border-0"
-                      />
+                      <HoroscopePreview src={pdfPreviewUrl} title={data.horoscopeName} />
                     </DialogContent>
                   </Dialog>
                   <Button asChild variant="outline" size="sm">
@@ -1340,7 +1339,7 @@ export default function ProfileEditPage() {
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-5 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
             >
               <Upload className="h-4 w-4" />
-              Upload horoscope PDF
+              Upload horoscope PDF or JPG
             </button>
           )}
         </div>

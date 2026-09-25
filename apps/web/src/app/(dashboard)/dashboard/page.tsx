@@ -253,6 +253,13 @@ function DiscoverPage() {
     router.replace(next === DEFAULT_VIEW ? "/dashboard" : `/dashboard?view=${next}`, { scroll: false })
   }
 
+  React.useEffect(() => {
+    document.documentElement.classList.add("hide-scrollbar", "scroll-smooth")
+    return () => {
+      document.documentElement.classList.remove("hide-scrollbar", "scroll-smooth")
+    }
+  }, [])
+
   return (
     <main className="mx-auto w-full max-w-7xl px-3 pb-10 pt-4 sm:px-4 md:pt-8">
       <div className="mb-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -509,6 +516,7 @@ function SearchFilterPanel({
       action()
       return
     }
+    setFilterOpen(false)
     setPaywall(feature)
   }
 
@@ -518,6 +526,7 @@ function SearchFilterPanel({
       action()
       return
     }
+    setFilterOpen(false)
     setPaywall(feature)
   }
 
@@ -728,7 +737,7 @@ function SearchFilterPanel({
       ) : null}
 
       {paywall && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={() => setPaywall(null)}>
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={() => setPaywall(null)}>
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl text-center" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-secondary/20 mb-4">
               <Crown className="h-7 w-7 text-secondary-foreground" />
@@ -740,7 +749,7 @@ function SearchFilterPanel({
             <div className="mt-6 flex flex-col gap-2">
               <Link href="/plans" onClick={() => setPaywall(null)}>
                 <Button className="w-full h-11 text-base rounded-xl bg-gradient-to-r from-[#d4af37] to-[#aa8022] hover:from-[#aa8022] hover:to-[#8a681c] text-white border-0">
-                  <Crown className="mr-2 h-4 w-4" /> View upgrade plans
+                  <Crown className="mr-2 h-4 w-4" /> Upgrade plan
                 </Button>
               </Link>
               <Button variant="ghost" className="rounded-xl" onClick={() => setPaywall(null)}>

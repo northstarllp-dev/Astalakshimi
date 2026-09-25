@@ -4,6 +4,7 @@ export const uploadPurposeSchema = z.enum(['profile_photo', 'selfie', 'govt_id',
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ALLOWED_PDF_TYPES = ['application/pdf'];
+const ALLOWED_HOROSCOPE_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg'];
 
 export const presignedUploadSchema = z
   .object({
@@ -13,18 +14,18 @@ export const presignedUploadSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.purpose === 'horoscope') {
-      if (!ALLOWED_PDF_TYPES.includes(data.contentType)) {
+      if (!ALLOWED_HOROSCOPE_TYPES.includes(data.contentType)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['contentType'],
-          message: 'Horoscope must be a PDF file',
+          message: 'Horoscope must be a PDF or JPG file',
         });
       }
       if (data.fileSize > 10 * 1024 * 1024) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['fileSize'],
-          message: 'Horoscope PDF must be under 10 MB',
+          message: 'Horoscope file must be under 10 MB',
         });
       }
     } else if (data.purpose === 'govt_id') {

@@ -17,7 +17,7 @@ export const MARITAL_STATUS_VALUES = [
   'Awaiting Divorce',
 ] as const;
 export const maritalStatusSchema = z.enum(MARITAL_STATUS_VALUES);
-export const educationLevelSchema = z.enum(['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'High School']);
+export const educationLevelSchema = z.enum(['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'Professional', 'High School']);
 export const employmentStatusSchema = z.enum(['Employed', 'Business Owner', 'Freelancer', 'Not Working']);
 export const companySectorSchema = z.enum(['Private', 'Govt', 'MNC', 'Startup', 'Business']);
 /** Accept omitted / empty string / null from forms; never pass "" to Postgres enums. */

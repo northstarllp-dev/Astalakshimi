@@ -105,11 +105,6 @@ export function normalizeForModeration(raw: string): string {
 
   text = text.toLowerCase();
 
-  // "priya(at)gmail(dot)com" / "priya [at] gmail [dot] com" -> "priya@gmail.com"
-  text = text.replace(/[\[({]\s*(?:at|dot)\s*[\])}]/g, (token) =>
-    token.includes('dot') ? '.' : '@',
-  );
-
   // Expand "double X" / "triple X" (e.g. "double nine" -> "99", "triple 8" -> "888")
   text = text.replace(/\b(double|triple)\s+([a-z0-9]+)\b/gi, (_m, mult, val) => {
     const digit = ALL_WORD_DIGITS[val] ?? (/^\d$/.test(val) ? val : null);
@@ -184,17 +179,16 @@ export const SOCIAL_URL_PATTERNS = [
   /maps\.app\.goo\.gl\/[^\s]*/gi,
 ];
 
-// Handle mentions WITHOUT a full url — "ig: myname", "insta is my_name98", "@myhandle".
-// A separator or "is/id/handle" is required so "instagram reels" is not a handle.
+// Handle mentions WITHOUT a full url — "ig: myname", "insta - my_name98", "@myhandle"
 export const SOCIAL_HANDLE_PATTERNS = [
-  /\b(?:ig|insta|instagram)(?:\s*[:\-=]\s*|\s+(?:is|id|handle|account)\s+)@?[a-z0-9_.]{3,30}\b/gi,
-  /\b(?:tg|telegram)(?:\s*[:\-=]\s*|\s+(?:is|id|handle|account)\s+)@?[a-z0-9_.]{3,30}\b/gi,
-  /\b(?:sc|snap|snapchat)(?:\s*[:\-=]\s*|\s+(?:is|id|handle|account)\s+)@?[a-z0-9_.]{3,30}\b/gi,
+  /\b(?:ig|insta|instagram)\s*[:\-=]?\s*@?[a-z0-9_.]{3,30}\b/gi,
+  /\b(?:tg|telegram)\s*[:\-=]?\s*@?[a-z0-9_.]{3,30}\b/gi,
+  /\b(?:sc|snap|snapchat)\s*[:\-=]?\s*@?[a-z0-9_.]{3,30}\b/gi,
   /@[a-z][a-z0-9_.]{2,29}\b/g, // generic @handle
 ];
 
 export const MESSAGING_APP_MENTION_PATTERNS = [
-  /\b(?:whatsapp|wtsapp|whats\s*app|wa\b|w\.a\.?)\b/gi,
+  /\b(?:whatsapp|wtsapp|wtsp|wtsapp|whatsap|whats\s*app|wa\b|w\.a\.?)\b/gi,
   /\btelegram\b|\btg\b/gi,
   /\bsignal\b/gi,
   /\bhangouts?\b/gi,
@@ -202,13 +196,37 @@ export const MESSAGING_APP_MENTION_PATTERNS = [
   /\bimo\b/gi,
 ];
 
+// SHORT FORMS / SLANG — casual chat rarely spells "number" or "instagram" in
+// full. These need tighter context than a bare word match would allow, since
+// short tokens like "no" and "pm" collide with everyday English ("no problem",
+// "5 pm") — so each pattern below requires an adjacent contact-request cue
+// (a pronoun, a platform prefix, or "me"/"pls") rather than matching alone.
+export const SHORT_FORM_PATTERNS = [
+  // "unga no?", "ur no", "your no", "u no pls", "yr num" — pronoun + no/num/number
+  /\b(?:unga|ungal|un|your|ur|u|yr)\s*(?:no\.?|num\.?|number)\b\s*\??/gi,
+
+  // "ph no", "mob no", "mobile no", "cell no", "wtsp no", "wa no"
+  /\b(?:ph|phn|mob|mobile|cell|wtsp|wa)\s*(?:no\.?|num\.?|number)\b/gi,
+
+  // "insta id", "ig id", "tg id", "fb id", "snap id"
+  /\b(?:insta|ig|tg|telegram|fb|snap)\s*id\b/gi,
+
+  // "dm me", "pm me", "inbox me", "dm pls" — require "me"/"pls"/"please" so
+  // "pm" (as in 5pm) and "dm" alone don't false-positive
+  /\b(?:dm|pm|inbox)\s*(?:me|pls|please)\b/gi,
+  /\b(?:please|pls)\s*(?:dm|pm|inbox)\b/gi,
+
+  // bare "no?" / "num?" right after a name/pronoun-like short exchange
+  // (kept narrow — only fires with a trailing question mark to reduce noise)
+  /\b(?:no|num)\?/gi,
+];
+
 // ADDRESS DATA — kept mostly as-is but PIN code demoted to low-confidence
 // (see scoring section) because a bare 6-digit number is common in
 // non-address contexts (ages typed wrong, OTPs pasted by mistake, etc.)
 export const ADDRESS_PATTERNS = [
-  /\b(?:flat|door|house|plot|shop|unit|room|block|floor|apt|apartment)\s*(?:no\.?|num\.?|#|number)?\s*\d+[\w\-\/]*/gi,
+  /\b(?:flat|door|house|plot|shop|unit|room|block|floor|apt|apartment)\s*(?:no\.?|num\.?|#|number)?\s*[\w\-\/]+/gi,
   /\b(?:no\.?|#)\s*\d+[\w\-\/]*/gi,
-  /\b(?:pin\s*code|pincode|zip\s*code|zipcode)\b.{0,30}\b\d{6}\b/gi,
   /\b\w[\w\s]{1,40}\b(?:street|st\.?|road|rd\.?|lane|ln\.?|avenue|ave\.?|nagar|colony|layout|extension|extn\.?|cross|main|circle|marg|path|bypass|highway|hwy\.?|enclave|vihar|puram|nagara|salai|galli|gali)\b/gi,
   /\b\w[\w\s]{1,40}\b(?:area|sector|phase|zone|village|taluk|tehsil|mandal|ward|division)\b/gi,
   /\b(?:near|beside|opposite|opp\.?|adjacent to|next to|behind|in front of|above|below)\b.{0,60}(?:temple|mosque|church|school|hospital|mall|park|market|station|stop|petrol|bunk|bank|atm|post office|office|building|tower|complex)\b/gi,
@@ -269,6 +287,7 @@ export const SOLICITATION_PATTERNS_REGIONAL = [
 export const SOLICITATION_PATTERNS = [
   ...SOLICITATION_PATTERNS_EN,
   ...SOLICITATION_PATTERNS_REGIONAL,
+  ...SHORT_FORM_PATTERNS,
 ];
 
 // ---------------------------------------------------------------------------
@@ -288,11 +307,11 @@ const CATEGORY_WEIGHTS: Record<string, number> = {
   email: 10,
   upi: 9,
   socialUrl: 10,
-  socialHandle: 10,
-  messagingAppMention: 2, // alone this is a mention, not contact data
-  address: 10,
-  pinCodeOnly: 2, // a bare 6-digit number is weak; "pincode 600001" is an address
-  solicitation: 10,
+  socialHandle: 5,
+  messagingAppMention: 2,
+  address: 4,
+  pinCodeOnly: 2, // low confidence alone
+  solicitation: 4,
 };
 
 const BLOCK_THRESHOLD = 8;
@@ -326,7 +345,7 @@ export function scoreMessage(rawText: string): ModerationResult {
 
   add('phone', testAny(PHONE_PATTERNS, text));
   add('email', testAny(EMAIL_PATTERNS, text));
-  add('upi', testAny([UPI_PATTERN], text));
+  add('upi', UPI_PATTERN.test(text));
   add('socialUrl', testAny(SOCIAL_URL_PATTERNS, text));
   add('socialHandle', testAny(SOCIAL_HANDLE_PATTERNS, text));
   add('messagingAppMention', testAny(MESSAGING_APP_MENTION_PATTERNS, text));
@@ -336,7 +355,7 @@ export function scoreMessage(rawText: string): ModerationResult {
   // PIN code only counts if no stronger address signal already fired —
   // otherwise it's redundant; alone, it's weak evidence.
   if (!matchedCategories.includes('address')) {
-    add('pinCodeOnly', testAny([PIN_CODE_LOW_CONFIDENCE], text));
+    add('pinCodeOnly', PIN_CODE_LOW_CONFIDENCE.test(text));
   }
 
   let severity: ModerationSeverity = 'allow';

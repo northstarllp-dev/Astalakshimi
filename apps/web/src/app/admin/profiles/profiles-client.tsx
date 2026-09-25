@@ -224,6 +224,11 @@ export default function AdminProfilesPageInner() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Link href={`/admin/profiles/${row.profileId}`}>
+                    <Button size="sm" variant="outline" className="rounded-lg">
+                      Review
+                    </Button>
+                  </Link>
                   <Button 
                     size="sm" 
                     variant="outline" 

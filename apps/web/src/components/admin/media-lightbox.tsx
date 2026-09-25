@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { isHoroscopePdfFileName } from "@/lib/horoscope-file"
 
 type MediaLightboxProps = {
   src: string
@@ -103,15 +104,19 @@ export function PdfLightboxTile({
   src: string
   name: string
 }) {
+  const isPdf = isHoroscopePdfFileName(name, src)
+
   return (
-    <MediaLightbox src={src} alt={name} pdf className="bg-muted/30">
+    <MediaLightbox src={src} alt={name} pdf={isPdf} className="bg-muted/30">
       <div className="flex items-center gap-3 p-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <FileText className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{name}</p>
-          <p className="text-xs text-muted-foreground">Click to preview PDF</p>
+          <p className="text-xs text-muted-foreground">
+            {isPdf ? "Click to preview PDF" : "Click to preview image"}
+          </p>
         </div>
       </div>
     </MediaLightbox>

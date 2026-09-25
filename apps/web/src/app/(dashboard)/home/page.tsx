@@ -279,11 +279,18 @@ export default function HomePage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     Choose an age range, religion, and marital status so we can show people who fit.
                   </p>
-                  <Link href="/profile/edit#preferences" className="mt-4 inline-block">
-                    <Button size="sm" className="rounded-md">
-                      Edit preferences
-                    </Button>
-                  </Link>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <Link href="/profile/edit#preferences">
+                      <Button size="sm" className="rounded-md">
+                        Edit preferences
+                      </Button>
+                    </Link>
+                    <Link href="/dashboard?view=search">
+                      <Button size="sm" variant="outline" className="rounded-md">
+                        Browse all profiles
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <>

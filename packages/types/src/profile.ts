@@ -6,7 +6,7 @@ export type ProfileFor = 'Myself' | 'Son' | 'Daughter' | 'Brother' | 'Sister' | 
 /** System-owned: set by member signup (`self`) or admin create (`staff`). Never member-writable. */
 export type CreatedBy = 'self' | 'staff';
 export type MaritalStatus = 'Never Married' | 'Divorced' | 'Widowed' | 'Awaiting Divorce';
-export type EducationLevel = 'Bachelors' | 'Masters' | 'Doctorate' | 'Diploma' | 'High School';
+export type EducationLevel = 'Bachelors' | 'Masters' | 'Doctorate' | 'Diploma' | 'Professional' | 'High School';
 export type EmploymentStatus = 'Employed' | 'Business Owner' | 'Freelancer' | 'Not Working';
 export type CompanySector = 'Private' | 'Govt' | 'MNC' | 'Startup' | 'Business';
 export type PhotoPrivacy = 'blurred' | 'accepted' | 'visible';

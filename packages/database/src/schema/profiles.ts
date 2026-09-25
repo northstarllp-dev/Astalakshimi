@@ -3,7 +3,7 @@ import { users } from './users';
 
 export const genderEnum = pgEnum('gender', ['Male', 'Female', 'Other']);
 export const maritalStatusEnum = pgEnum('marital_status', ['Never Married', 'Divorced', 'Widowed', 'Awaiting Divorce']);
-export const educationLevelEnum = pgEnum('education_level', ['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'High School']);
+export const educationLevelEnum = pgEnum('education_level', ['Bachelors', 'Masters', 'Doctorate', 'Diploma', 'Professional', 'High School']);
 export const employmentStatusEnum = pgEnum('employment_status', ['Employed', 'Business Owner', 'Freelancer', 'Not Working']);
 export const companySectorEnum = pgEnum('company_sector', ['Private', 'Govt', 'MNC', 'Startup', 'Business']);
 export const photoPrivacyEnum = pgEnum('photo_privacy', ['blurred', 'accepted', 'visible']);

@@ -25,7 +25,8 @@
     "db:import-educations": "node scripts/import-educations.mjs",
     "db:import-careers": "node scripts/import-careers.mjs",
     "db:import-communities": "node scripts/import-communities.mjs",
-    "db:apply-migration": "node scripts/apply-migration.mjs"
+    "db:apply-migration": "node scripts/apply-migration.mjs",
+    "db:backfill-females": "tsx scripts/backfill-female-profiles.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
