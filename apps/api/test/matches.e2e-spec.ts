@@ -11,15 +11,21 @@ describe('MatchesController (e2e)', () => {
   let dbMock: any;
 
   beforeAll(async () => {
+    const qbProxy = new Proxy({}, {
+      get: (target, prop) => {
+        if (prop === 'then') {
+          return (resolve) => resolve([{ id: 'user1', phone: '1234567890', role: 'member', status: 'active' }]);
+        }
+        return () => qbProxy;
+      },
+    });
+
     dbMock = {
-      select: jest.fn().mockReturnThis(),
-      from: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      innerJoin: jest.fn().mockReturnThis(),
-      // Catch-all for promises
-      then: jest.fn(),
+      select: () => qbProxy,
+      insert: () => qbProxy,
+      update: () => qbProxy,
+      delete: () => qbProxy,
+      transaction: jest.fn((cb) => cb(dbMock)),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -49,7 +55,6 @@ describe('MatchesController (e2e)', () => {
     const token = jwtService.sign({ sub: 'user1', phone: '1234567890' });
 
     // Just mocking the DB response to avoid crashing the service logic
-    dbMock.then.mockImplementation((res, rej) => res([]));
 
     return request(app.getHttpServer())
       .get('/matches/top')

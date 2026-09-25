@@ -94,15 +94,21 @@ export function parseHeightToCm(raw: string | undefined | null): number | null {
   return null
 }
 
-/** Format stored cm as string, e.g. 180 → "180" */
+/** Format stored cm as string, e.g. 180 → 5'11" */
 export function formatHeightFromCm(cm: number): string {
-  return String(cm)
+  const totalInches = Math.round(cm / 2.54)
+  const feet = Math.floor(totalInches / 12)
+  const inches = totalInches % 12
+  return `${feet}'${inches}"`
 }
 
-/** Accept cm strings. */
+/** Accept cm strings or feet/inches strings and display as feet/inches. */
 export function displayHeight(raw: string | undefined | null): string {
   const text = String(raw ?? "").trim()
   if (!text) return ""
+  if (text.includes("'")) return text
+  const n = parseInt(text, 10)
+  if (Number.isFinite(n) && n > 0) return formatHeightFromCm(n)
   return text
 }
 

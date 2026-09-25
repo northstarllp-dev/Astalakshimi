@@ -17,6 +17,7 @@ export const profilePhotos = pgTable('profile_photos', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   profilePhotoIdx: index('profile_photos_profile_idx').on(table.profileId, table.displayOrder),
+  profilePrimaryPhotoIdx: index('profile_photos_primary_idx').on(table.profileId, table.isPrimary),
   profileContentHashIdx: index('profile_photos_content_hash_idx').on(table.profileId, table.contentHash),
 }));
 

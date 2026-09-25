@@ -119,11 +119,12 @@ describe('Feature 14: Admin - AdminService (Unit Tests)', () => {
   });
 
   describe('createProfile', () => {
-    const baseInput = {
+    const baseInput: any = {
       profileFor: 'Daughter',
       phone: '9876543210',
       fullName: 'Test User',
       gender: 'Female' as const,
+      height: '165',
       dobDay: '01',
       dobMonth: '01',
       dobYear: '1998',

@@ -73,6 +73,7 @@ export const profiles = pgTable('profiles', {
   searchIdx: index('profiles_search_idx').on(table.gender, table.religion, table.caste, table.city),
   dobIdx: index('profiles_dob_idx').on(table.dob),
   requiredCompleteIdx: index('profiles_required_complete_idx').on(table.requiredComplete),
+  discoverIdx: index('profiles_discover_idx').on(table.gender, table.requiredComplete, table.createdAt),
 }));
 
 export type Profile = typeof profiles.$inferSelect;
