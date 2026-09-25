@@ -120,7 +120,7 @@ describe('DashboardPage - Browse Section (SearchFilterPanel)', () => {
     })
 
     // Mock saved preferences
-    ;(apiClient.preferences.getMyPreferences as jest.Mock).mockResolvedValue({
+    ;(apiClient.preferences.getMyPreferences as any).mockResolvedValue({
       prefAgeMin: 22,
       prefAgeMax: 29,
       prefLocations: ['Mumbai'],
