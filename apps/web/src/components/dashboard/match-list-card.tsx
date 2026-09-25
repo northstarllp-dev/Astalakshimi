@@ -46,6 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ProfileContactUnlockDialog } from "@/components/profile/profile-contact-unlock-dialog"
+import { ProfileMutualUnlockDialog, useMutualUnlockDialog } from "@/components/profile/profile-mutual-unlock-dialog"
 
 function formatHeight(height?: string, heightCm?: number): string {
   if (heightCm && heightCm > 0) {
@@ -113,6 +114,7 @@ export function MatchListCard({
   const [paused, setPaused] = React.useState(false)
   const [contactDialogOpen, setContactDialogOpen] = React.useState(false)
   const [justConnected, setJustConnected] = React.useState(false)
+  const mutualUnlockDialog = useMutualUnlockDialog()
 
   const photos = match.photos || []
   // The API withholds keys entirely when a photo should be blurred.
@@ -249,9 +251,8 @@ export function MatchListCard({
             </span>
           </div>
 
-          {/* Top Right: Plan Crown Badge (Silver/Gold/Platinum/Diamond; hidden for free) + Photo Count + Three dots menu */}
+          {/* Top Right: Photo Count + Three dots menu */}
           <div className="flex items-center gap-2">
-            <PlanCrownBadge plan={match.planSlug || match.plan || match.membership || (match.isVip ? "gold" : null)} />
 
             {/* Photo count pill */}
             <div className="flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-md border border-white/15 shadow-sm">
@@ -367,6 +368,10 @@ export function MatchListCard({
                   e.preventDefault()
                   e.stopPropagation()
                   if (interactionsLocked) return
+                  if (connectStatus !== "mutual") {
+                    mutualUnlockDialog.prompt("contact")
+                    return
+                  }
                   setContactDialogOpen(true)
                 }}
                 disabled={interactionsLocked}
@@ -456,7 +461,6 @@ export function MatchListCard({
               </div>
 
               <div className="flex items-center gap-1.5">
-                <PlanCrownBadge plan={match.planSlug || match.plan || match.membership || (match.isVip ? "gold" : null)} />
                 <button
                   type="button"
                   onClick={handleToggleShortlist}
@@ -504,10 +508,7 @@ export function MatchListCard({
             </div>
           </div>
 
-          <div className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-[11px] font-medium text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary/60" />
-            <span>ID: {match.id?.slice(0, 8).toUpperCase()}</span>
-          </div>
+
         </div>
 
         {/* Right: Details and Action Column */}
@@ -611,20 +612,11 @@ export function MatchListCard({
               </div>
             </div>
 
-            {/* About / Personal Note */}
-            <div className="mt-3 rounded-xl border border-border/60 bg-muted/30 p-3 text-xs leading-relaxed text-foreground/85">
-              <p className="line-clamp-2">
-                {match.about || "Profile created by staff on behalf of the family. Looking for an understanding partner from a good family background."}
-              </p>
-            </div>
+
           </div>
 
           {/* Footer Action Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/60">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
-              <span>Last active: {match.lastActive || "Online now"}</span>
-            </div>
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-border/60">
 
             <div className="flex items-center gap-2 sm:gap-2.5">
               <Button
@@ -685,6 +677,11 @@ export function MatchListCard({
               }
             : null
         }
+      />
+      <ProfileMutualUnlockDialog
+        open={mutualUnlockDialog.open}
+        onOpenChange={mutualUnlockDialog.setOpen}
+        reason={mutualUnlockDialog.reason}
       />
     </article>
   )

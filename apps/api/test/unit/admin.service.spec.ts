@@ -56,6 +56,7 @@ describe('Feature 14: Admin - AdminService (Unit Tests)', () => {
         [{ count: 25 }],  // subscriptions
         [{ count: 5 }],   // pending verifications
         [{ count: 3 }],   // idle verifications
+        [{ total: 49900 }], // payments revenue (paise)
       ]);
 
       const stats = await adminService.getStats();
@@ -65,11 +66,12 @@ describe('Feature 14: Admin - AdminService (Unit Tests)', () => {
         activeSubscriptions: 25,
         pendingVerifications: 5,
         idleVerifications: 3,
+        totalRevenue: 499,
       });
     });
 
     it('should handle zero counts', async () => {
-      mockDb.select = mockQueryBuilder([[], [], [], [], []]);
+      mockDb.select = mockQueryBuilder([[], [], [], [], [], []]);
 
       const stats = await adminService.getStats();
       expect(stats).toEqual({
@@ -78,6 +80,7 @@ describe('Feature 14: Admin - AdminService (Unit Tests)', () => {
         activeSubscriptions: 0,
         pendingVerifications: 0,
         idleVerifications: 0,
+        totalRevenue: 0,
       });
     });
   });

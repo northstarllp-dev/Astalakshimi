@@ -154,6 +154,43 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
       ).rejects.toThrow('You have reached your interest quota limit of 5');
     });
 
+    it('should throw ForbiddenException if user on Silver plan has reached their interest quota limit of 100', async () => {
+      mockEntitlementsService.getUserPlan.mockResolvedValue({
+        slug: 'silver',
+        interestQuota: 100,
+      });
+
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          // sender profile
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([senderProfile]),
+          };
+        } else if (selectCount === 2) {
+          // target profile
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([targetProfile]),
+          };
+        } else {
+          // sent count query -> 100 interests already sent
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockResolvedValue([{ count: 100 }]),
+          };
+        }
+      });
+
+      await expect(
+        interestsService.sendInterest('sender-user-id', { targetProfileId: targetProfile.id })
+      ).rejects.toThrow('You have reached your interest quota limit of 100');
+    });
+
     it('should auto-accept into mutual match if target user already sent a pending interest', async () => {
       const existingReverseInterest = {
         id: 'rev-interest-1',

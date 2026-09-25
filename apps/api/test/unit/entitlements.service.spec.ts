@@ -142,6 +142,28 @@ describe('Feature 4: Entitlements - EntitlementsService (Unit Tests)', () => {
       expect(status.canPayExtra).toBe(true);
       expect(status.remaining).toBe(0);
     });
+
+    it('should prompt payment for silver plan when 10 contacts limit is reached', async () => {
+      jest.spyOn(entitlementsService, 'getUserPlan').mockResolvedValue({
+        slug: 'silver',
+        contactUnlocks: 10,
+      } as any);
+      jest.spyOn(entitlementsService, 'isContactUnlocked').mockResolvedValue(false);
+      jest.spyOn(entitlementsService, 'getMonthlyContactUnlockCount').mockResolvedValue(10);
+
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: 'viewer-1', userId: 'user-1' }]),
+      });
+
+      const status = await entitlementsService.getContactUnlockStatus('user-1', 'target-1', true);
+
+      expect(status.canUnlockWithQuota).toBe(false);
+      expect(status.canPayExtra).toBe(true);
+      expect(status.remaining).toBe(0);
+      expect(status.extraContactFeePaise).toBe(2900);
+    });
   });
 
   describe('unlockContactWithQuota', () => {

@@ -15,6 +15,7 @@ import {
   userSettings,
   plans,
   notifications,
+  payments,
 } from '@astalakshimi/database';
 import { eq, inArray, and, sql } from 'drizzle-orm';
 import type { AdminCreateProfileInput } from '@astalakshimi/validation';
@@ -54,12 +55,18 @@ export class AdminService {
       .from(verifications)
       .where(eq(verifications.status, 'idle'));
 
+    const revenueResult = await this.db
+      .select({ total: sql<number>`sum(${payments.amountPaise})` })
+      .from(payments)
+      .where(eq(payments.status, 'captured'));
+
     return {
       totalUsers: totalUsers[0]?.count || 0,
       totalProfiles: totalProfiles[0]?.count || 0,
       activeSubscriptions: activeSubscriptions[0]?.count || 0,
       pendingVerifications: pendingVerifications[0]?.count || 0,
       idleVerifications: idleVerifications[0]?.count || 0,
+      totalRevenue: revenueResult[0]?.total ? Math.round(revenueResult[0].total / 100) : 0,
     };
   }
 

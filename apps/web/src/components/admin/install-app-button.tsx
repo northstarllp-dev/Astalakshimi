@@ -34,8 +34,13 @@ export function InstallAppButton({
   const [deferred, setDeferred] = React.useState<BeforeInstallPromptEvent | null>(null)
   const [installed, setInstalled] = React.useState(false)
   const [showIosHint, setShowIosHint] = React.useState(false)
+  const [iosUser, setIosUser] = React.useState(false)
 
   React.useEffect(() => {
+    if (isIos()) {
+      setIosUser(true)
+    }
+
     if (isStandalone()) {
       setInstalled(true)
       return
@@ -76,7 +81,7 @@ export function InstallAppButton({
       setDeferred(null)
       return
     }
-    if (isIos()) {
+    if (iosUser) {
       setShowIosHint((v) => !v)
       return
     }
@@ -93,12 +98,12 @@ export function InstallAppButton({
         aria-label="Install as web app"
         className={compact ? "tap-target" : undefined}
       >
-        {isIos() ? <Share className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-        {!compact && <span className="ml-2">{isIos() ? "Add to Home" : "Install app"}</span>}
+        {iosUser ? <Share className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+        {!compact && <span className="ml-2">{iosUser ? "Add to Home" : "Install app"}</span>}
       </Button>
       {showIosHint && (
         <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-card p-3 text-xs shadow-sm">
-          {isIos() ? (
+          {iosUser ? (
             <p>
               Tap <span className="font-semibold">Share</span> in Safari, then{" "}
               <span className="font-semibold">Add to Home Screen</span>.

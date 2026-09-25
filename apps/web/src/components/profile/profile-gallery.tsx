@@ -4,7 +4,6 @@ import * as React from "react"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight, FileText, MapPin, X } from "lucide-react"
 import { cn, getMediaUrl } from "@/lib/utils"
-import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
 import { LockedPhoto } from "@/components/profile/locked-photo"
 
 type ProfileGalleryProps = {
@@ -130,7 +129,6 @@ export function ProfileGallery({
           )}
 
           <div className="absolute left-2.5 right-2.5 top-2.5 z-20 flex flex-wrap items-center gap-1.5">
-            <PlanCrownBadge plan={plan} />
             {hasHoroscope && (
               <button
                 type="button"
@@ -157,7 +155,6 @@ export function ProfileGallery({
                     {city}, {state}
                   </span>
                 </p>
-                <p className="mt-0.5 text-[11px] text-white/65 sm:mt-1 sm:text-xs">{lastActive}</p>
               </div>
 
               {extra.length > 0 && (

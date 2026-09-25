@@ -122,10 +122,11 @@ export function useAdminStatsQuery() {
       if (!actualStats) return mockStats
       return {
         ...mockStats,
-        totalUsers: actualStats.totalUsers,
-        totalProfiles: actualStats.totalProfiles,
-        activeSubscriptions: actualStats.activeSubscriptions,
-        pendingVerifications: actualStats.pendingVerifications,
+        totalUsers: actualStats.totalUsers ?? mockStats.totalUsers,
+        totalProfiles: actualStats.totalProfiles ?? mockStats.totalProfiles,
+        activeSubscriptions: actualStats.activeSubscriptions ?? mockStats.activeSubscriptions,
+        pendingVerifications: actualStats.pendingVerifications ?? mockStats.pendingVerifications,
+        totalRevenue: actualStats.totalRevenue ?? mockStats.totalRevenue,
       }
     },
     enabled: typeof window !== "undefined",

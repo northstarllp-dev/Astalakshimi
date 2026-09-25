@@ -47,6 +47,7 @@ const MASKED_PHONE = "+91 ••••• •••••"
 
 type ProfileAboutSectionProps = {
   profileId: string
+  aboutText?: string
   gender: string
   maritalStatus: string
   hasChildren?: boolean | null
@@ -74,6 +75,7 @@ type ProfileAboutSectionProps = {
 
 export function ProfileAboutSection({
   profileId,
+  aboutText,
   gender,
   maritalStatus,
   hasChildren = false,
@@ -119,6 +121,10 @@ export function ProfileAboutSection({
       setRevealOpen(true)
       return
     }
+    if (!initialMutualConnect) {
+      horoscopeDialog.prompt("contact")
+      return
+    }
     setContactOpen(true)
   }
 
@@ -141,6 +147,12 @@ export function ProfileAboutSection({
             {gender === "Female" ? "About her" : "About him"}
           </h2>
         </div>
+
+        {aboutText && (
+          <p className="mb-6 text-[15px] leading-relaxed text-foreground/85">
+            {aboutText}
+          </p>
+        )}
 
         <dl>
           <DetailRow label="Marital status" value={maritalStatus} />
@@ -303,7 +315,7 @@ export function ProfileAboutSection({
       <ProfileMutualUnlockDialog
         open={horoscopeDialog.open}
         onOpenChange={horoscopeDialog.setOpen}
-        reason="horoscope"
+        reason={horoscopeDialog.reason}
       />
     </>
   )

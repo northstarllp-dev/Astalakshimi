@@ -116,7 +116,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
     subcaste: data.profile.subcaste?.trim() || "",
     gotra: data.profile.gotra?.trim() || "",
     willingToRelocate: data.profile.willingToRelocate || "",
-    about: data.profile.aboutMe || "No details provided.",
+    about: data.profile.aboutMe || "This profile is managed by family. Looking for a compatible and understanding partner from a good background.",
     gender: data.profile.gender,
     maritalStatus: data.profile.maritalStatus,
     hasChildren: Boolean(data.profile.hasChildren),
@@ -201,36 +201,12 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
           </div>
         </div>
 
+
         {/* RIGHT: details column (continuous natural scroll) */}
         <div className="min-w-0 space-y-4 sm:space-y-5">
-          {/* Quick pills */}
-          <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
-            <div className="flex flex-wrap gap-2 text-sm">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
-                <Ruler className="h-3.5 w-3.5 text-primary" /> {profile.height} cm
-              </span>
-              {profile.education && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
-                  <GraduationCap className="h-3.5 w-3.5 text-primary" /> {profile.education}
-                </span>
-              )}
-              {profile.occupation ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
-                  <Briefcase className="h-3.5 w-3.5 text-primary" /> {profile.occupation}
-                </span>
-              ) : null}
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
-                <Users className="h-3.5 w-3.5 text-primary" /> {profile.community}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs sm:text-sm font-medium">
-                <MapPin className="h-3.5 w-3.5 text-primary" /> {profile.city}
-              </span>
-            </div>
-            <p className="mt-4 text-sm leading-relaxed text-foreground/85">{profile.about}</p>
-          </section>
-
           <ProfileAboutSection
             profileId={profile.id}
+            aboutText={profile.about}
             gender={profile.gender}
             maritalStatus={profile.maritalStatus}
             hasChildren={profile.hasChildren}
@@ -314,15 +290,7 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
             </dl>
           </Section>
 
-          <Section title="Partner preferences" icon={<CheckCircle2 className="h-4 w-4" />}>
-            <dl>
-              <DetailRow label="Age" value={profile.preferences.ageRange} />
-              <DetailRow label="Height" value={profile.preferences.heightRange} />
-              <DetailRow label="Education" value={profile.preferences.education} />
-              <DetailRow label="Location" value={profile.preferences.location} />
-              <DetailRow label="Community" value={profile.preferences.community} />
-            </dl>
-          </Section>
+
 
         </div>
       </div>

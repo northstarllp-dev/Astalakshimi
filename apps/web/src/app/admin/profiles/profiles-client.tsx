@@ -15,6 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import {
   useAdminProfilesQuery,
   usePendingVerificationsQuery,
   useDeleteProfileMutation,
@@ -40,12 +48,30 @@ export default function AdminProfilesPageInner() {
   const [createdByFilter, setCreatedByFilter] = React.useState("all")
   const [filtersOpen, setFiltersOpen] = React.useState(false)
 
+  const [rejectProfileId, setRejectProfileId] = React.useState<string | null>(null)
+  const [rejectType, setRejectType] = React.useState("Photo is unclear or invalid")
+  const [rejectCustom, setRejectCustom] = React.useState("")
+
   const { data: profiles = [] } = useAdminProfilesQuery()
   const { data: pending = [] } = usePendingVerificationsQuery()
   const { data: session } = useAdminSessionQuery()
   const deleteMutation = useDeleteProfileMutation()
   const approveMutation = useApproveProfileMutation()
   const rejectMutation = useRejectProfileMutation()
+
+  const handleReject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!session || !rejectProfileId) return
+    const finalReason = rejectType === "other" ? rejectCustom : rejectType
+    await rejectMutation.mutateAsync({
+      profileId: rejectProfileId,
+      staff: session,
+      rejectionReason: finalReason,
+    })
+    setRejectProfileId(null)
+    setRejectType("Photo is unclear or invalid")
+    setRejectCustom("")
+  }
 
   const cities = React.useMemo(
     () => Array.from(new Set(profiles.map((p) => p.city))).sort(),
@@ -198,11 +224,6 @@ export default function AdminProfilesPageInner() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Link href={`/admin/profiles/${row.profileId}`}>
-                    <Button size="sm" variant="outline" className="rounded-lg">
-                      Review
-                    </Button>
-                  </Link>
                   <Button 
                     size="sm" 
                     variant="outline" 
@@ -211,6 +232,7 @@ export default function AdminProfilesPageInner() {
                       if (!session) return;
                       void approveMutation.mutateAsync({ profileId: row.profileId, staff: session });
                     }}
+                    disabled={approveMutation.isPending}
                   >
                     Approve
                   </Button>
@@ -218,13 +240,7 @@ export default function AdminProfilesPageInner() {
                     size="sm" 
                     variant="outline" 
                     className="rounded-lg text-destructive hover:bg-destructive/10" 
-                    onClick={() => {
-                      if (!session) return;
-                      const reason = window.prompt("Reason for rejection:");
-                      if (reason !== null) {
-                        void rejectMutation.mutateAsync({ profileId: row.profileId, staff: session, rejectionReason: reason || "Photo unclear or ID invalid" });
-                      }
-                    }}
+                    onClick={() => setRejectProfileId(row.profileId)}
                   >
                     Reject
                   </Button>
@@ -282,6 +298,51 @@ export default function AdminProfilesPageInner() {
           </div>
         </>
       )}
+
+      <Dialog open={!!rejectProfileId} onOpenChange={(open) => !open && setRejectProfileId(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reject Profile</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleReject}>
+            <div>
+              <Label htmlFor="rejectionType">Reason for rejection</Label>
+              <select
+                id="rejectionType"
+                value={rejectType}
+                onChange={(e) => setRejectType(e.target.value)}
+                className="mt-1.5 mb-3 flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="Photo is unclear or invalid">Photo is unclear or invalid</option>
+                <option value="Government ID is unclear or invalid">Government ID is unclear or invalid</option>
+                <option value="other">Other (type reason below)</option>
+              </select>
+
+              {rejectType === "other" && (
+                <div className="mt-2">
+                  <Label htmlFor="rejectionReason">Custom reason</Label>
+                  <Input 
+                    id="rejectionReason" 
+                    value={rejectCustom} 
+                    onChange={(e) => setRejectCustom(e.target.value)} 
+                    placeholder="Explain what needs to be fixed…" 
+                    className="mt-1.5"
+                    required
+                  />
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="ghost" onClick={() => setRejectProfileId(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="default" disabled={rejectMutation.isPending}>
+                Confirm reject
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
