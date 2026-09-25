@@ -4,29 +4,22 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { cn, getMediaUrl } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Bookmark,
-  Briefcase,
-  Building2,
   Check,
   ChevronLeft,
   ChevronRight,
-  Coins,
-  Crown,
   Eye,
-  GraduationCap,
   Image as ImageIcon,
-  Languages,
   Loader2,
   MapPin,
   MoreVertical,
   Phone,
-  Sparkles,
   Users,
   X,
 } from "lucide-react"
+import { displayHeight, formatHeightFromCm } from "@/lib/input-units"
 import { ConnectButton } from "@/components/profile/connect-button"
 import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
 import { LockedPhoto } from "@/components/profile/locked-photo"
@@ -76,6 +69,16 @@ function NextPhotoPreload({ photo, sizes }: { photo?: string; sizes: string }) {
   )
 }
 
+const PROFILE_CREATED_BY: Record<string, string> = {
+  Myself: "Self",
+  Son: "Parent",
+  Daughter: "Parent",
+  Brother: "Sibling",
+  Sister: "Sibling",
+  Relative: "Relative",
+  Friend: "Friend",
+}
+
 function formatCommunity(match: any): string {
   const caste = match.caste || match.community || ""
   const subCaste = match.subCaste || match.subcaste || ""
@@ -105,11 +108,6 @@ export function MatchListCard({
   /** Unverified teaser — disable interest / skip / contact unlock; keep shortlist. */
   interactionsLocked?: boolean
 }) {
-  const education =
-    (match.education || match.educationLevel || "").split(/\s+/)[0]?.trim() ||
-    match.education ||
-    match.educationLevel ||
-    "Not specified"
   const [activePhoto, setActivePhoto] = React.useState(0)
   const [paused, setPaused] = React.useState(false)
   const [contactDialogOpen, setContactDialogOpen] = React.useState(false)
@@ -189,6 +187,20 @@ export function MatchListCard({
     match.gender?.toLowerCase() === "bride" ||
     match.profileFor?.toLowerCase() === "daughter" ||
     match.profileFor?.toLowerCase() === "sister"
+
+  const desktopHeight =
+    match.heightCm && match.heightCm > 0 ? formatHeightFromCm(match.heightCm) : displayHeight(match.height)
+  const profileCreatedBy = PROFILE_CREATED_BY[match.profileFor as string] ?? ""
+  const aboutSnippet = String(match.aboutMe || match.about || "").trim()
+  const religionCommunity = [match.religion, formattedCommunity].filter(Boolean).join(" · ")
+  const summaryRows = [
+    { label: "Religion", value: religionCommunity },
+    { label: "Mother tongue", value: match.motherTongue },
+    { label: "Education", value: match.education || match.educationLevel },
+    { label: "Profession", value: match.occupation || match.profession },
+    { label: "Works at", value: match.company },
+    { label: "Annual income", value: match.income || match.annualIncome },
+  ].filter((row): row is { label: string; value: string } => Boolean(row.value && String(row.value).trim()))
 
   return (
     <article
@@ -455,29 +467,6 @@ export function MatchListCard({
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
             </Link>
 
-            {/* Top Photo Badges */}
-            <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-2.5">
-              <div className="flex flex-col items-start gap-1">
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleToggleShortlist}
-                  disabled={toggleShortlistMutation.isPending}
-                  aria-label={isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur transition hover:bg-black/75 hover:scale-105 active:scale-95 border border-white/20"
-                >
-                  <Bookmark
-                    className={cn(
-                      "h-3.5 w-3.5 transition-colors",
-                      isShortlisted ? "fill-amber-400 text-amber-400" : "text-white"
-                    )}
-                  />
-                </button>
-              </div>
-            </div>
-
             {/* Bottom photo controls (prev/next + photo count) */}
             <div className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-between p-2.5">
               {photos.length > 1 ? (
@@ -511,119 +500,75 @@ export function MatchListCard({
 
         </div>
 
-        {/* Right: Details and Action Column */}
-        <div className="flex-1 min-w-0 p-5 lg:p-6 flex flex-col justify-between gap-4">
-          {/* Header Row */}
+        {/* Right: matrimony-style profile summary */}
+        <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-5 lg:p-6">
           <div>
-            <div className="flex flex-wrap items-start justify-between gap-2.5">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/profiles/${match.id}`}
-                    className="font-serif text-2xl lg:text-[1.65rem] font-bold text-foreground hover:text-primary transition-colors flex items-center gap-2"
-                  >
-                    <span>{match.fullName}, {match.age}</span>
-                  </Link>
-                </div>
-
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs sm:text-sm font-medium text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 text-foreground/90 font-semibold">
-                    <MapPin className="h-3.5 w-3.5 text-primary" /> {match.city || "City not specified"}
-                  </span>
-                  {formattedCommunity && (
-                    <>
-                      <span>•</span>
-                      <span>{formattedCommunity}</span>
-                    </>
-                  )}
-                  {formattedHeight && (
-                    <>
-                      <span>•</span>
-                      <span>{formattedHeight}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Match Reasons Badges on the right */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {Array.isArray(match.matchReasons) && match.matchReasons.map((reason: string, i: number) => (
-                  <Badge key={i} variant="secondary" className="text-[11px] font-semibold bg-primary/10 text-primary border-primary/20">
-                    <Sparkles className="mr-1.5 h-3 w-3" /> {reason}
-                  </Badge>
-                ))}
-              </div>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <Link
+                href={`/profiles/${match.id}`}
+                className="font-serif text-2xl font-bold text-foreground transition-colors hover:text-primary lg:text-[1.65rem]"
+              >
+                {match.fullName}
+              </Link>
+              {profileCreatedBy && (
+                <span className="text-xs text-muted-foreground">Profile created by {profileCreatedBy}</span>
+              )}
             </div>
 
-            {/* Bento Attribute Tiles */}
-            <div className="mt-4 grid grid-cols-2 lg:grid-cols-3 gap-2.5">
-              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
-                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <GraduationCap className="h-3.5 w-3.5 text-primary" /> Education
-                </dt>
-                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground" title={match.education}>
-                  {match.education || "Not specified"}
-                </dd>
-              </div>
+            <p className="mt-1 text-sm text-foreground/85">
+              {[
+                match.age ? `${match.age} yrs` : "",
+                desktopHeight,
+                match.maritalStatus,
+              ]
+                .filter(Boolean)
+                .join(", ")}
+            </p>
+            <p className="mt-0.5 flex items-center gap-1 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+              {[match.city, match.state].filter(Boolean).join(", ") || "Location not shared"}
+            </p>
 
-              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
-                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <Briefcase className="h-3.5 w-3.5 text-primary" /> Profession
-                </dt>
-                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground" title={match.occupation}>
-                  {match.occupation || "Not specified"}
-                </dd>
-              </div>
+            <div className="my-4 h-px bg-gradient-to-r from-secondary/40 via-secondary/15 to-transparent" />
 
-              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
-                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <Building2 className="h-3.5 w-3.5 text-primary" /> Company
-                </dt>
-                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground" title={match.company}>
-                  {match.company || "Not specified"}
-                </dd>
-              </div>
+            <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm lg:grid-cols-2">
+              {summaryRows.map((row) => (
+                <div key={row.label} className="flex gap-2">
+                  <dt className="w-28 shrink-0 text-muted-foreground">{row.label}</dt>
+                  <dd className="min-w-0 truncate font-medium text-foreground" title={row.value}>
+                    {row.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
 
-              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
-                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <Coins className="h-3.5 w-3.5 text-primary" /> Annual Income
-                </dt>
-                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground">
-                  {match.income || "Not specified"}
-                </dd>
-              </div>
+            {aboutSnippet && (
+              <p className="mt-4 line-clamp-2 text-sm italic leading-relaxed text-foreground/75">
+                &ldquo;{aboutSnippet}&rdquo;
+              </p>
+            )}
 
-              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
-                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <Languages className="h-3.5 w-3.5 text-primary" /> Mother Tongue
-                </dt>
-                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground">
-                  {match.motherTongue || "Tamil"}
-                </dd>
-              </div>
-
-              <div className="rounded-xl border border-secondary/20 bg-[#fffbf4]/80 p-2.5 px-3 shadow-xs">
-                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <Users className="h-3.5 w-3.5 text-primary" /> Profile For
-                </dt>
-                <dd className="mt-0.5 truncate text-xs sm:text-sm font-semibold text-foreground">
-                  {match.profileFor ? `For ${match.profileFor}` : "Self / Family"}
-                </dd>
-              </div>
-            </div>
-
-
+            {Array.isArray(match.matchReasons) && match.matchReasons.length > 0 && (
+              <p className="mt-3 text-xs text-[#8a6a12]">
+                <span className="font-semibold">Why this match:</span> {match.matchReasons.join(" · ")}
+              </p>
+            )}
           </div>
 
-          {/* Footer Action Bar */}
-          <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-border/60">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
+            <Link
+              href={`/profiles/${match.id}`}
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              View full profile →
+            </Link>
 
             <div className="flex items-center gap-2 sm:gap-2.5">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-10 rounded-xl px-4 text-xs font-semibold hover:bg-muted text-muted-foreground hover:text-foreground"
+                className="h-10 rounded-full px-4 text-xs font-semibold text-muted-foreground hover:text-foreground"
                 disabled={interactionsLocked}
                 title={interactionsLocked ? "Verify to interact" : undefined}
                 onClick={() => {
@@ -631,21 +576,23 @@ export function MatchListCard({
                   onSkip(match.id)
                 }}
               >
-                Skip
+                Not now
               </Button>
-              <Link href={`/profiles/${match.id}`}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-10 rounded-xl border-secondary/40 px-4 text-xs font-semibold hover:bg-secondary/10 text-primary"
-                >
-                  View Profile
-                </Button>
-              </Link>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 rounded-full border-secondary/40 px-4 text-xs font-semibold text-primary hover:bg-secondary/10"
+                onClick={handleToggleShortlist}
+                disabled={toggleShortlistMutation.isPending}
+              >
+                <Bookmark className={cn("mr-1.5 h-3.5 w-3.5", isShortlisted && "fill-amber-400 text-amber-400")} />
+                {isShortlisted ? "Shortlisted" : "Shortlist"}
+              </Button>
               <ConnectButton
                 profileId={match.id}
                 size="sm"
-                className="h-10 rounded-xl px-5 text-xs font-semibold shadow-xs"
+                className="h-10 rounded-full px-5 text-xs font-semibold shadow-xs"
                 disabled={interactionsLocked}
                 title={interactionsLocked ? "Verify to send interest" : undefined}
               />
@@ -684,14 +631,5 @@ export function MatchListCard({
         reason={mutualUnlockDialog.reason}
       />
     </article>
-  )
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</dt>
-      <dd className="truncate font-medium text-foreground">{value || "Not specified"}</dd>
-    </div>
   )
 }

@@ -182,11 +182,11 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
   }
 
   return (
-    <div className="relative mx-auto max-w-6xl px-3 py-4 sm:px-4 md:py-6 pb-28 sm:pb-32">
-      <div className="grid gap-5 lg:grid-cols-[400px_minmax(0,1fr)] lg:items-start xl:grid-cols-[440px_minmax(0,1fr)]">
-        {/* LEFT: portrait photo card (natural scroll on mobile, sticky on desktop) */}
-        <div className="lg:sticky lg:top-20">
-          <div className="relative mx-auto aspect-[3/4] w-full max-w-[440px] overflow-hidden rounded-2xl sm:rounded-3xl shadow-md border border-border/70">
+    <div className="relative mx-auto max-w-6xl px-3 pb-28 pt-4 sm:px-4 sm:pb-32 md:pt-6 lg:h-[calc(100dvh-10rem)] lg:overflow-hidden lg:pb-0 lg:pt-6">
+      <div className="grid gap-5 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-8 lg:overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        {/* LEFT: fixed portrait — fills the left side, no scroll */}
+        <div className="min-h-0 lg:h-full lg:min-h-0 lg:overflow-hidden">
+          <div className="relative mx-auto aspect-[3/4] w-full max-w-[440px] overflow-hidden rounded-2xl border border-border/70 shadow-md sm:rounded-3xl lg:mx-0 lg:aspect-auto lg:h-full lg:max-w-none lg:rounded-3xl">
             <ProfileGallery
               name={profile.fullName}
               age={profile.age}
@@ -202,8 +202,8 @@ export default async function anyPage({ params }: { params: Promise<{ profileId:
         </div>
 
 
-        {/* RIGHT: details column (continuous natural scroll) */}
-        <div className="min-w-0 space-y-4 sm:space-y-5">
+        {/* RIGHT: the only scrollable column on desktop */}
+        <div className="min-w-0 space-y-4 sm:space-y-5 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pb-6 lg:pr-2 [scrollbar-gutter:stable]">
           <ProfileAboutSection
             profileId={profile.id}
             aboutText={profile.about}

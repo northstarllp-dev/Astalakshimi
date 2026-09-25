@@ -11,20 +11,17 @@ import {
   BadgeCheck,
   BriefcaseBusiness,
   Gift,
-  Heart,
   IndianRupee,
   Lock,
   ShieldCheck,
-  Smartphone,
   Star,
-  Users,
 } from "lucide-react"
 
 const stats = [
-  { value: "25+", label: "Years of trust" },
-  { value: "10L+", label: "Verified profiles" },
-  { value: "12 hrs", label: "Photo review SLA" },
-  { value: "100%", label: "Screened members" },
+  { value: "₹299", label: "Plans from" },
+  { value: "100%", label: "Screened profiles" },
+  { value: "12 hrs", label: "Photo review" },
+  { value: "Free", label: "To register" },
 ]
 
 const stories = [
@@ -177,16 +174,22 @@ export default function LandingPage() {
         </div>
       </section>
 
-
-
-      {/* ── Stats Bar ── */}
       <section className="relative border-y border-secondary/20 bg-card/90">
         <div className="gold-rule absolute inset-x-0 top-0" />
-        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-0 divide-x divide-secondary/15 px-4 py-10 md:grid-cols-4">
-          {stats.map((stat) => (
-            <div key={stat.label} className="flex flex-col items-center px-6 text-center">
+        <div className="mx-auto grid max-w-5xl grid-cols-2 md:grid-cols-4">
+          {stats.map((stat, index) => (
+            <div
+              key={stat.label}
+              className={`flex flex-col items-center px-4 py-7 text-center md:px-6 md:py-10 ${
+                index % 2 === 1 ? "border-l border-secondary/15" : ""
+              } ${index >= 2 ? "border-t border-secondary/15 md:border-t-0" : ""} ${
+                index > 0 ? "md:border-l md:border-secondary/15" : ""
+              }`}
+            >
               <p className="font-serif text-3xl font-bold text-primary md:text-4xl">{stat.value}</p>
-              <p className="mt-1.5 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">{stat.label}</p>
+              <p className="mt-1.5 text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                {stat.label}
+              </p>
             </div>
           ))}
         </div>
@@ -301,9 +304,8 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Cards  always one row; scroll on smaller screens */}
-          <div className="-mx-4 overflow-x-auto px-4 pb-3 hide-scrollbar lg:mx-0 lg:overflow-visible lg:px-0">
-          <div className="flex min-w-max flex-nowrap items-end gap-4 lg:min-w-0 lg:grid lg:grid-cols-5">
+          {/* Cards: stacked on phones, two columns on tablets, one row on desktop */}
+          <div className="grid min-w-0 grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
             {MEMBERSHIP_PLANS.map((plan) => {
               const isGold = plan.id === "gold"
               const isPlatinum = plan.id === "platinum"
@@ -313,7 +315,7 @@ export default function LandingPage() {
                 return (
                   <article
                     key={plan.id}
-                    className="relative flex w-[min(260px,82vw)] shrink-0 flex-col overflow-visible rounded-3xl lg:-mt-6 lg:mb-0 lg:w-auto animate-in"
+                    className="relative flex w-full min-w-0 flex-col overflow-visible rounded-3xl sm:col-span-2 lg:col-span-1 lg:-mt-6 lg:mb-0"
                     style={{
                       background: "linear-gradient(145deg, #1a0e08, #2a1008)",
                       boxShadow: "0 0 0 2px #b8901f, 0 0 40px rgba(184,144,31,0.35), 0 24px 60px rgba(0,0,0,0.6)",
@@ -383,7 +385,7 @@ export default function LandingPage() {
               return (
                 <article
                   key={plan.id}
-                  className="relative flex w-[min(240px,80vw)] shrink-0 flex-col overflow-hidden rounded-2xl lg:w-auto"
+                  className="relative flex w-full min-w-0 flex-col overflow-hidden rounded-2xl"
                   style={{
                     background: "rgba(255,255,255,0.04)",
                     backdropFilter: "blur(12px)",
@@ -402,7 +404,7 @@ export default function LandingPage() {
                       {plan.badge}
                     </div>
                   ) : (
-                    <div className="h-[38px]" />
+                    <div className="hidden h-[38px] lg:block" />
                   )}
 
                   <div className="flex flex-1 flex-col px-4 py-5">
@@ -435,7 +437,6 @@ export default function LandingPage() {
                 </article>
               )
             })}
-          </div>
           </div>
 
           <p className="mt-10 text-center text-xs text-white/30">
@@ -588,41 +589,6 @@ export default function LandingPage() {
             <Link href="/register" className="inline-block">
               <Button size="lg" className="px-8">Register free →</Button>
             </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── App Download ── */}
-      <section className="mx-auto max-w-6xl px-4 pb-20">
-        <div className="grid items-center gap-10 overflow-hidden rounded-3xl bg-gradient-to-br from-[#2e0a0c] via-[#4f0f1a] to-primary p-8 text-white md:grid-cols-2 md:p-12">
-          <div className="space-y-5">
-            <p className="text-xs font-semibold tracking-[0.22em] text-secondary uppercase">On the go</p>
-            <h2 className="font-serif text-3xl font-bold leading-tight">Download the Astalakshimi app</h2>
-            <p className="text-white/70 leading-relaxed">Daily matches, chat, and verification status  designed for mobile first.</p>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button variant="secondary" className="justify-center font-semibold">
-                <Smartphone className="mr-2 h-4 w-4" /> Get it on Google Play
-              </Button>
-              <Button variant="outline" className="border-white/25 bg-white/10 text-white hover:bg-white/20 font-semibold">
-                Download on App Store
-              </Button>
-            </div>
-          </div>
-          <div className="relative mx-auto h-64 w-40 rounded-[2rem] border-2 border-secondary/40 bg-white/10 p-2.5 shadow-2xl">
-            <div className="flex h-full flex-col rounded-2xl bg-[#fffdf8] p-3 text-[#1a0e08]">
-              <div className="mb-3 h-8 rounded-lg bg-primary/15" />
-              <div className="relative mb-2 h-28 overflow-hidden rounded-xl">
-                <Image src={IMAGES.stories.chennai} alt="" fill className="object-cover" sizes="140px" />
-              </div>
-              <div className="h-2.5 w-3/4 rounded-full bg-muted" />
-              <div className="mt-1.5 h-2.5 w-1/2 rounded-full bg-muted" />
-              <div className="mt-auto flex justify-center gap-1.5 text-primary">
-                <Heart className="h-4 w-4" />
-                <Users className="h-4 w-4" />
-              </div>
-            </div>
-            {/* Gold ring accent */}
-            <div className="absolute -inset-1 rounded-[2.25rem] border border-secondary/20 pointer-events-none" />
           </div>
         </div>
       </section>

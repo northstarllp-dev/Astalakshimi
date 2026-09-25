@@ -109,13 +109,27 @@ CREATE TABLE "subcastes" (
 	"name" varchar(100) NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "refresh_token_hash" varchar(64);--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "education_id" integer;--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "specialization_id" integer;--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "occupation_id" integer;--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "company_id" integer;--> statement-breakpoint
-ALTER TABLE "profile_photos" ADD COLUMN "blur_data_url" text;--> statement-breakpoint
-ALTER TABLE "payments" ADD COLUMN "target_profile_id" uuid;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "users" ADD COLUMN "refresh_token_hash" varchar(64);
+EXCEPTION WHEN duplicate_column THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "profiles" ADD COLUMN "education_id" integer;
+EXCEPTION WHEN duplicate_column THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "profiles" ADD COLUMN "specialization_id" integer;
+EXCEPTION WHEN duplicate_column THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "profiles" ADD COLUMN "occupation_id" integer;
+EXCEPTION WHEN duplicate_column THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "profiles" ADD COLUMN "company_id" integer;
+EXCEPTION WHEN duplicate_column THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "profile_photos" ADD COLUMN "blur_data_url" text;
+EXCEPTION WHEN duplicate_column THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "payments" ADD COLUMN "target_profile_id" uuid;
+EXCEPTION WHEN duplicate_column THEN null; END $$;--> statement-breakpoint
 ALTER TABLE "cities" ADD CONSTRAINT "cities_state_id_states_id_fk" FOREIGN KEY ("state_id") REFERENCES "public"."states"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "city_aliases" ADD CONSTRAINT "city_aliases_city_id_cities_id_fk" FOREIGN KEY ("city_id") REFERENCES "public"."cities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "education_aliases" ADD CONSTRAINT "education_aliases_education_id_education_levels_id_fk" FOREIGN KEY ("education_id") REFERENCES "public"."education_levels"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
