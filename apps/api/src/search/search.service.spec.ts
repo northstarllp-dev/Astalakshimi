@@ -118,5 +118,44 @@ describe('SearchService', () => {
 
       await expect(service.searchProfiles('user1', filters)).rejects.toThrow('Advanced filters require a paid plan');
     });
+
+    it('applies advanced filters successfully if entitled', async () => {
+      (loadViewerContext as jest.Mock).mockResolvedValue({
+        profileId: 'profile1',
+        gender: 'Male',
+      });
+      (targetGenders as jest.Mock).mockReturnValue(['Female']);
+      
+      entitlementsServiceMock.checkEntitlement.mockResolvedValue(true);
+
+      dbMock.where.mockReturnValue(dbMock);
+      dbMock.offset.mockReturnValue(dbMock);
+      dbMock.then = jest.fn()
+        .mockImplementationOnce((res) => res([{ id: 'match1', userId: 'u1' }]))
+        .mockImplementationOnce((res) => res([{ count: 1 }]))
+        .mockImplementationOnce((res) => res([]))
+        .mockImplementationOnce((res) => res([]))
+        .mockImplementationOnce((res) => res([]))
+        .mockImplementationOnce((res) => res([]));
+
+      const filters = {
+        advanced: { 
+          heights: ['165-173'],
+          educations: ['MBA'],
+          diets: ['Vegetarian'],
+          smoking: ['No'],
+          drinking: ['No'],
+          manglik: ['No'],
+          stars: ['Ashwini'],
+          relocate: 'yes'
+        },
+      };
+
+      const result = await service.searchProfiles('user1', filters);
+      
+      expect(result.totalCount).toBe(1);
+      expect(result.profiles[0].id).toBe('match1');
+      expect(entitlementsServiceMock.checkEntitlement).toHaveBeenCalledWith('user1', 'advanced_filters');
+    });
   });
 });

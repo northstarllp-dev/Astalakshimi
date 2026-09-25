@@ -78,6 +78,22 @@ describe("toSearchApiParams", () => {
     expect(toSearchApiParams({ ...DEFAULT_DISCOVER, tab: "nearby" }).tab).toBe("nearby")
     expect(toSearchApiParams({ ...DEFAULT_DISCOVER, tab: "new" }).tab).toBe("new")
   })
+
+  it("includes advanced filters when provided", () => {
+    const params = toSearchApiParams({
+      ...DEFAULT_DISCOVER,
+      advanced: {
+        ...EMPTY_ADVANCED,
+        heights: ["165-173"],
+        diets: ["Vegetarian"],
+      },
+    })
+    expect(params.advanced).toEqual({
+      ...EMPTY_ADVANCED,
+      heights: ["165-173"],
+      diets: ["Vegetarian"],
+    })
+  })
 })
 
 describe("discover sub-tabs", () => {

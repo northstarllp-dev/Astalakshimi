@@ -5,6 +5,7 @@ import { messages, profiles, profilePhotos, interests } from '@astalakshimi/data
 import { eq, or, and, desc, asc, inArray, sql } from 'drizzle-orm';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ContactGuardService } from './guard/contact-guard.service';
+import { getRecentSenderMessageTexts } from './guard/recent-messages.helper';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { BlocksService } from '../blocks/blocks.service';
 import { getApprovedPrimaryPhotos } from '../common/photo-access';
@@ -226,8 +227,13 @@ export class ChatService {
       throw new BadRequestException('Cannot send message. You or the other user have blocked each other.');
     }
 
-    // Pass through Contact Guard
-    const guardResult = await this.contactGuard.checkMessage(dto.text);
+    // Pass through Contact Guard (includes cross-message digit assembly)
+    const recentSenderMessages = await getRecentSenderMessageTexts(
+      this.db,
+      senderProfile.id,
+      targetProfile.id,
+    );
+    const guardResult = await this.contactGuard.checkMessage(dto.text, { recentSenderMessages });
     if (guardResult.status === 'BLOCKED') {
       return guardResult; // return structured response so frontend can show paywall
     }

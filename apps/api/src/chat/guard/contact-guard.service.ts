@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { normalizeText } from './normalizer.util';
-import { CONTACT_DATA_RULES, CONTACT_SOLICITATION_RULES } from './rules.constant';
+import { scoreMessage, type ModerationResult } from './rules.constant';
+import { assembleDigitFragments, containsAssembledPhone } from './digit-fragment.util';
 
 export interface GuardResult {
   status: 'ALLOW' | 'BLOCKED';
@@ -8,36 +8,51 @@ export interface GuardResult {
   action?: 'CONTACT_UNLOCK_REQUIRED';
 }
 
+export interface ContactGuardContext {
+  /** Prior outbound texts from the same sender in this thread (oldest first). */
+  recentSenderMessages?: string[];
+}
+
+const CONTACT_DATA_CATEGORIES = new Set([
+  'phone',
+  'email',
+  'upi',
+  'socialUrl',
+  'socialHandle',
+  'address',
+  'pinCodeOnly',
+]);
+
 @Injectable()
 export class ContactGuardService {
-  public async checkMessage(message: string): Promise<GuardResult> {
-    const normalizedText = normalizeText(message);
-
-    // Layer 1 Check - Solicitation
-    for (const rule of CONTACT_SOLICITATION_RULES) {
-      if (rule.test(normalizedText) || rule.test(message)) {
-        return {
-          status: 'BLOCKED',
-          reason: 'CONTACT_SOLICITATION',
-          action: 'CONTACT_UNLOCK_REQUIRED',
-        };
-      }
+  public async checkMessage(message: string, context?: ContactGuardContext): Promise<GuardResult> {
+    const result = scoreMessage(message ?? '');
+    if (result.severity === 'block') {
+      return this.toBlocked(result);
     }
 
-    // Layer 1 Check - Data
-    for (const rule of CONTACT_DATA_RULES) {
-      if (rule.test(normalizedText) || rule.test(message)) {
-        return {
-          status: 'BLOCKED',
-          reason: 'CONTACT_INFORMATION',
-          action: 'CONTACT_UNLOCK_REQUIRED',
-        };
-      }
+    const recent = context?.recentSenderMessages ?? [];
+    const digitStream = assembleDigitFragments([...recent, message ?? '']);
+    if (containsAssembledPhone(digitStream)) {
+      return {
+        status: 'BLOCKED',
+        reason: 'CONTACT_INFORMATION',
+        action: 'CONTACT_UNLOCK_REQUIRED',
+      };
     }
-
-    // Layer 3 (Contextual/ML) scaffolding - to be implemented with AWS Bedrock if needed later
-    // For MVP, relying on Layers 1 and 2.
 
     return { status: 'ALLOW' };
+  }
+
+  private toBlocked(result: ModerationResult): GuardResult {
+    const sharesContactData = result.matchedCategories.some((category) =>
+      CONTACT_DATA_CATEGORIES.has(category),
+    );
+
+    return {
+      status: 'BLOCKED',
+      reason: sharesContactData ? 'CONTACT_INFORMATION' : 'CONTACT_SOLICITATION',
+      action: 'CONTACT_UNLOCK_REQUIRED',
+    };
   }
 }

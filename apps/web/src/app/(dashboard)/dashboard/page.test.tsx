@@ -38,6 +38,7 @@ vi.mock('@/hooks/queries', async (importOriginal) => {
     useAddSavedSearchMutation: () => ({ mutate: vi.fn() }),
     useToggleShortlistMutation: () => ({ mutate: vi.fn() }),
     usePaidQuery: () => ({ data: false }),
+    useSubscriptionQuery: () => ({ data: null }),
     useSavedSearchesQuery: () => ({ data: [] }),
     useSearchQuery: () => ({ data: { profiles: [], totalCount: 0 }, isLoading: false }),
     useUnlockedContactsQuery: () => ({ data: [] }),

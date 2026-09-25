@@ -107,7 +107,9 @@ export default function MyProfilePage() {
     { id: "career", label: "Career & Education" },
     { id: "community", label: "Community & Location" },
     { id: "family", label: "Family" },
-    { id: "preferences", label: "Horoscope & Prefs" },
+    { id: "horoscope", label: "Horoscope" },
+    { id: "photos", label: "Photos" },
+    { id: "preferences", label: "Preferences" },
   ]
 
   if (isPending) {
@@ -163,7 +165,7 @@ export default function MyProfilePage() {
                     {data.horoscopeName ? (
                       <button
                         type="button"
-                        onClick={() => setActiveTab("preferences")}
+                        onClick={() => setActiveTab("horoscope")}
                         className="text-muted-foreground underline-offset-2 hover:text-primary hover:underline"
                       >
                         Horoscope
@@ -415,7 +417,7 @@ export default function MyProfilePage() {
               </div>
             )}
 
-            {activeTab === "preferences" && (
+            {activeTab === "horoscope" && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div>
                   <h3 className="mb-4 font-serif text-lg font-bold">Horoscope</h3>
@@ -428,7 +430,47 @@ export default function MyProfilePage() {
                     <GridItem label="Horoscope file" value={data.horoscopeName} />
                   </dl>
                 </div>
+              </div>
+            )}
 
+            {activeTab === "photos" && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <h3 className="mb-4 font-serif text-lg font-bold">Photos</h3>
+                {data.photoS3Keys && data.photoS3Keys.filter(Boolean).length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {data.photoS3Keys.filter(Boolean).map((key, i) => (
+                      <div
+                        key={key}
+                        className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-muted"
+                      >
+                        <Image
+                          src={getMediaUrl(key)}
+                          alt={`Photo ${i + 1}`}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 50vw, 33vw"
+                        />
+                        {i === 0 && (
+                          <span className="absolute bottom-2 left-2 rounded-full bg-primary/90 px-2 py-0.5 text-[10px] font-semibold text-white">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/20 py-12 text-center">
+                    <p className="text-sm font-medium text-muted-foreground">No photos uploaded yet</p>
+                    <Link href="/profile/edit#photos">
+                      <Button size="sm" variant="outline" className="rounded-full">Upload photos</Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "preferences" && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div>
                   <h3 className="mb-4 font-serif text-lg font-bold">Partner Preferences</h3>
                   <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">

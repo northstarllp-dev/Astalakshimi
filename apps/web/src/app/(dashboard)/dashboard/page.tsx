@@ -20,13 +20,14 @@ import {
   useSkipMatchMutation,
   useSkippedQuery,
   useSearchQuery,
+  useSubscriptionQuery,
   useTopMatchesPaginatedQuery,
   useActivitySummaryQuery,
   queryKeys,
 } from "@/hooks/queries"
 import { discoverQuickSchema } from "@/lib/validation"
 import { apiClient } from "@/lib/api-client"
-import { VERIFICATION_SLA_HOURS, INCOME_BANDS, DIETS, STARS } from "@/lib/profile-store"
+import { VERIFICATION_SLA_HOURS, INCOME_BANDS, DIETS, STARS, EDUCATION_LEVELS, MARITAL_STATUSES, EMPLOYMENT_STATUSES, FAMILY_TYPES, FAMILY_VALUES, FAMILY_STATUS, MOTHER_TONGUES, COMPLEXIONS, RASHIS } from "@/lib/profile-store"
 import {
   BROWSE_TABS,
   DEFAULT_DISCOVER,
@@ -86,7 +87,6 @@ const HEIGHT_BANDS = [
   { label: "Average (165 - 173 cm)", value: "165-173" },
   { label: "Tall (174 cm & above)", value: "174-300" }
 ]
-const EDUCATION_GROUPS = ["B.Tech", "B.E", "MBA", "M.Sc", "Ph.D", "M.Phil", "Post Doctorate", "Others"]
 const MATCHES_PAGE_SIZE = 10
 
 function FilterSection({
@@ -431,6 +431,8 @@ function SearchFilterPanel({
 }) {
   const queryClient = useQueryClient()
   const { data: paid = false } = usePaidQuery()
+  const { data: subscription } = useSubscriptionQuery()
+  const hasAdvancedFilters = subscription?.plan?.hasAdvancedFilters ?? false
   const { data: saved = [] } = useSavedSearchesQuery()
   const saveSearchMutation = useAddSavedSearchMutation()
 
@@ -458,6 +460,14 @@ function SearchFilterPanel({
     if (query.advanced.manglik.length > 0) count++
     if (query.advanced.stars.length > 0) count++
     if (query.advanced.relocate) count++
+    if (query.advanced.maritalStatuses.length > 0) count++
+    if (query.advanced.employmentStatuses.length > 0) count++
+    if (query.advanced.familyTypes.length > 0) count++
+    if (query.advanced.familyValues.length > 0) count++
+    if (query.advanced.familyStatus.length > 0) count++
+    if (query.advanced.motherTongues.length > 0) count++
+    if (query.advanced.complexions.length > 0) count++
+    if (query.advanced.rashis.length > 0) count++
     return count
   }, [query])
 
@@ -502,6 +512,16 @@ function SearchFilterPanel({
     setPaywall(feature)
   }
 
+  const requireAdvancedFilters = (feature: string, action: () => void) => {
+    if (hasAdvancedFilters) {
+      setPaywall(null)
+      action()
+      return
+    }
+    setPaywall(feature)
+  }
+
+
   const applyPreferences = async () => {
     // Stored partner prefs → free Discover filters only (age / city / community).
     // Paid advanced filters are never auto-filled from prefs.
@@ -539,6 +559,8 @@ function SearchFilterPanel({
   const incomes = INCOME_BANDS
   const diets = DIETS
   const stars = STARS
+  const motherTongueOptions = MOTHER_TONGUES
+  const rashiOptions = RASHIS.map((r) => r.label)
 
   return (
     <>
@@ -659,7 +681,7 @@ function SearchFilterPanel({
               </button>
             </span>
           )}
-          {(["heights", "educations", "incomes", "occupations", "diets", "smoking", "drinking", "manglik", "stars"] as const).flatMap(key => 
+          {(["heights", "educations", "incomes", "occupations", "diets", "smoking", "drinking", "manglik", "stars", "maritalStatuses", "employmentStatuses", "familyTypes", "familyValues", "familyStatus", "motherTongues", "complexions", "rashis"] as const).flatMap(key => 
             query.advanced[key].map(val => {
               const prefix = ["smoking", "drinking", "manglik"].includes(key)
                 ? `${key.charAt(0).toUpperCase() + key.slice(1)}: `
@@ -706,16 +728,26 @@ function SearchFilterPanel({
       ) : null}
 
       {paywall && (
-        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-secondary/40 bg-[#fff8ef] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-semibold text-foreground">{paywall} is a Premium feature</p>
-            <p className="text-sm text-muted-foreground">Upgrade to unlock 20+ filters, saved searches, and high-intent tabs.</p>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={() => setPaywall(null)}>
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-secondary/20 mb-4">
+              <Crown className="h-7 w-7 text-secondary-foreground" />
+            </div>
+            <h2 className="font-serif text-2xl font-bold">{paywall} is locked</h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Advanced filters and saved searches are locked for Free and Silver plans. Upgrade to <strong className="text-foreground">Gold</strong> or higher to unlock 20+ advanced filters and find your perfect match faster.
+            </p>
+            <div className="mt-6 flex flex-col gap-2">
+              <Link href="/plans" onClick={() => setPaywall(null)}>
+                <Button className="w-full h-11 text-base rounded-xl bg-gradient-to-r from-[#d4af37] to-[#aa8022] hover:from-[#aa8022] hover:to-[#8a681c] text-white border-0">
+                  <Crown className="mr-2 h-4 w-4" /> View upgrade plans
+                </Button>
+              </Link>
+              <Button variant="ghost" className="rounded-xl" onClick={() => setPaywall(null)}>
+                Maybe later
+              </Button>
+            </div>
           </div>
-          <Link href="/plans">
-            <Button size="sm">
-              <Crown className="mr-1.5 h-3.5 w-3.5" /> See plans
-            </Button>
-          </Link>
         </div>
       )}
 
@@ -953,12 +985,12 @@ function SearchFilterPanel({
                   variant="outline"
                   size="sm"
                   className="rounded-full text-xs"
-                  onClick={() => requirePaid("Advanced filters", () => {
+                  onClick={() => requireAdvancedFilters("Advanced filters", () => {
                     setFilterOpen(false)
                     setMoreOpen(true)
                   })}
                 >
-                  {paid ? <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" /> : <Lock className="mr-1.5 h-3.5 w-3.5" />}
+                  {hasAdvancedFilters ? <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" /> : <Lock className="mr-1.5 h-3.5 w-3.5" />}
                   Advanced filters (Height, Education, etc.)
                 </Button>
 
@@ -1027,7 +1059,7 @@ function SearchFilterPanel({
               ))}
             </FilterSection>
             <FilterSection title="Education">
-              {EDUCATION_GROUPS.map((e) => (
+              {[...EDUCATION_LEVELS].map((e) => (
                 <CheckItem
                   key={e}
                   label={e}
@@ -1103,6 +1135,86 @@ function SearchFilterPanel({
                   label={s}
                   checked={query.advanced.stars.includes(s)}
                   onChange={() => setAdvanced({ stars: toggle(query.advanced.stars, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Marital status">
+              {MARITAL_STATUSES.map((s) => (
+                <CheckItem
+                  key={s}
+                  label={s}
+                  checked={query.advanced.maritalStatuses.includes(s)}
+                  onChange={() => setAdvanced({ maritalStatuses: toggle(query.advanced.maritalStatuses, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Employment status">
+              {EMPLOYMENT_STATUSES.map((s) => (
+                <CheckItem
+                  key={s}
+                  label={s}
+                  checked={query.advanced.employmentStatuses.includes(s)}
+                  onChange={() => setAdvanced({ employmentStatuses: toggle(query.advanced.employmentStatuses, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Family type">
+              {FAMILY_TYPES.map((s) => (
+                <CheckItem
+                  key={s}
+                  label={s}
+                  checked={query.advanced.familyTypes.includes(s)}
+                  onChange={() => setAdvanced({ familyTypes: toggle(query.advanced.familyTypes, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Family values">
+              {FAMILY_VALUES.map((s) => (
+                <CheckItem
+                  key={s}
+                  label={s}
+                  checked={query.advanced.familyValues.includes(s)}
+                  onChange={() => setAdvanced({ familyValues: toggle(query.advanced.familyValues, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Family status">
+              {FAMILY_STATUS.map((s) => (
+                <CheckItem
+                  key={s}
+                  label={s}
+                  checked={query.advanced.familyStatus.includes(s)}
+                  onChange={() => setAdvanced({ familyStatus: toggle(query.advanced.familyStatus, s) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Mother tongue">
+              {motherTongueOptions.map((lang) => (
+                <CheckItem
+                  key={lang}
+                  label={lang}
+                  checked={query.advanced.motherTongues.includes(lang)}
+                  onChange={() => setAdvanced({ motherTongues: toggle(query.advanced.motherTongues, lang) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Complexion">
+              {COMPLEXIONS.map((c) => (
+                <CheckItem
+                  key={c}
+                  label={c}
+                  checked={query.advanced.complexions.includes(c)}
+                  onChange={() => setAdvanced({ complexions: toggle(query.advanced.complexions, c) })}
+                />
+              ))}
+            </FilterSection>
+            <FilterSection title="Rashi (Zodiac)">
+              {rashiOptions.map((r) => (
+                <CheckItem
+                  key={r}
+                  label={r}
+                  checked={query.advanced.rashis.includes(r)}
+                  onChange={() => setAdvanced({ rashis: toggle(query.advanced.rashis, r) })}
                 />
               ))}
             </FilterSection>

@@ -13,6 +13,7 @@ import {
   useShortlistQuery,
   useSavedSearchesQuery,
   usePaidQuery,
+  useSubscriptionQuery,
 } from '@/hooks/queries'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
@@ -47,6 +48,7 @@ vi.mock('@/hooks/queries', async (importOriginal) => {
     useShortlistQuery: vi.fn(),
     useSavedSearchesQuery: vi.fn(),
     usePaidQuery: vi.fn(),
+    useSubscriptionQuery: vi.fn(),
     useContactUsageQuery: () => ({ data: null }),
     useUnlockedContactsQuery: () => ({ data: [] }),
     useSkipMatchMutation: () => ({ mutate: vi.fn() }),
@@ -94,6 +96,7 @@ describe('DashboardPage - Browse Section (SearchFilterPanel)', () => {
     ;(useActivitySummaryQuery as any).mockReturnValue({ data: { viewers: [] } })
     ;(useSavedSearchesQuery as any).mockReturnValue({ data: [] })
     ;(usePaidQuery as any).mockReturnValue({ data: false })
+    ;(useSubscriptionQuery as any).mockReturnValue({ data: null })
   })
 
   it('renders Browse section and displays profiles', async () => {

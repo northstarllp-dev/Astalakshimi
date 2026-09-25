@@ -17,6 +17,14 @@ export type AdvancedFilters = {
   manglik: string[]
   stars: string[]
   relocate: "" | "yes" | "no"
+  maritalStatuses: string[]
+  employmentStatuses: string[]
+  familyTypes: string[]
+  familyValues: string[]
+  familyStatus: string[]
+  motherTongues: string[]
+  complexions: string[]
+  rashis: string[]
 }
 
 export type DiscoverQuery = {
@@ -41,6 +49,14 @@ export const EMPTY_ADVANCED: AdvancedFilters = {
   manglik: [],
   stars: [],
   relocate: "",
+  maritalStatuses: [],
+  employmentStatuses: [],
+  familyTypes: [],
+  familyValues: [],
+  familyStatus: [],
+  motherTongues: [],
+  complexions: [],
+  rashis: [],
 }
 
 /** Slider defaults when the age filter is inactive (not applied to search). */

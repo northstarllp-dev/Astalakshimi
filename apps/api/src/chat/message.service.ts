@@ -1,5 +1,6 @@
 import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
 import { ContactGuardService } from './guard/contact-guard.service';
+import { getRecentSenderMessageTexts } from './guard/recent-messages.helper';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { messages, interests } from '@astalakshimi/database';
@@ -61,8 +62,13 @@ export class MessageService {
       throw new ForbiddenException('Cannot send message. You or the other user have blocked each other.');
     }
 
-    // 2. Pass through Contact Guard
-    const guardResult = await this.contactGuard.checkMessage(text);
+    // 2. Pass through Contact Guard (includes cross-message digit assembly)
+    const recentSenderMessages = await getRecentSenderMessageTexts(
+      this.db,
+      senderProfileId,
+      receiverProfileId,
+    );
+    const guardResult = await this.contactGuard.checkMessage(text, { recentSenderMessages });
     
     if (guardResult.status === 'BLOCKED') {
       return guardResult;

@@ -1,7 +1,7 @@
 import { Injectable, Inject, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
-import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans, verifications, lifestyleInterests, horoscopes } from '@astalakshimi/database';
+import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans, verifications, lifestyleInterests, horoscopes, familyDetails } from '@astalakshimi/database';
 import { eq, and, ne, inArray, gte, lte, or, desc, sql, gt, lt, between } from 'drizzle-orm';
 import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
 import { dobBoundsForAgeWindow, loadViewerContext, visibilitySql } from '../matches/viewer-context';
@@ -205,6 +205,81 @@ export class SearchService {
 
       if (adv.relocate) {
         conditions.push(eq(profiles.willingToRelocate, adv.relocate === 'yes' ? 'Yes' : 'No'));
+      }
+
+      // --- New filters added to match registration form fields ---
+
+      if (adv.maritalStatuses && adv.maritalStatuses.length > 0) {
+        conditions.push(inArray(profiles.maritalStatus, adv.maritalStatuses));
+      }
+
+      if (adv.employmentStatuses && adv.employmentStatuses.length > 0) {
+        conditions.push(inArray(profiles.employmentStatus, adv.employmentStatuses));
+      }
+
+      if (adv.complexions && adv.complexions.length > 0) {
+        conditions.push(inArray(profiles.complexion, adv.complexions));
+      }
+
+      if (adv.motherTongues && adv.motherTongues.length > 0) {
+        conditions.push(inArray(profiles.motherTongue, adv.motherTongues));
+      }
+
+      if (adv.rashis && adv.rashis.length > 0) {
+        // rashis are stored as label strings like "Aries (Mesha)" on the frontend
+        // but the DB stores the value (e.g. "Mesha"). Map label -> value.
+        const RASHI_LABEL_TO_VALUE: Record<string, string> = {
+          'Aries (Mesha)': 'Mesha',
+          'Taurus (Vrishabha)': 'Vrishabha',
+          'Gemini (Mithuna)': 'Mithuna',
+          'Cancer (Karka)': 'Karka',
+          'Leo (Simha)': 'Simha',
+          'Virgo (Kanya)': 'Kanya',
+          'Libra (Tula)': 'Tula',
+          'Scorpio (Vrishchika)': 'Vrishchika',
+          'Sagittarius (Dhanu)': 'Dhanu',
+          'Capricorn (Makara)': 'Makara',
+          'Aquarius (Kumbha)': 'Kumbha',
+          'Pisces (Meena)': 'Meena',
+        };
+        const rashiValues = adv.rashis
+          .map((r: string) => RASHI_LABEL_TO_VALUE[r] ?? r)
+          .filter(Boolean);
+        if (rashiValues.length > 0) {
+          conditions.push(
+            inArray(
+              profiles.id,
+              this.db.select({ id: horoscopes.profileId }).from(horoscopes).where(inArray(horoscopes.rashi, rashiValues)),
+            ),
+          );
+        }
+      }
+
+      if (adv.familyTypes && adv.familyTypes.length > 0) {
+        conditions.push(
+          inArray(
+            profiles.id,
+            this.db.select({ id: familyDetails.profileId }).from(familyDetails).where(inArray(familyDetails.familyType, adv.familyTypes)),
+          ),
+        );
+      }
+
+      if (adv.familyValues && adv.familyValues.length > 0) {
+        conditions.push(
+          inArray(
+            profiles.id,
+            this.db.select({ id: familyDetails.profileId }).from(familyDetails).where(inArray(familyDetails.familyValues, adv.familyValues)),
+          ),
+        );
+      }
+
+      if (adv.familyStatus && adv.familyStatus.length > 0) {
+        conditions.push(
+          inArray(
+            profiles.id,
+            this.db.select({ id: familyDetails.profileId }).from(familyDetails).where(inArray(familyDetails.familyStatus, adv.familyStatus)),
+          ),
+        );
       }
     }
 
