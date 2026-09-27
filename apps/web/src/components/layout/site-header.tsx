@@ -59,9 +59,6 @@ export function SiteHeader({ variant = "marketing" }: { variant?: "marketing" | 
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Link href="#success" className="hover:text-primary transition-colors">
-              Success stories
-            </Link>
             <Link href="#how" className="hover:text-primary transition-colors">
               How it works
             </Link>
@@ -102,9 +99,6 @@ export function SiteHeader({ variant = "marketing" }: { variant?: "marketing" | 
         <nav className="flex flex-col gap-1 text-base font-medium">
           <Link href="/register" className="rounded-xl px-4 py-3 hover:bg-muted hover:text-primary transition-colors">
             Browse by community
-          </Link>
-          <Link href="#success" className="rounded-xl px-4 py-3 hover:bg-muted hover:text-primary transition-colors">
-            Success stories
           </Link>
           <Link href="#how" className="rounded-xl px-4 py-3 hover:bg-muted hover:text-primary transition-colors">
             How it works

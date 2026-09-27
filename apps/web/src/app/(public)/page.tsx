@@ -14,7 +14,6 @@ import {
   IndianRupee,
   Lock,
   ShieldCheck,
-  Star,
 } from "lucide-react"
 
 const stats = [
@@ -22,27 +21,6 @@ const stats = [
   { value: "100%", label: "Screened profiles" },
   { value: "12 hrs", label: "Photo review" },
   { value: "Free", label: "To register" },
-]
-
-const stories = [
-  {
-    names: "Ananya & Karthik",
-    place: "Chennai",
-    quote: "We matched on community and values. The verified photos made our families comfortable from day one.",
-    image: IMAGES.stories.chennai,
-  },
-  {
-    names: "Meera & Arjun",
-    place: "Bengaluru",
-    quote: "Daily recommendations felt personal  not noisy. We met within three weeks.",
-    image: IMAGES.stories.bengaluru,
-  },
-  {
-    names: "Divya & Rohan",
-    place: "Hyderabad",
-    quote: "Privacy controls and ID verification were the reason our parents trusted Astalakshimi.",
-    image: IMAGES.stories.hyderabad,
-  },
 ]
 
 const communities = [
@@ -487,62 +465,22 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Success Stories ── */}
-      <section id="success" className="w-full overflow-hidden py-16 md:py-20">
-        <div className="mx-auto max-w-6xl px-4">
-          <div className="text-center mb-10 md:mb-12">
-            <p className="royal-label mb-2">Success stories</p>
-            <h2 className="font-serif text-2xl font-bold leading-tight md:text-4xl lg:text-5xl">
-              Happily married through Astalakshimi
-            </h2>
-            <div className="ornament-line mx-auto mt-4 w-48 md:mt-5 md:max-w-xs">
-              <span className="text-secondary text-sm px-2">✦</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Cards  bleed to edges on mobile, contained on desktop */}
-        <div className="flex gap-4 overflow-x-auto px-4 pb-6 pt-2 snap-x snap-mandatory hide-scrollbar md:mx-auto md:max-w-6xl md:grid md:grid-cols-3 md:gap-5 md:overflow-visible md:p-0 md:px-4">
-          {stories.map((story) => (
-            <article
-              key={story.names}
-              className="shrink-0 w-[78vw] max-w-[300px] snap-start overflow-hidden rounded-2xl border border-secondary/20 bg-card shadow-sm md:w-auto md:max-w-none royal-card"
-            >
-              <div className="relative h-52 md:h-60">
-                <Image src={story.image} alt={story.names} fill className="object-cover object-top" sizes="(max-width: 768px) 300px, 33vw" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-              </div>
-              <div className="space-y-2 p-5 md:p-6">
-                <div className="flex items-center gap-1 text-secondary">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className="h-3 w-3 fill-current md:h-3.5 md:w-3.5" />
-                  ))}
-                </div>
-                <h3 className="font-serif text-base font-bold md:text-lg">{story.names}</h3>
-                <p className="text-xs text-muted-foreground">{story.place}</p>
-                <p className="font-serif text-xs leading-relaxed text-foreground/75 italic md:text-sm">&ldquo;{story.quote}&rdquo;</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
       {/* ── How It Works ── */}
       <section id="how" className="border-y border-secondary/15 bg-card/60 py-20">
         <div className="mx-auto max-w-5xl px-4">
           <div className="text-center mb-12">
-            <p className="royal-label mb-2">Simple process</p>
-            <h2 className="font-serif text-4xl font-bold md:text-5xl">How it works</h2>
+            <p className="royal-label mb-2">A trusted start</p>
+            <h2 className="font-serif text-4xl font-bold md:text-5xl">How families begin</h2>
             <div className="ornament-line mx-auto mt-5 max-w-xs">
               <span className="text-secondary text-sm px-2">✦</span>
             </div>
           </div>
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { n: "01", title: "Create profile", body: "Share community, education and partner preferences in a few minutes." },
-              { n: "02", title: "Verify photos", body: "Selfie or government ID. Our team reviews within 12 hours." },
-              { n: "03", title: "See daily matches", body: "Browse recommendations tailored to your filters  on phone first." },
-              { n: "04", title: "Connect with families", body: "Send interests, chat when both accept, and take the next step." },
+              { n: "01", title: "Register a biodata", body: "Add community, education, profession and partner preferences. You or your family can do this in a few minutes." },
+              { n: "02", title: "Get photos verified", body: "Upload a clear photo, then confirm it with a selfie or ID. Our team reviews every profile within 12 hours." },
+              { n: "03", title: "Browse daily matches", body: "See profiles that fit your community, city and preferences. Refine the search whenever you wish." },
+              { n: "04", title: "Express interest", body: "Send interest to a profile you like. When both sides accept, you can talk and involve families." },
             ].map((step, i) => (
               <div key={step.n} className="relative text-center sm:text-left">
                 {/* Connector line */}

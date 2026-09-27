@@ -33,6 +33,8 @@
 // 1. NORMALIZATION
 // ---------------------------------------------------------------------------
 
+import { convertNumberWords } from './number-words.util';
+
 const ZERO_WIDTH_RE = /[\u200B-\u200F\uFEFF\u2060\u00AD]/g;
 
 // Digit-lookalike letters commonly substituted to dodge digit regexes.
@@ -105,21 +107,31 @@ export function normalizeForModeration(raw: string): string {
 
   text = text.toLowerCase();
 
-  // Expand "double X" / "triple X" (e.g. "double nine" -> "99", "triple 8" -> "888")
-  text = text.replace(/\b(double|triple)\s+([a-z0-9]+)\b/gi, (_m, mult, val) => {
+  // Convert numbers typed in words (English tens/teens, Hindi, regional,
+  // native scripts, misspellings, letter-spaced, concatenated) into digits.
+  // Replaces the old single-word pass below.
+  text = convertNumberWords(text);
+
+  // Expand "double X" / "triple X" / "quadruple X"
+  text = text.replace(/\b(double|triple|quadruple)\s+([a-z0-9]+)\b/gi, (_m, mult, val) => {
     const digit = ALL_WORD_DIGITS[val] ?? (/^\d$/.test(val) ? val : null);
     if (!digit) return _m;
-    const count = mult.toLowerCase() === 'double' ? 2 : 3;
+    const count = mult.toLowerCase() === 'double' ? 2 : mult.toLowerCase() === 'triple' ? 3 : 4;
     return digit.repeat(count);
   });
 
-  // Replace spelled-out digit words (English + regional transliterations)
+  // Replace spelled-out single-digit words (legacy safety net; convertNumberWords
+  // already handled most, this catches anything missed).
   text = text.replace(/\b[a-z]+\b/gi, (word) => ALL_WORD_DIGITS[word.toLowerCase()] ?? word);
 
   // Collapse separators BETWEEN digits: "98 76-54.32 10" -> "9876543210"
-  // Repeat pass since overlapping separators can remain after one pass.
+  // Also collapse commas, semicolons, colons, pipes, asterisks, hashes, tildes,
+  // parentheses, plus signs, and the fillers "and"/"then"/"next" between digits.
+  // "/" is left out so dates keep their shape.
+  const FILLER_RE = /\s+(?:and|then|next)\s+/gi;
   for (let i = 0; i < 3; i++) {
-    text = text.replace(/(\d)[\s.\-_]+(?=\d)/g, '$1');
+    text = text.replace(/(\d)[\s.,;:|*#~()\-_]+(?=\d)/g, '$1');
+    text = text.replace(/(\d)\s+(?:and|then|next)\s+(?=\d)/gi, '$1');
   }
 
   // Normalize obvious letter/digit substitutions ONLY within tokens that are
@@ -144,14 +156,28 @@ export function normalizeForModeration(raw: string): string {
 // ---------------------------------------------------------------------------
 
 export const PHONE_PATTERNS = [
-  /(?:\+|0{0,2})91[\s\-]*\d{10}\b/g,
-  /\b[6-9]\d{9}\b/g, // Indian mobile numbers start 6-9, exactly 10 digits — far fewer false positives than \d{8,15}
-  /\b\d{5}[\s\-]?\d{5}\b/g, // common "12345 67890" spacing pattern pre-collapse fallback
+  // Indian mobile: optional +91 / 0, then 6-9 + 9 digits, not surrounded by other digits.
+  /(?<!\d)(?:\+?91|0)?[6-9]\d{9}(?!\d)/g,
+  // Landlines / international: any 8+ digit run not surrounded by digits.
+  // Catches "044 2345 6789", "+1 415 555 0134", "09876543210", "call9876543210".
+  /(?<!\d)\d{8,}(?!\d)/g,
+  // Common "12345 67890" spacing pattern (kept as a fallback for pre-collapse).
+  /\b\d{5}[\s\-]?\d{5}\b/g,
 ];
 
 export const EMAIL_PATTERNS = [
-  /[a-z0-9._%+-]+\s*(?:@|\bat\b)\s*[a-z0-9.-]+\s*(?:\.|\bdot\b)\s*[a-z]{2,}/gi,
+  // Accept @, at, "at the rate", attherate, (at), [at], {at} as the "@".
+  // Accept ., dot, (dot), [dot] as the ".".
+  /[a-z0-9._%+-]+\s*(?:@|\bat\b|\bat\s+the\s+rate\b|\battherate\b|\(at\)|\[at\]|\{at\})\s*[a-z0-9.-]+\s*(?:\.|\bdot\b|\(dot\)|\[dot\])\s*[a-z]{2,}/gi,
 ];
+
+// Bare email provider names ("priya sharma gmail", "send to my yahoo").
+export const EMAIL_PROVIDER_PATTERN =
+  /\b(?:gmail|googlemail|yahoo|ymail|outlook|hotmail|live\.com|rediff|rediffmail|icloud|proton|zoho|aol|msn)\b/gi;
+
+// Bare domain ("priya.in", "xyz dot com", "priya dot in").
+export const DOMAIN_PATTERN =
+  /\b[a-z0-9][a-z0-9._-]*\s*(?:\.|\bdot\b)\s*(?:com|in|net|org|co\.in|co|io|me|info|biz|edu|gov)\b/gi;
 
 // UPI handles: name@psp-handle. Checked against known PSP suffixes to avoid
 // treating this as a duplicate of the generic email pattern (which it
@@ -187,6 +213,16 @@ export const SOCIAL_HANDLE_PATTERNS = [
   /@[a-z][a-z0-9_.]{2,29}\b/g, // generic @handle
 ];
 
+// Social platforms block when paired with a cue word either before OR after:
+// me, my, id, handle, username, follow, add, search, find, dm, profile.
+const SOCIAL_PLATFORM_NAMES =
+  'instagram|insta|ig|facebook|fb|youtube|yt|linkedin|linked\\s*in|twitter|tweet|x\\.com|sharechat|moj|josh|threads|reddit|quora';
+const SOCIAL_CUE_WORDS = 'me|my|id|handle|username|follow|add|search|find|dm|profile';
+export const SOCIAL_PLATFORM_CUE_PATTERN = new RegExp(
+  `\\b(?:${SOCIAL_PLATFORM_NAMES})\\b[^.]{0,40}?\\b(?:${SOCIAL_CUE_WORDS})\\b|\\b(?:${SOCIAL_CUE_WORDS})\\b[^.]{0,40}?\\b(?:${SOCIAL_PLATFORM_NAMES})\\b`,
+  'gi'
+);
+
 export const MESSAGING_APP_MENTION_PATTERNS = [
   /\b(?:whatsapp|wtsapp|wtsp|wtsapp|whatsap|whats\s*app|wa\b|w\.a\.?)\b/gi,
   /\btelegram\b|\btg\b/gi,
@@ -194,6 +230,16 @@ export const MESSAGING_APP_MENTION_PATTERNS = [
   /\bhangouts?\b/gi,
   /\bviber\b/gi,
   /\bimo\b/gi,
+  /\bskype\b/gi,
+  /\bdiscord\b/gi,
+  /\bsnapchat\b|\bsnap\b/gi,
+  /\bzoom\b/gi,
+  /\bgoogle\s*meet\b/gi,
+  /\bduo\b|\bfacetime\b/gi,
+  /\bmessenger\b|\bfb\s*messenger\b/gi,
+  /\bhike\b/gi,
+  /\bwechat\b/gi,
+  /\bline\b/gi,
 ];
 
 // SHORT FORMS / SLANG — casual chat rarely spells "number" or "instagram" in
@@ -250,7 +296,7 @@ export const SOLICITATION_PATTERNS_EN = [
   /where\b.*\b(?:do you|are you|you)\b.*\b(?:stay|live|reside|based|located|from)/gi,
   /\byour\b.*\b(?:address|location|home|house|flat|apartment|place|area|locality)\b/gi,
   /(?:come|visit|drop by|stop by|swing by)\b.*\b(?:my|our)\b.*\b(?:place|home|house|flat|apartment|office)\b/gi,
-  /let(?:'s| us)\b.*\b(?:meet|catch up)\b.*\b(?:at|near|outside|in person|face to face)\b/gi,
+  /let(?:'s| us)\b.*\b(?:meet|catch up)\b.*\b(?:in person|face to face)\b/gi,
   /(?:i will|i'll|we will|we'll)\b.*\bcome\b.*\bto your\b/gi,
   /(?:exchange|swap|trade)\b.*\b(?:number|contact|address|location|details)\b/gi,
   /(?:share|send)\b.*\b(?:your|my)\b.*\b(?:address|location|contact|number|details)\b/gi,
@@ -290,6 +336,27 @@ export const SOLICITATION_PATTERNS = [
   ...SHORT_FORM_PATTERNS,
 ];
 
+// Self-disclosure: sender offering their own contact details.
+// "my number is ...", "call me", "text me", "my whatsapp", "my id is priya_98".
+export const SELF_DISCLOSURE_PATTERNS = [
+  /\bmy\s+(?:number|no\.?|num\.?|mobile|cell|phone|contact|whatsapp|wtsp|wtsapp|email|mail|mail\s+id|gmail|insta|instagram|ig|id|handle|username|snapchat|snap|telegram|tg|fb|facebook|linkedin|youtube|profile)\b/gi,
+  /\b(?:call|ring|text|ping|whatsapp|wtsapp|message|reach|contact)\s+me\b/gi,
+  /\bgive\s+(?:me\s+)?a\s+(?:call|ring|missed\s+call|buzz)\b/gi,
+  /\bmissed\s+call\s+do\b/gi,
+  /\b(?:here'?s|this\s+is)\s+my\s+(?:number|no\.?|num\.?|mobile|whatsapp|contact|email|mail|id)\b/gi,
+];
+
+// Hinglish solicitation: Hindi written in Latin script.
+export const SOLICITATION_PATTERNS_HINGLISH = [
+  /\b(?:apna|aapka|tumhara|tera|mera|meri)\s+(?:number|no\.?|num\.?|mobile|phone|contact|whatsapp|wtsp|wtsapp|email|mail|id)\b/gi,
+  /\b(?:number|no\.?|num\.?|mobile|phone|contact)\s+(?:do|dedo|de\s+do|bhejo|bhej|batao|batao\s+na|dena)\b/gi,
+  /\b(?:call|missed\s+call)\s+(?:karo|kar|kardo|kardo\s+na)\b/gi,
+  /\b(?:whatsapp|wtsapp|wtsp)\s+(?:pe|par|mein|main)\s+(?:baat|baat\s+karo|chat|message|msg)\b/gi,
+  /\b(?:insta|instagram|ig)\s+(?:pe|par|mein|main)\s+(?:follow|message|msg|dm)\b/gi,
+  /\b(?:milte|mil)\s+hain\b/gi,
+  /\b(?:mera|meri)\s+(?:number|no\.?|num\.?|mobile|whatsapp|email|mail|id)\s+(?:hai|he|ho)\b/gi,
+];
+
 // ---------------------------------------------------------------------------
 // 4. SCORING — combine matches into a confidence tier instead of binary block
 // ---------------------------------------------------------------------------
@@ -305,16 +372,23 @@ export interface ModerationResult {
 const CATEGORY_WEIGHTS: Record<string, number> = {
   phone: 10,
   email: 10,
+  emailProvider: 10,
+  domain: 8,
   upi: 9,
   socialUrl: 10,
   socialHandle: 5,
-  messagingAppMention: 2,
+  socialPlatformCue: 8,
+  messagingAppMention: 8,
   address: 4,
-  pinCodeOnly: 2, // low confidence alone
+  pinCodeOnly: 4, // blocks when a 6-digit number appears (pincode context)
   solicitation: 4,
+  selfDisclosure: 8,
+  hinglish: 8,
 };
 
-const BLOCK_THRESHOLD = 8;
+// Review tier is now treated as blocked (effective threshold = REVIEW_THRESHOLD).
+// This is intentional: the user asked for tighter rules.
+const BLOCK_THRESHOLD = 4;
 const REVIEW_THRESHOLD = 4;
 
 function testAny(patterns: RegExp[], text: string): boolean {
@@ -345,12 +419,17 @@ export function scoreMessage(rawText: string): ModerationResult {
 
   add('phone', testAny(PHONE_PATTERNS, text));
   add('email', testAny(EMAIL_PATTERNS, text));
-  add('upi', UPI_PATTERN.test(text));
+  add('emailProvider', testAny([EMAIL_PROVIDER_PATTERN], text));
+  add('domain', testAny([DOMAIN_PATTERN], text));
+  add('upi', testAny([UPI_PATTERN], text));
   add('socialUrl', testAny(SOCIAL_URL_PATTERNS, text));
   add('socialHandle', testAny(SOCIAL_HANDLE_PATTERNS, text));
+  add('socialPlatformCue', testAny([SOCIAL_PLATFORM_CUE_PATTERN], text));
   add('messagingAppMention', testAny(MESSAGING_APP_MENTION_PATTERNS, text));
   add('address', testAny(ADDRESS_PATTERNS, text));
   add('solicitation', testAny(SOLICITATION_PATTERNS, text));
+  add('selfDisclosure', testAny(SELF_DISCLOSURE_PATTERNS, text));
+  add('hinglish', testAny(SOLICITATION_PATTERNS_HINGLISH, text));
 
   // PIN code only counts if no stronger address signal already fired —
   // otherwise it's redundant; alone, it's weak evidence.

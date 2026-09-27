@@ -16,11 +16,17 @@ export interface ContactGuardContext {
 const CONTACT_DATA_CATEGORIES = new Set([
   'phone',
   'email',
+  'emailProvider',
+  'domain',
   'upi',
   'socialUrl',
   'socialHandle',
+  'socialPlatformCue',
+  'messagingAppMention',
   'address',
   'pinCodeOnly',
+  'selfDisclosure',
+  'hinglish',
 ]);
 
 @Injectable()

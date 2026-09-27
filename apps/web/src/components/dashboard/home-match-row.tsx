@@ -9,6 +9,7 @@ import { useSendInterestMutation, useShortlistQuery, useToggleShortlistMutation 
 import { Bookmark, Heart } from "lucide-react"
 import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
 import { LockedPhoto } from "@/components/profile/locked-photo"
+import { PhotoGuard } from "@/components/profile/photo-guard"
 
 import { formatHeightFromCm } from "@/lib/input-units"
 
@@ -58,13 +59,16 @@ export function HomeMatchRow({
         className="relative h-[132px] w-[96px] shrink-0 overflow-hidden rounded-md bg-muted sm:h-[168px] sm:w-[128px]"
       >
         {photo && !isHidden ? (
-          <Image
-            src={getMediaUrl(photo)}
-            alt={match.fullName}
-            fill
-            className={cn("object-cover object-[center_18%]", locked && "scale-110 blur-[7px]")}
-            sizes="(max-width: 640px) 96px, 128px"
-          />
+          <PhotoGuard className="absolute inset-0">
+            <Image
+              src={getMediaUrl(photo)}
+              alt={match.fullName}
+              fill
+              draggable={false}
+              className={cn("object-cover object-[center_18%]", locked && "scale-110 blur-[7px]")}
+              sizes="(max-width: 640px) 96px, 128px"
+            />
+          </PhotoGuard>
         ) : (
           <LockedPhoto compact src={photo} label="Photo hidden" />
         )}

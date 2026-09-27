@@ -46,6 +46,39 @@ export const BLOCKED_CONTACT_MESSAGES: ContactSharingCase[] = [
   { label: 'street address', text: 'I stay at flat 12, 4th cross, Anna Nagar main road' },
   { label: 'landmark address', text: 'come near the temple opposite the bus stop in T Nagar' },
   { label: 'pincode', text: 'my pincode is 600001' },
+  // ── New blocked cases: numbers in words ──
+  { label: 'english tens and ones', text: 'ninety eight seventy six fifty four thirty two ten' },
+  { label: 'hyphenated digit words', text: 'nine-eight-seven-six-five-four-three-two-one-zero' },
+  { label: 'letter spaced digit words', text: 'n i n e e i g h t s e v e n s i x f i v e f o u r t h r e e t w o o n e z e r o' },
+  { label: 'concatenated digit words', text: 'nineeightsevensixfivefourthreetwoonezero' },
+  { label: 'misspelled digit words', text: 'nain ate sevan six fiv for tree to won zeero' },
+  { label: 'hindi latin digit words', text: 'nau aath saat chhe paanch chaar teen do ek shunya' },
+  { label: 'devanagari digits', text: '९८७६५४३२१०' },
+  { label: 'tamil script digit words', text: 'ஒன்பது எட்டு ஏழு ஆறு ஐந்து நான்கு மூன்று இரண்டு ஒன்று' },
+  // ── New blocked cases: phone format evasions ──
+  { label: 'leading zero mobile', text: '09876543210' },
+  { label: 'phone glued to word', text: 'call9876543210' },
+  { label: 'landline', text: '044 2345 6789' },
+  { label: 'international number', text: '+1 415 555 0134' },
+  { label: 'eleven digit run', text: '98765432101' },
+  // ── New blocked cases: email evasions ──
+  { label: 'at the rate email', text: 'priya at the rate gmail dot com' },
+  { label: 'bare provider name', text: 'priya sharma gmail' },
+  { label: 'bracketed at and dot', text: 'priya[at]yahoo[dot]in' },
+  { label: 'bare domain', text: 'visit priya dot in' },
+  // ── New blocked cases: platforms and self-disclosure ──
+  { label: 'linkedin with cue', text: 'add me on linkedin' },
+  { label: 'my id is handle', text: 'my id is priya_98' },
+  { label: 'bare whatsapp', text: 'whatsapp' },
+  { label: 'call me', text: 'call me' },
+  { label: 'text me', text: 'text me' },
+  { label: 'my number is', text: 'my number is 98765' },
+  // ── New blocked cases: Hinglish ──
+  { label: 'apna number do', text: 'apna number do' },
+  { label: 'mera number hai', text: 'mera number hai' },
+  { label: 'whatsapp pe baat karo', text: 'whatsapp pe baat karo' },
+  { label: 'number bhejo', text: 'number bhejo' },
+  { label: 'call karo', text: 'call karo' },
 ];
 
 /** Icebreakers and ordinary chat. These must not be treated as contact sharing. */
@@ -56,4 +89,15 @@ export const ALLOWED_CHAT_MESSAGES: ContactSharingCase[] = [
   { label: 'profession', text: 'I work as a software engineer in Chennai.' },
   { label: 'hobby', text: 'I enjoy classical music and weekend travel.' },
   { label: 'age', text: 'I am 28 years old.' },
+  // ── New allowed cases: protect against false positives ──
+  { label: 'live for music', text: 'I live for music' },
+  { label: 'no problem', text: 'no problem, talk tomorrow' },
+  { label: 'siblings count', text: 'I have two brothers and one sister' },
+  { label: 'birth year', text: 'born in 1996' },
+  { label: 'salary', text: 'salary is 12 lakh' },
+  { label: 'height', text: 'height 5 feet 8 inches' },
+  { label: 'meet at 5pm', text: 'let us meet families at 5 pm' },
+  { label: 'from chennai', text: 'we are from Chennai' },
+  { label: 'often', text: 'I often visit the temple' },
+  { label: 'someone', text: 'someone in your family should call' },
 ];

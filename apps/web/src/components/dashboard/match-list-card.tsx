@@ -23,6 +23,7 @@ import { displayHeight, formatHeightFromCm } from "@/lib/input-units"
 import { ConnectButton } from "@/components/profile/connect-button"
 import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
 import { LockedPhoto } from "@/components/profile/locked-photo"
+import { PhotoGuard } from "@/components/profile/photo-guard"
 import {
   useContactUsageQuery,
   useInterestsQuery,
@@ -228,17 +229,20 @@ export function MatchListCard({
             <LockedPhoto src={photos[activePhoto] ?? photos[0]} label="Photo hidden" />
           ) : (
             <>
-              <Image
-                src={getMediaUrl(photos[activePhoto] ?? photos[0])}
-                alt={`${match.fullName}, ${match.age}`}
-                fill
-                priority={priority}
-                className={cn(
-                  "object-cover object-[center_20%] transition-all duration-500",
-                  match.blurPhoto ? "scale-110 blur-xl" : ""
-                )}
-                sizes="(max-width: 768px) 100vw, 400px"
-              />
+              <PhotoGuard className="absolute inset-0">
+                <Image
+                  src={getMediaUrl(photos[activePhoto] ?? photos[0])}
+                  alt={`${match.fullName}, ${match.age}`}
+                  fill
+                  priority={priority}
+                  draggable={false}
+                  className={cn(
+                    "object-cover object-[center_20%] transition-all duration-500",
+                    match.blurPhoto ? "scale-110 blur-xl" : ""
+                  )}
+                  sizes="(max-width: 768px) 100vw, 400px"
+                />
+              </PhotoGuard>
               {photos.length > 1 && (
                 <NextPhotoPreload
                   photo={photos[(activePhoto + 1) % photos.length]}
@@ -445,17 +449,20 @@ export function MatchListCard({
                 <LockedPhoto src={photos[activePhoto] ?? photos[0]} label="Photo hidden" />
               ) : (
                 <>
-                  <Image
-                    src={getMediaUrl(photos[activePhoto] ?? photos[0])}
-                    alt={`${match.fullName}, ${match.age}`}
-                    fill
-                    priority={priority}
-                    className={cn(
-                      "object-cover object-[center_18%] transition-all duration-500",
-                      match.blurPhoto ? "blur-xl scale-110" : "hover:scale-105"
-                    )}
-                    sizes="(max-width: 1200px) 300px, 330px"
-                  />
+                  <PhotoGuard className="absolute inset-0">
+                    <Image
+                      src={getMediaUrl(photos[activePhoto] ?? photos[0])}
+                      alt={`${match.fullName}, ${match.age}`}
+                      fill
+                      priority={priority}
+                      draggable={false}
+                      className={cn(
+                        "object-cover object-[center_18%] transition-all duration-500",
+                        match.blurPhoto ? "blur-xl scale-110" : "hover:scale-105"
+                      )}
+                      sizes="(max-width: 1200px) 300px, 330px"
+                    />
+                  </PhotoGuard>
                   {photos.length > 1 && (
                     <NextPhotoPreload
                       photo={photos[(activePhoto + 1) % photos.length]}

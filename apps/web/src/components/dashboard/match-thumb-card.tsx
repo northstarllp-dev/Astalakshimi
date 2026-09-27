@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { getMediaUrl } from "@/lib/utils"
 import { LockedPhoto } from "@/components/profile/locked-photo"
+import { PhotoGuard } from "@/components/profile/photo-guard"
 
 export function MatchThumbCard({
   match,
@@ -24,14 +25,17 @@ export function MatchThumbCard({
         {isHidden ? (
           <LockedPhoto src={photo} label="Photo hidden" />
         ) : (
-          <Image
-            src={getMediaUrl(photo)}
-            alt={`${match.fullName}, ${match.age}`}
-            fill
-            priority={priority}
-            className="object-cover object-[center_18%] transition-transform duration-500 group-hover:scale-[1.03]"
-            sizes="(max-width: 640px) 50vw, 220px"
-          />
+          <PhotoGuard className="absolute inset-0">
+            <Image
+              src={getMediaUrl(photo)}
+              alt={`${match.fullName}, ${match.age}`}
+              fill
+              priority={priority}
+              draggable={false}
+              className="object-cover object-[center_18%] transition-transform duration-500 group-hover:scale-[1.03]"
+              sizes="(max-width: 640px) 50vw, 220px"
+            />
+          </PhotoGuard>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-black/20" />
         <div className="absolute inset-x-0 bottom-0 p-2.5 text-white">

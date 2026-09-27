@@ -86,4 +86,12 @@ describe('Chat contact sharing — ContactGuardService (unit)', () => {
     const result = await checkMessage('34', { recentSenderMessages: ['12'] });
     expect(result.status).toBe('ALLOW');
   });
+
+  it('blocks a phone split across two messages with words', async () => {
+    const result = await checkMessage('four three two one zero', {
+      recentSenderMessages: ['my number is nine eight seven six five'],
+    });
+    expect(result.status).toBe('BLOCKED');
+    expect(result.reason).toBe('CONTACT_INFORMATION');
+  });
 });

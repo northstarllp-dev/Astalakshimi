@@ -5,6 +5,7 @@ import Image from "next/image"
 import { ChevronLeft, ChevronRight, FileText, MapPin, X } from "lucide-react"
 import { cn, getMediaUrl } from "@/lib/utils"
 import { LockedPhoto } from "@/components/profile/locked-photo"
+import { PhotoGuard } from "@/components/profile/photo-guard"
 
 type ProfileGalleryProps = {
   name: string
@@ -41,6 +42,7 @@ export function ProfileGallery({
   const [slot, setSlot] = React.useState({ width: 0, height: 0 })
   const slotRef = React.useRef<HTMLDivElement>(null)
   const hero = photos[activeIndex] ?? photos[0]
+  const framePhoto = photos[0]
   const extra = photos.slice(1)
   const hasMany = photos.length > 1
   const isHidden = Boolean(blurPhoto) || photos.length === 0
@@ -83,8 +85,7 @@ export function ProfileGallery({
   }, [naturalSize, slot])
 
   React.useEffect(() => {
-    setNaturalSize(null)
-    if (!hero || isHidden) return
+    if (!framePhoto || isHidden) return
     const probe = new window.Image()
     let cancelled = false
     probe.onload = () => {
@@ -92,11 +93,11 @@ export function ProfileGallery({
         setNaturalSize({ width: probe.naturalWidth, height: probe.naturalHeight })
       }
     }
-    probe.src = getMediaUrl(hero)
+    probe.src = getMediaUrl(framePhoto)
     return () => {
       cancelled = true
     }
-  }, [hero, isHidden])
+  }, [framePhoto, isHidden])
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -122,18 +123,20 @@ export function ProfileGallery({
         >
           {isHidden ? (
             <LockedPhoto src={hero} label={`${name}'s photo is hidden`} />
-          ) : fitted && naturalSize ? (
-            <Image
-              src={getMediaUrl(hero)}
-              alt={`${name}, ${age}`}
-              width={naturalSize.width}
-              height={naturalSize.height}
-              quality={100}
-              unoptimized
-              priority
-              className={cn("block h-full w-full object-contain", blurPhoto ? "blur-xl" : "")}
-              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-            />
+          ) : fitted ? (
+            <PhotoGuard className="absolute inset-0">
+              <Image
+                src={getMediaUrl(hero)}
+                alt={`${name}, ${age}`}
+                fill
+                quality={100}
+                unoptimized
+                priority
+                draggable={false}
+                sizes="(min-width: 1024px) 40vw, 100vw"
+                className={cn("object-contain", blurPhoto ? "blur-xl" : "")}
+              />
+            </PhotoGuard>
           ) : (
             <div className="h-full w-full bg-muted" aria-hidden />
           )}
@@ -220,7 +223,9 @@ export function ProfileGallery({
                       )}
                       aria-label={`Open photo ${i + 2}`}
                     >
-                      <Image src={getMediaUrl(photo)} alt="" fill className="object-cover" sizes="56px" />
+                      <PhotoGuard className="absolute inset-0">
+                        <Image src={getMediaUrl(photo)} alt="" fill draggable={false} className="object-cover" sizes="56px" />
+                      </PhotoGuard>
                     </button>
                   ))}
                 </div>
@@ -308,13 +313,16 @@ export function ProfileGallery({
             {isHidden ? (
               <LockedPhoto src={photos[activeIndex] ?? hero} label={`${name}'s photo is hidden`} />
             ) : (
-              <Image
-                src={getMediaUrl(photos[activeIndex])}
-                alt={`${name} photo ${activeIndex + 1}`}
-                fill
-                className={cn("object-contain", blurPhoto ? "blur-2xl scale-105" : "")}
-                sizes="100vw"
-              />
+              <PhotoGuard className="absolute inset-0">
+                <Image
+                  src={getMediaUrl(photos[activeIndex])}
+                  alt={`${name} photo ${activeIndex + 1}`}
+                  fill
+                  draggable={false}
+                  className={cn("object-contain", blurPhoto ? "blur-2xl scale-105" : "")}
+                  sizes="100vw"
+                />
+              </PhotoGuard>
             )}
           </div>
 

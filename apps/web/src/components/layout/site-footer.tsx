@@ -24,7 +24,6 @@ const columns = [
     title: "Company",
     links: [
       { href: "#how", label: "How it works" },
-      { href: "#success", label: "Success stories" },
       { href: "#trust", label: "Safety & privacy" },
     ],
   },
