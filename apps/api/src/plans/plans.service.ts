@@ -45,7 +45,7 @@ export class PlansService implements OnModuleInit {
         periodLabel: '3 Months',
         interestQuota: 100,
         contactUnlocks: 10,
-        hasAdvancedFilters: false,
+        hasAdvancedFilters: true,
         hasPriorityListing: false,
         badge: null,
         tagline: 'More interests, monthly contacts, and mutual details.',

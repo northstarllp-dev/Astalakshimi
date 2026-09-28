@@ -700,7 +700,7 @@ export class PaymentsService {
         requestId,
         error: err?.response?.data || err?.message,
       });
-      throw new InternalServerErrorException('Failed to create payment order');
+      throw new InternalServerErrorException(err?.response?.data || err?.message || 'Failed to create payment order');
     }
   }
 

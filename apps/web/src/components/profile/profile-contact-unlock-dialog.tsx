@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,7 @@ export function ProfileContactUnlockDialog({
 }) {
   const unlock = useUnlockContactMutation()
   const payExtra = usePayExtraContactUnlockMutation()
+  const router = useRouter()
   const [error, setError] = React.useState("")
 
   const remaining = access?.remaining ?? null
@@ -67,15 +69,9 @@ export function ProfileContactUnlockDialog({
     }
   }
 
-  const handlePayExtra = async () => {
-    setError("")
-    try {
-      const res = await payExtra.mutateAsync(profileId)
-      onUnlocked?.(res.contactPhone ?? null)
-      onOpenChange(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Payment failed. Please try again.")
-    }
+  const handlePayExtra = () => {
+    onOpenChange(false)
+    router.push(`/checkout?plan=extra_contact&targetProfileId=${profileId}`)
   }
 
   return (

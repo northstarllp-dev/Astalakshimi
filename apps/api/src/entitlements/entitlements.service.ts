@@ -140,7 +140,7 @@ export class EntitlementsService {
     const remaining = limit === null ? null : Math.max(0, limit - usedThisMonth);
     const canUnlockWithQuota = !isUnlocked && (limit === null || (remaining !== null && remaining > 0));
     const canPayExtra = !isUnlocked && !canUnlockWithQuota && limit !== null;
-    const canView = isUnlocked || (isMutualConnect && isMutualBenefit);
+    const canView = isUnlocked;
 
     return {
       canView,

@@ -13,9 +13,20 @@ import { apiClient } from "@/lib/api-client"
 function CheckoutInner() {
   const router = useRouter()
   const params = useSearchParams()
-  const planId = (params.get("plan") || "gold") as PlanId
+  const planId = (params.get("plan") || "gold") as PlanId | "extra_contact"
   const isRenew = params.get("renew") === "1"
-  const plan = getPlanById(planId)
+  let plan: any = getPlanById(planId as string)
+  if (planId === "extra_contact") {
+    plan = {
+      id: "extra_contact",
+      name: "Extra Contact Unlock",
+      price: `₹29`,
+      priceInPaise: 2900,
+      period: "One-time",
+      tagline: "Instantly unlock one mobile number.",
+      unlocks: ["1 Contact Unlock"]
+    }
+  }
   const queryClient = useQueryClient()
   const [paying, setPaying] = React.useState(false)
   const [done, setDone] = React.useState(false)
@@ -44,9 +55,16 @@ function CheckoutInner() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.invoices })
     await queryClient.invalidateQueries({ queryKey: queryKeys.paid })
     await queryClient.invalidateQueries({ queryKey: queryKeys.contactUsage })
+    await queryClient.invalidateQueries({ queryKey: queryKeys.unlockedContacts })
     setPaying(false)
     setDone(true)
-    window.setTimeout(() => router.push("/plans"), 1400)
+    window.setTimeout(() => {
+      if (planId === "extra_contact") {
+        router.push(`/profiles/${params.get("targetProfileId")}`)
+      } else {
+        router.push("/plans")
+      }
+    }, 1400)
   }
 
   const confirm = async () => {
@@ -55,7 +73,28 @@ function CheckoutInner() {
 
     try {
       if (isPaidPlan) {
-        throw new Error("Paid checkout is not available yet. The payment adapter is not wired to this page.")
+        let order: any;
+        if (plan.id === "extra_contact") {
+          const targetId = params.get("targetProfileId");
+          if (!targetId) throw new Error("Missing target profile ID.");
+          order = await apiClient.contacts.createPaidOrder(targetId);
+        } else {
+          order = await apiClient.payments.createOrder(plan.id);
+        }
+
+        const { openCashfreeCheckout } = await import("@/lib/cashfree");
+        const cfResult = await openCashfreeCheckout({
+           paymentSessionId: order.paymentSessionId || order.payment_session_id,
+           redirectTarget: "_modal"
+        });
+
+        if (cfResult && "error" in cfResult) {
+           throw new Error(cfResult.error.message || "Payment cancelled or failed.");
+        }
+        
+        await new Promise(r => setTimeout(r, 1000));
+        await finishCheckout();
+        return;
       }
 
       const order = await apiClient.payments.createOrder(plan.id)
@@ -86,7 +125,7 @@ function CheckoutInner() {
         <div>
           <h1 className="font-serif text-2xl font-bold">{isRenew ? "Renew plan" : "Upgrade checkout"}</h1>
           <p className="text-xs text-muted-foreground">
-            {isPaidPlan ? "Paid checkout is not wired yet" : "Free plan activation"}
+            {isPaidPlan ? "Complete your payment below" : "Free plan activation"}
           </p>
         </div>
       </div>
@@ -127,10 +166,10 @@ function CheckoutInner() {
             </div>
           ) : (
             <>
-              <h3 className="font-semibold">{isPaidPlan ? "Paid checkout coming soon" : "Activate free plan"}</h3>
+              <h3 className="font-semibold">{isPaidPlan ? "Complete payment" : "Activate free plan"}</h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 {isPaidPlan
-                  ? "The Cashfree payment adapter is in place but is not connected to this page yet."
+                  ? "You will be securely redirected to the payment gateway."
                   : "No payment is required for the free plan."}
               </p>
 
@@ -149,7 +188,7 @@ function CheckoutInner() {
               </Button>
               <p className="mt-3 text-center text-[11px] text-muted-foreground">
                 {isPaidPlan
-                  ? "Paid plans will open Cashfree checkout once the paywall is wired."
+                  ? "Secure payments powered by Cashfree."
                   : "You can switch plans later from the plans page."}
               </p>
             </>

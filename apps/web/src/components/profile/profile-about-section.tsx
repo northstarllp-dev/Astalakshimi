@@ -109,8 +109,8 @@ export function ProfileAboutSection({
 
   React.useEffect(() => {
     setStoredPhone(contactPhone ?? null)
-    setIsRevealed(false)
-  }, [contactPhone, profileId])
+    setIsRevealed(contactAccess?.isUnlocked ?? false)
+  }, [contactPhone, profileId, contactAccess?.isUnlocked])
 
   const canViewContact = Boolean(contactAccess?.canView || storedPhone)
   const canViewHoroscope = Boolean(
@@ -288,7 +288,10 @@ export function ProfileAboutSection({
         profileId={profileId}
         access={contactAccess}
         onUnlocked={(phone) => {
-          if (phone) setStoredPhone(phone)
+          if (phone) {
+            setStoredPhone(phone)
+            setIsRevealed(true)
+          }
         }}
       />
       <Dialog open={revealOpen} onOpenChange={setRevealOpen}>
