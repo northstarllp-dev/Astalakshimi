@@ -1,58 +1,65 @@
+import { INestApplication, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../../src/app.module';
-import { DB_CLIENT } from '../../src/database/database.constants';
-import { JwtService } from '@nestjs/jwt';
+import { SearchController } from '../../src/search/search.controller';
+import { SearchService } from '../../src/search/search.service';
+import { JwtAuthGuard } from '../../src/common/guards/auth.guard';
+
+const USER_ID = 'user1';
+
+const authGuardStub: CanActivate = {
+  canActivate(context: ExecutionContext) {
+    const req = context.switchToHttp().getRequest();
+    const auth = req.headers?.authorization as string | undefined;
+    if (!auth?.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Authentication required. Please log in.');
+    }
+    req.user = { userId: USER_ID, phone: '1234567890', role: 'member' };
+    return true;
+  },
+};
 
 describe('SearchController (e2e)', () => {
   let app: INestApplication;
-  let jwtService: JwtService;
-  let dbMock: any;
+  let searchService: jest.Mocked<SearchService>;
 
   beforeAll(async () => {
-    dbMock = {
-      select: jest.fn().mockReturnThis(),
-      from: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      offset: jest.fn().mockReturnThis(),
-      innerJoin: jest.fn().mockReturnThis(),
-      then: jest.fn(),
+    const mockSearchService = {
+      searchProfiles: jest.fn().mockResolvedValue({ profiles: [{ id: 'match1' }], total: 1 }),
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      controllers: [SearchController],
+      providers: [{ provide: SearchService, useValue: mockSearchService }],
     })
-      .overrideProvider(DB_CLIENT)
-      .useValue(dbMock)
+      .overrideGuard(JwtAuthGuard)
+      .useValue(authGuardStub)
       .compile();
 
     app = moduleFixture.createNestApplication();
-    jwtService = moduleFixture.get<JwtService>(JwtService);
     await app.init();
+    searchService = moduleFixture.get(SearchService);
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   it('/search (GET) should require authentication', () => {
-    return request(app.getHttpServer())
-      .get('/search')
-      .expect(401);
+    return request(app.getHttpServer()).get('/search').expect(401);
   });
 
   it('/search (GET) should return 200 with valid token and query params', async () => {
-    const token = jwtService.sign({ sub: 'user1', phone: '1234567890' });
-
-    // Mocking the DB chain logic to resolve safely
-    dbMock.then.mockImplementation((res, rej) => res([{ id: 'match1' }, { count: 1 }]));
-
-    return request(app.getHttpServer())
+    await request(app.getHttpServer())
       .get('/search?page=1&limit=10&city=Chennai')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', 'Bearer valid-token')
       .expect(200);
+
+    expect(searchService.searchProfiles).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({ page: 1, limit: 10, city: 'Chennai' }),
+    );
   });
 });
