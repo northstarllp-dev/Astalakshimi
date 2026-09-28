@@ -147,12 +147,27 @@ describe('Feature 5: Chat - ChatService (Unit Tests)', () => {
             where: jest.fn().mockReturnThis(),
             limit: jest.fn().mockResolvedValue([{ id: 'interest-123' }]),
           };
-        } else {
+        } else if (selectCount === 4) {
           // targetProfile fetch
           return {
             from: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
             limit: jest.fn().mockResolvedValue([partnerProfile]),
+          };
+        } else if (selectCount === 5) {
+          // accepted-interest check
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([{ id: 'interest-123' }]),
+          };
+        } else {
+          // recent sender messages for the contact-sharing guard
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([]),
           };
         }
       });

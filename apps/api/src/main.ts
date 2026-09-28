@@ -2,8 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import helmet from 'helmet';
-import { json } from 'express';
-import type { IncomingMessage } from 'http';
 import { AppModule } from './app.module';
 import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -18,16 +16,8 @@ async function bootstrap() {
     logger.error('Uncaught Exception:', err);
   });
 
-  const app = await NestFactory.create(AppModule, { bodyParser: false, rawBody: true });
-
-  // Capture exact request bytes for Cashfree webhook HMAC. Do not re-serialize JSON.
-  app.use(
-    json({
-      verify: (req: IncomingMessage & { rawBody?: Buffer }, _res, buf: Buffer) => {
-        req.rawBody = buf;
-      },
-    }),
-  );
+  // Nest's built-in JSON parser with rawBody keeps the exact webhook bytes for HMAC.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 4000;

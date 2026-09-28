@@ -80,7 +80,8 @@ if [ "${SKIP_GIT_PULL:-false}" != "true" ]; then
   git remote prune origin >/dev/null 2>&1 || true
   rm -f .git/refs/remotes/origin/"$DEPLOY_BRANCH".lock 2>/dev/null || true
   git fetch origin "$DEPLOY_BRANCH" --prune
-  # Always land on the deploy branch (EC2 may have been left on `dev`).
+  # Discard server-only hotfixes of tracked files so checkout cannot abort.
+  git reset --hard "origin/$DEPLOY_BRANCH"
   git checkout -B "$DEPLOY_BRANCH" "origin/$DEPLOY_BRANCH"
   log "deploying commit: $(git log -1 --oneline)"
   export SKIP_GIT_PULL=true
