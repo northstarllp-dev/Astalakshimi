@@ -3,7 +3,7 @@ import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { shortlists, profiles, userSettings, interests, verifications } from '@astalakshimi/database';
 import { eq, and, or, desc, inArray } from 'drizzle-orm';
-import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
+import { getApprovedPrimaryPhotos, getAllApprovedPhotosForProfiles, computeBlurDecision } from '../common/photo-access';
 import { candidateAge } from '../matches/match-scoring';
 
 @Injectable()
@@ -43,7 +43,7 @@ export class ShortlistsService {
 
     const targetProfileIds = userShortlists.map((s) => s.targetProfileId);
 
-    const photos = await getApprovedPrimaryPhotos(this.db, targetProfileIds);
+    const photos = await getAllApprovedPhotosForProfiles(this.db, targetProfileIds);
 
     // Shortlisting is one-directional, so shortlisting someone does not grant
     // photo access — we still honour their blur preference.
@@ -87,7 +87,7 @@ export class ShortlistsService {
 
     return userShortlists.map((item) => {
       const p = item.targetProfile;
-      const primaryPhoto = photos.get(p.id);
+      const primaryPhoto = photos.get(p.id)?.[0];
       const age = candidateAge(p.dob) ?? 0;
 
       const { blurPhoto, withholdKey } = computeBlurDecision({
@@ -97,6 +97,7 @@ export class ShortlistsService {
         ownerUserId: p.userId,
       });
       const visibleKey = withholdKey ? null : (primaryPhoto?.s3Key ?? null);
+      const allVisibleKeys = withholdKey ? [] : (photos.get(p.id)?.map(photo => photo.s3Key) || []);
       const isVerified = verificationByProfile.get(p.id) === 'verified';
 
       return {
@@ -118,7 +119,7 @@ export class ShortlistsService {
         income: p.annualIncome || 'Not specified',
         annualIncome: p.annualIncome || 'Not specified',
         motherTongue: p.motherTongue || 'Tamil',
-        photos: visibleKey ? [visibleKey] : [],
+        photos: allVisibleKeys,
         photo: visibleKey,
         photoVerified: isVerified,
         isVerified,
@@ -136,7 +137,7 @@ export class ShortlistsService {
           profession: p.profession || 'Professional',
           // Always expose the S3 key string — never the photo row object.
           photo: visibleKey,
-          photos: visibleKey ? [visibleKey] : [],
+          photos: allVisibleKeys,
         },
       };
     });

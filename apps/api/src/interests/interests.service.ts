@@ -7,7 +7,7 @@ import { EntitlementsService } from '../entitlements/entitlements.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 import { BlocksService } from '../blocks/blocks.service';
-import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
+import { getApprovedPrimaryPhotos, getAllApprovedPhotosForProfiles, computeBlurDecision } from '../common/photo-access';
 
 @Injectable()
 export class InterestsService {
@@ -273,7 +273,7 @@ export class InterestsService {
     if (rows.length === 0) return [];
 
     const senderIds = rows.map((r) => r.sender.id);
-    const photos = await getApprovedPrimaryPhotos(this.db, senderIds);
+    const photos = await getAllApprovedPhotosForProfiles(this.db, senderIds);
 
     const settings = await this.db
       .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
@@ -295,10 +295,11 @@ export class InterestsService {
         isAccepted,
         ownerUserId: r.sender.userId,
       });
+      const allVisibleKeys = withholdKey ? [] : (photos.get(r.sender.id)?.map(p => p.s3Key) || []);
       return this.formatInterestItem(
         r.interest,
         r.sender,
-        withholdKey ? null : (photos.get(r.sender.id)?.s3Key ?? null),
+        allVisibleKeys,
         { blurPhoto, isVerified: verificationByProfile.get(r.sender.id) === 'verified' },
       );
     });
@@ -320,7 +321,7 @@ export class InterestsService {
     if (rows.length === 0) return [];
 
     const receiverIds = rows.map((r) => r.receiver.id);
-    const photos = await getApprovedPrimaryPhotos(this.db, receiverIds);
+    const photos = await getAllApprovedPhotosForProfiles(this.db, receiverIds);
 
     const settings = await this.db
       .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
@@ -341,10 +342,11 @@ export class InterestsService {
         isAccepted,
         ownerUserId: r.receiver.userId,
       });
+      const allVisibleKeys = withholdKey ? [] : (photos.get(r.receiver.id)?.map(p => p.s3Key) || []);
       return this.formatInterestItem(
         r.interest,
         r.receiver,
-        withholdKey ? null : (photos.get(r.receiver.id)?.s3Key ?? null),
+        allVisibleKeys,
         { blurPhoto, isVerified: verificationByProfile.get(r.receiver.id) === 'verified' },
       );
     });
@@ -377,7 +379,7 @@ export class InterestsService {
     if (rows.length === 0) return [];
 
     const profileIds = rows.map((r) => r.sender.id);
-    const photos = await getApprovedPrimaryPhotos(this.db, profileIds);
+    const photos = await getAllApprovedPhotosForProfiles(this.db, profileIds);
 
     const verificationRows = await this.db
       .select({ profileId: verifications.profileId, status: verifications.status })
@@ -385,14 +387,15 @@ export class InterestsService {
       .where(inArray(verifications.profileId, profileIds));
     const verificationByProfile = new Map(verificationRows.map((v) => [v.profileId, v.status]));
 
-    return rows.map((r) =>
-      this.formatInterestItem(
+    return rows.map((r) => {
+      const allVisibleKeys = photos.get(r.sender.id)?.map(p => p.s3Key) || [];
+      return this.formatInterestItem(
         r.interest,
         r.sender,
-        photos.get(r.sender.id)?.s3Key ?? null,
+        allVisibleKeys,
         { isVerified: verificationByProfile.get(r.sender.id) === 'verified' },
-      ),
-    );
+      );
+    });
   }
 
   async getUsage(userId: string) {
@@ -629,7 +632,7 @@ export class InterestsService {
   private formatInterestItem(
     interest: any,
     otherProfile: any,
-    photoS3Key?: string | null,
+    photoS3Keys?: string[] | null,
     options: { blurPhoto?: boolean; isVerified?: boolean } = {},
   ) {
     const age = otherProfile.dob
@@ -654,8 +657,8 @@ export class InterestsService {
         community: otherProfile.caste || 'Unknown',
         educationLevel: otherProfile.educationLevel || 'Graduate',
         profession: otherProfile.profession || 'Professional',
-        photo: photoS3Key || null,
-        photos: photoS3Key ? [photoS3Key] : [],
+        photo: photoS3Keys?.[0] || null,
+        photos: photoS3Keys || [],
         blurPhoto: options.blurPhoto ?? false,
         photoVerified: options.isVerified ?? false,
         isVerified: options.isVerified ?? false,

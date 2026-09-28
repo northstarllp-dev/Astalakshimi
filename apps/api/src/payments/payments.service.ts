@@ -586,7 +586,7 @@ export class PaymentsService {
         targetProfileId,
         orderType: 'contact_unlock',
       },
-      order_expiry_time: this.toExpiryIso(15),
+      order_expiry_time: this.toExpiryIso(30),
     };
 
     const cfOrder = await this.createCashfreeOrder(request, randomUUID(), orderId);

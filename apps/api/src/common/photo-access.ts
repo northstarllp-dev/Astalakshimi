@@ -109,6 +109,47 @@ export async function getApprovedPrimaryPhotos(
   return map;
 }
 
+export async function getAllApprovedPhotosForProfiles(
+  db: Database,
+  profileIds: string[],
+): Promise<Map<string, Array<{ s3Key: string; id: string; isPrimary: boolean; displayOrder: number }>>> {
+  const map = new Map<string, Array<{ s3Key: string; id: string; isPrimary: boolean; displayOrder: number }>>();
+  if (profileIds.length === 0) return map;
+
+  const rows = await db
+    .select({
+      id: profilePhotos.id,
+      profileId: profilePhotos.profileId,
+      s3Key: profilePhotos.s3Key,
+      isPrimary: profilePhotos.isPrimary,
+      displayOrder: profilePhotos.displayOrder,
+    })
+    .from(profilePhotos)
+    .where(
+      and(
+        inArray(profilePhotos.profileId, profileIds),
+        eq(profilePhotos.status, 'approved'),
+      ),
+    );
+
+  for (const row of rows) {
+    if (!map.has(row.profileId)) {
+      map.set(row.profileId, []);
+    }
+    map.get(row.profileId)!.push(row);
+  }
+
+  for (const photos of map.values()) {
+    photos.sort((a, b) => {
+      if (a.isPrimary && !b.isPrimary) return -1;
+      if (!a.isPrimary && b.isPrimary) return 1;
+      return a.displayOrder - b.displayOrder;
+    });
+  }
+
+  return map;
+}
+
 /**
  * Fetches approved photos in display order for a single profile.
  * Used by public/full-profile views — pending/rejected stay hidden.

@@ -3,7 +3,7 @@ import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { profiles, users, profilePhotos, userSettings, interests, subscriptions, plans, verifications, lifestyleInterests, horoscopes, familyDetails } from '@astalakshimi/database';
 import { eq, and, ne, inArray, gte, lte, or, desc, sql, gt, lt, between } from 'drizzle-orm';
-import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
+import { getApprovedPrimaryPhotos, getAllApprovedPhotosForProfiles, computeBlurDecision } from '../common/photo-access';
 import { dobBoundsForAgeWindow, loadViewerContext, visibilitySql } from '../matches/viewer-context';
 import { candidateAge, targetGenders } from '../matches/match-scoring';
 import { EntitlementsService } from '../entitlements/entitlements.service';
@@ -333,7 +333,7 @@ export class SearchService {
     const profileIds = result.map((p) => p.id);
     const userIds = result.map((p) => p.userId);
     
-    let photos: Map<string, { s3Key: string; id: string }> = new Map();
+    let photos: Map<string, Array<{ s3Key: string; id: string; isPrimary: boolean; displayOrder: number }>> = new Map();
     let settings: any[] = [];
     let connections: any[] = [];
     let activeSubs: any[] = [];
@@ -342,7 +342,7 @@ export class SearchService {
     if (profileIds.length > 0) {
       // Run all five lookups concurrently — they are independent and the
       // sequential await chain was the dominant cost on the hot path.
-      const photosPromise = getApprovedPrimaryPhotos(this.db, profileIds);
+      const photosPromise = getAllApprovedPhotosForProfiles(this.db, profileIds);
       const settingsPromise = this.db
         .select({
           userId: userSettings.userId,
@@ -446,7 +446,7 @@ export class SearchService {
         age: candidateAge(profile.dob) ?? 0,
         // Key is withheld when blurred — the bucket is public, so sending it
         // would let anyone view the photo regardless of the blur flag.
-        photos: withholdKey || !primaryPhoto ? [] : [primaryPhoto.s3Key],
+        photos: withholdKey ? [] : (photos.get(profile.id)?.map(p => p.s3Key) || []),
         blurPhoto,
         photoVerified: isVerified,
         isVerified,

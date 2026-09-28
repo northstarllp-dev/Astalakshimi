@@ -10,7 +10,7 @@ import {
   plans,
 } from '@astalakshimi/database';
 import { eq, ne, and, inArray, or, desc, gte, lte, gt, sql } from 'drizzle-orm';
-import { getApprovedPrimaryPhotos, computeBlurDecision } from '../common/photo-access';
+import { getApprovedPrimaryPhotos, getAllApprovedPhotosForProfiles, computeBlurDecision } from '../common/photo-access';
 import {
   candidateAge,
   hasRequiredPartnerPrefs,
@@ -174,7 +174,7 @@ export class MatchesService {
     const profileIds = scoredProfiles.map((p) => p.id);
     const userIds = scoredProfiles.map((p) => p.userId);
 
-    const photos = await getApprovedPrimaryPhotos(this.db, profileIds);
+    const photos = await getAllApprovedPhotosForProfiles(this.db, profileIds);
 
     const settings = await this.db
       .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
@@ -248,7 +248,7 @@ export class MatchesService {
         annualIncome: p.annualIncome,
         // Key is withheld when blurred — the bucket is public, so sending it
         // would let anyone view the photo regardless of the blur flag.
-        photos: withholdKey || !primaryPhoto ? [] : [primaryPhoto.s3Key],
+        photos: withholdKey ? [] : (photos.get(p.id)?.map(photo => photo.s3Key) || []),
         photoVerified: isVerified,
         isPremium: false,
         isVerified,
