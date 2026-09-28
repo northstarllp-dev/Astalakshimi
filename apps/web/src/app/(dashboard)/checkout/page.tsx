@@ -9,7 +9,6 @@ import { ArrowLeft, CheckCircle2, Lock } from "lucide-react"
 import { queryKeys } from "@/hooks/queries"
 import { useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api-client"
-import { openRazorpayCheckout } from "@/lib/razorpay"
 
 function CheckoutInner() {
   const router = useRouter()
@@ -38,6 +37,7 @@ function CheckoutInner() {
       ? { label: "₹0", paise: 0 }
       : { label: plan.price, paise: plan.priceInPaise }
   const unlocks = plan.unlocks || []
+  const isPaidPlan = plan.priceInPaise > 0
 
   const finishCheckout = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.subscription })
@@ -54,6 +54,10 @@ function CheckoutInner() {
     setPaying(true)
 
     try {
+      if (isPaidPlan) {
+        throw new Error("Paid checkout is not available yet. The payment adapter is not wired to this page.")
+      }
+
       const order = await apiClient.payments.createOrder(plan.id)
 
       if (order.freeActivated) {
@@ -61,21 +65,7 @@ function CheckoutInner() {
         return
       }
 
-      if (!order.orderId || !order.keyId) {
-        throw new Error("Could not start Razorpay checkout. Check RAZORPAY_KEY_ID on the API.")
-      }
-
-      const paid = await openRazorpayCheckout({
-        keyId: order.keyId,
-        orderId: order.orderId,
-        amount: order.amount ?? plan.priceInPaise,
-        currency: order.currency || "INR",
-        name: "Ashtalakshmi",
-        description: `${plan.name} plan`,
-      })
-
-      await apiClient.payments.verifyPayment(paid)
-      await finishCheckout()
+      throw new Error("Could not activate this plan. Please try again.")
     } catch (err: any) {
       console.error("Payment error:", err)
       setError(err?.message || "Payment processing failed. Please try again.")
@@ -95,7 +85,9 @@ function CheckoutInner() {
         </Link>
         <div>
           <h1 className="font-serif text-2xl font-bold">{isRenew ? "Renew plan" : "Upgrade checkout"}</h1>
-          <p className="text-xs text-muted-foreground">Secured by Razorpay</p>
+          <p className="text-xs text-muted-foreground">
+            {isPaidPlan ? "Paid checkout is not wired yet" : "Free plan activation"}
+          </p>
         </div>
       </div>
 
@@ -135,9 +127,11 @@ function CheckoutInner() {
             </div>
           ) : (
             <>
-              <h3 className="font-semibold">Pay with Razorpay</h3>
+              <h3 className="font-semibold">{isPaidPlan ? "Paid checkout coming soon" : "Activate free plan"}</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                UPI, cards, netbanking, and wallets open in the Razorpay checkout.
+                {isPaidPlan
+                  ? "The Cashfree payment adapter is in place but is not connected to this page yet."
+                  : "No payment is required for the free plan."}
               </p>
 
               {error && (
@@ -154,7 +148,9 @@ function CheckoutInner() {
                     : `Pay ${priced.label}`}
               </Button>
               <p className="mt-3 text-center text-[11px] text-muted-foreground">
-                Payments are processed by Razorpay. You will be redirected back after a successful payment.
+                {isPaidPlan
+                  ? "Paid plans will open Cashfree checkout once the paywall is wired."
+                  : "You can switch plans later from the plans page."}
               </p>
             </>
           )}

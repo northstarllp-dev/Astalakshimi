@@ -39,6 +39,20 @@ describe('ContactsController', () => {
     expect(contactsService.unlock).toHaveBeenCalledWith('u1', 'p1');
   });
 
+  it('verifies a paid unlock with orderId only', async () => {
+    contactsService.verifyPaidUnlock.mockResolvedValue({ success: true, contactPhone: '9999999999' });
+    await expect(
+      controller.verifyPaidUnlock({ userId: 'u1', phone: '1', role: 'member' }, 'p1', 'cf_order_1'),
+    ).resolves.toEqual({ success: true, contactPhone: '9999999999' });
+    expect(contactsService.verifyPaidUnlock).toHaveBeenCalledWith('u1', 'p1', 'cf_order_1');
+  });
+
+  it('rejects paid unlock verification without orderId', () => {
+    expect(() =>
+      controller.verifyPaidUnlock({ userId: 'u1', phone: '1', role: 'member' }, 'p1', ''),
+    ).toThrow(BadRequestException);
+  });
+
   it('forwards an empty targetProfileId to the service (UUID validation is the pipe\'s job, covered in e2e)', async () => {
     contactsService.unlock.mockResolvedValue({ success: false });
     await controller.unlock({ userId: 'u1', phone: '1', role: 'member' }, '');

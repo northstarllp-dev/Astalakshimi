@@ -132,7 +132,7 @@ Interests, shortlist, search filters, media upload to S3, verification workflow.
 
 ### Phase 3  money and ops
 
-Subscriptions, Razorpay/PhonePe, entitlements, admin, jobs, docker-compose, CI.
+Subscriptions, Cashfree, entitlements, admin, jobs, docker-compose, CI.
 
 ### Phase 4  mobile
 

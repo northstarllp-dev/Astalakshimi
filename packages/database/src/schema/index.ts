@@ -10,6 +10,8 @@ export * from './interests';
 export * from './shortlists';
 export * from './plans';
 export * from './payments';
+export * from './payment-discrepancies';
+export * from './payment-refunds';
 export * from './subscriptions';
 export * from './user-settings';
 export * from './notifications';

@@ -489,9 +489,9 @@ class ApiClient {
     createOrder: (planId: string) =>
       this.request<{
         orderId?: string;
+        paymentSessionId?: string;
         amount?: number;
         currency?: string;
-        keyId?: string;
         planId?: string;
         planSlug?: string;
         planName?: string;
@@ -501,12 +501,14 @@ class ApiClient {
         body: JSON.stringify({ planId }),
       }),
 
-    verifyPayment: (data: {
-      razorpayOrderId: string;
-      razorpayPaymentId: string;
-      razorpaySignature: string;
-    }) =>
-      this.request<{ success: boolean; planName?: string; planSlug?: string }>('/payments/verify', {
+    verifyOrder: (data: { orderId: string }) =>
+      this.request<{
+        success: boolean;
+        planName?: string;
+        planSlug?: string;
+        message?: string;
+        status?: string;
+      }>('/payments/verify', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -541,25 +543,23 @@ class ApiClient {
     createPaidOrder: (targetProfileId: string) =>
       this.request<{
         orderId: string
+        paymentSessionId: string
         amount: number
         currency: string
-        keyId: string
         targetProfileId: string
       }>('/contacts/unlock/order', {
         method: 'POST',
         body: JSON.stringify({ targetProfileId }),
       }),
 
-    verifyPaidUnlock: (data: {
-      targetProfileId: string
-      razorpayOrderId: string
-      razorpayPaymentId: string
-      razorpaySignature: string
-    }) =>
-      this.request<{ success: boolean; contactPhone?: string | null }>('/contacts/unlock/verify', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
+    verifyPaidUnlock: (data: { targetProfileId: string; orderId: string }) =>
+      this.request<{ success: boolean; contactPhone?: string | null; status?: string }>(
+        '/contacts/unlock/verify',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        },
+      ),
 
     listUnlocked: () =>
       this.request<

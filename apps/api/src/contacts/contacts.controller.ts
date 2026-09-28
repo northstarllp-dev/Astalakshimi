@@ -43,19 +43,11 @@ export class ContactsController {
   verifyPaidUnlock(
     @CurrentUser() user: UserSession,
     @Body('targetProfileId', UuidValidationPipe) targetProfileId: string,
-    @Body('razorpayOrderId') razorpayOrderId: string,
-    @Body('razorpayPaymentId') razorpayPaymentId: string,
-    @Body('razorpaySignature') razorpaySignature: string,
+    @Body('orderId') orderId: string,
   ) {
-    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+    if (!orderId) {
       throw new BadRequestException('Missing paid unlock verification details');
     }
-    return this.contactsService.verifyPaidUnlock(
-      user.userId,
-      targetProfileId,
-      razorpayOrderId,
-      razorpayPaymentId,
-      razorpaySignature,
-    );
+    return this.contactsService.verifyPaidUnlock(user.userId, targetProfileId, orderId);
   }
 }

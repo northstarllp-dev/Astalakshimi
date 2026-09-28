@@ -26,20 +26,8 @@ export class ContactsService {
     return this.paymentsService.createContactUnlockOrder(userId, targetProfileId);
   }
 
-  verifyPaidUnlock(
-    userId: string,
-    targetProfileId: string,
-    razorpayOrderId: string,
-    razorpayPaymentId: string,
-    razorpaySignature: string,
-  ) {
-    return this.paymentsService.verifyContactUnlockPayment(
-      userId,
-      targetProfileId,
-      razorpayOrderId,
-      razorpayPaymentId,
-      razorpaySignature,
-    );
+  verifyPaidUnlock(userId: string, targetProfileId: string, orderId: string) {
+    return this.paymentsService.verifyContactUnlockPayment(userId, targetProfileId, orderId);
   }
 
   async listUnlocked(userId: string) {

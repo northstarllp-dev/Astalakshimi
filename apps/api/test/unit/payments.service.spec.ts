@@ -1,424 +1,484 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  InternalServerErrorException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PaymentsService } from '../../src/payments/payments.service';
-import { payments, subscriptions, plans, profiles } from '@astalakshimi/database';
-import * as crypto from 'crypto';
+import { Cashfree } from 'cashfree-pg';
 
-jest.mock('razorpay', () => {
-  return jest.fn().mockImplementation(() => ({
-    orders: {
-      create: jest.fn().mockResolvedValue({
-        id: 'order_mock_123',
-        amount: 29900,
-        currency: 'INR',
-      }),
-    },
-  }));
+jest.mock('cashfree-pg', () => {
+  const instance = {
+    XApiVersion: '',
+    PGCreateOrder: jest.fn(),
+    PGFetchOrder: jest.fn(),
+    PGOrderFetchPayments: jest.fn(),
+    PGTerminateOrder: jest.fn(),
+    PGOrderCreateRefund: jest.fn(),
+    PGVerifyWebhookSignature: jest.fn(),
+  };
+  return {
+    CFEnvironment: { SANDBOX: 'SANDBOX', PRODUCTION: 'PRODUCTION' },
+    Cashfree: Object.assign(jest.fn().mockImplementation(() => instance), {
+      __instance: instance,
+    }),
+  };
 });
 
-describe('Feature 4: Payments & Subscriptions - PaymentsService (Unit Tests)', () => {
+type CfMock = {
+  XApiVersion: string;
+  PGCreateOrder: jest.Mock;
+  PGFetchOrder: jest.Mock;
+  PGOrderFetchPayments: jest.Mock;
+  PGTerminateOrder: jest.Mock;
+  PGOrderCreateRefund: jest.Mock;
+  PGVerifyWebhookSignature: jest.Mock;
+};
+
+function cf(): CfMock {
+  return (Cashfree as unknown as { __instance: CfMock }).__instance;
+}
+
+function selectReturning(rows: unknown[]) {
+  const q: Record<string, jest.Mock> = {
+    from: jest.fn(),
+    where: jest.fn(),
+    innerJoin: jest.fn(),
+    leftJoin: jest.fn(),
+    orderBy: jest.fn(),
+    limit: jest.fn(),
+  };
+  q.from.mockReturnValue(q);
+  q.where.mockReturnValue(q);
+  q.innerJoin.mockReturnValue(q);
+  q.leftJoin.mockReturnValue(q);
+  q.orderBy.mockResolvedValue(rows);
+  q.limit.mockResolvedValue(rows);
+  return q;
+}
+
+function queueSelect(db: { select: jest.Mock }, responses: unknown[][]) {
+  let i = 0;
+  db.select.mockImplementation(() => selectReturning(responses[i++] ?? []));
+}
+
+describe('PaymentsService (Cashfree)', () => {
   let paymentsService: PaymentsService;
   let mockDb: any;
-  let mockConfigService: any;
+  let mockConfigService: { get: jest.Mock };
 
-  const mockSecret = 'test_real_secret_2026';
+  const profile = { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', userId: 'user-1', fullName: 'Ada' };
+  const paidPlan = {
+    id: 'plan-silver',
+    slug: 'silver',
+    name: 'Silver',
+    pricePaise: 29900,
+    durationDays: 30,
+  };
+  const freePlan = {
+    id: 'plan-free',
+    slug: 'free',
+    name: 'Free',
+    pricePaise: 0,
+    durationDays: 36500,
+  };
+  const owner = { id: 'user-1', email: 'ada@example.com', phone: '9876543210' };
+  const createdPayment = {
+    id: 'pay-1',
+    userId: 'user-1',
+    planId: paidPlan.id,
+    targetProfileId: null,
+    amountPaise: 29900,
+    currency: 'INR',
+    provider: 'cashfree',
+    providerOrderId: 'cf_order_1',
+    providerSessionId: 'sess_1',
+    status: 'created',
+    createdAt: new Date(),
+  };
 
   beforeEach(() => {
+    jest.clearAllMocks();
     mockConfigService = {
       get: jest.fn((key: string) => {
-        if (key === 'RAZORPAY_KEY_ID') return 'rzp_test_key123';
-        if (key === 'RAZORPAY_KEY_SECRET') return mockSecret;
-        if (key === 'payments.razorpayKeyId') return 'rzp_test_key123';
-        if (key === 'payments.razorpayKeySecret') return mockSecret;
-        return null;
-      }),
-      getOrThrow: jest.fn((key: string) => {
-        if (key === 'payments.razorpayKeyId') return 'rzp_test_key123';
-        if (key === 'payments.razorpayKeySecret') return mockSecret;
-        return 'test';
+        const map: Record<string, unknown> = {
+          'payments.cashfreeClientId': 'TEST_ID',
+          'payments.cashfreeClientSecret': 'TEST_SECRET',
+          'payments.cashfreeEnvironment': 'sandbox',
+          'payments.cashfreeApiVersion': '2025-01-01',
+          'payments.cashfreeWebhookSecret': 'whsec',
+          'payments.webhookReplayWindowMs': 5 * 60_000,
+          'app.frontendUrl': 'http://localhost:3000',
+          'app.apiPublicUrl': 'http://localhost:4000/api',
+        };
+        return map[key] ?? null;
       }),
     };
 
     mockDb = {
       select: jest.fn(),
-      insert: jest.fn(),
-      update: jest.fn(),
+      insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+      }),
     };
 
-    paymentsService = new PaymentsService(mockDb, mockConfigService);
+    cf().PGCreateOrder.mockResolvedValue({
+      data: {
+        order_id: 'cf_order_1',
+        payment_session_id: 'sess_1',
+        order_status: 'ACTIVE',
+      },
+      headers: {},
+    });
+    cf().PGFetchOrder.mockResolvedValue({
+      data: { order_id: 'cf_order_1', order_status: 'PAID', order_amount: 299, order_currency: 'INR' },
+    });
+    cf().PGOrderFetchPayments.mockResolvedValue({
+      data: [{ payment_status: 'SUCCESS', cf_payment_id: 'cfpay_1' }],
+    });
+
+    paymentsService = new PaymentsService(mockDb, mockConfigService as any);
   });
 
   describe('createOrder', () => {
-    it('should throw NotFoundException if user has no profile', async () => {
-      mockDb.select.mockReturnValue({
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([]),
-      });
-
-      await expect(
-        paymentsService.createOrder('user-no-profile', 'silver')
-      ).rejects.toThrow(NotFoundException);
+    it('throws if the user has no profile', async () => {
+      queueSelect(mockDb, [[]]);
+      await expect(paymentsService.createOrder('user-1', 'silver')).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw NotFoundException if requested plan is not found', async () => {
-      let selectCount = 0;
-      mockDb.select.mockImplementation(() => {
-        selectCount++;
-        if (selectCount === 1) {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ id: 'prof-1', userId: 'user-1' }]),
-          };
-        } else {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([]),
-          };
-        }
-      });
-
-      await expect(
-        paymentsService.createOrder('user-1', 'non-existent-plan')
-      ).rejects.toThrow("Plan 'non-existent-plan' not found");
+    it('throws if the plan is not found', async () => {
+      queueSelect(mockDb, [[profile], []]);
+      await expect(paymentsService.createOrder('user-1', 'missing')).rejects.toThrow(
+        "Plan 'missing' not found",
+      );
     });
 
-    it('should automatically activate free plan (price = 0) without creating Razorpay order', async () => {
-      const mockProfile = { id: 'prof-1', userId: 'user-1' };
-      const freePlan = {
-        id: 'free-plan-uuid',
-        slug: 'free',
-        name: 'Free',
-        pricePaise: 0,
-        durationDays: 36500,
-      };
-
-      let selectCount = 0;
-      mockDb.select.mockImplementation(() => {
-        selectCount++;
-        if (selectCount === 1) {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([mockProfile]),
-          };
-        } else {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([freePlan]),
-          };
-        }
-      });
-
-      mockDb.update.mockReturnValue({
-        set: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue(undefined),
-      });
-
-      const mockValues = jest.fn().mockResolvedValue(undefined);
-      mockDb.insert.mockReturnValue({ values: mockValues });
-
+    it('activates a free plan without calling Cashfree', async () => {
+      queueSelect(mockDb, [[profile], [freePlan]]);
       const result = await paymentsService.createOrder('user-1', 'free');
-
-      expect(result).toEqual({
-        freeActivated: true,
-        planId: 'free-plan-uuid',
-        planSlug: 'free',
-        planName: 'Free',
-        amount: 0,
-        currency: 'INR',
-      });
-
-      expect(mockDb.update).toHaveBeenCalledWith(subscriptions);
-      expect(mockValues).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 'user-1',
-          planId: 'free-plan-uuid',
-          status: 'active',
-        })
-      );
+      expect(result).toMatchObject({ freeActivated: true, planSlug: 'free', amount: 0 });
+      expect(cf().PGCreateOrder).not.toHaveBeenCalled();
+      expect(mockDb.insert).toHaveBeenCalled();
     });
 
-    it('should create order and record payment row in database for a paid plan (e.g. Silver)', async () => {
-      const mockProfile = { id: 'prof-12345678', userId: 'user-1' };
-      const silverPlan = {
-        id: 'silver-plan-uuid',
-        slug: 'silver',
-        name: 'Silver',
-        pricePaise: 29900,
-        durationDays: 90,
-      };
-
-      let selectCount = 0;
-      mockDb.select.mockImplementation(() => {
-        selectCount++;
-        if (selectCount === 1) {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([mockProfile]),
-          };
-        } else {
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([silverPlan]),
-          };
-        }
-      });
-
-      const mockValues = jest.fn().mockResolvedValue(undefined);
-      mockDb.insert.mockReturnValue({ values: mockValues });
-
+    it('creates a Cashfree order and stores paymentSessionId', async () => {
+      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
       const result = await paymentsService.createOrder('user-1', 'silver');
+      expect(cf().PGCreateOrder).toHaveBeenCalled();
+      expect(result).toEqual({
+        orderId: 'cf_order_1',
+        paymentSessionId: 'sess_1',
+        amount: 29900,
+        currency: 'INR',
+        planId: paidPlan.id,
+        planSlug: 'silver',
+        planName: 'Silver',
+      });
+      expect(mockDb.insert).toHaveBeenCalled();
+    });
 
-      expect(result.amount).toBe(29900);
-      expect(result.currency).toBe('INR');
-      expect(result.planSlug).toBe('silver');
-      expect(result.planName).toBe('Silver');
-      expect(result.orderId).toBeDefined();
-
-      expect(mockDb.insert).toHaveBeenCalledWith(payments);
-      expect(mockValues).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 'user-1',
-          planId: 'silver-plan-uuid',
-          amountPaise: 29900,
-          currency: 'INR',
-          provider: 'razorpay',
-          status: 'created',
-        })
+    it('surfaces Cashfree SDK failures as 500', async () => {
+      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      cf().PGCreateOrder.mockRejectedValue({ response: { data: { message: 'boom' } } });
+      await expect(paymentsService.createOrder('user-1', 'silver')).rejects.toThrow(
+        InternalServerErrorException,
       );
+    });
+
+    it('maps idempotency_error to 400', async () => {
+      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      cf().PGCreateOrder.mockRejectedValue({
+        response: { data: { type: 'idempotency_error', code: 'request_invalid' } },
+      });
+      await expect(paymentsService.createOrder('user-1', 'silver')).rejects.toThrow(BadRequestException);
     });
   });
 
-  describe('verifyPayment', () => {
-    it('should throw BadRequestException if signature is invalid', async () => {
-      await expect(
-        paymentsService.verifyPayment(
-          'user-1',
-          'order_123',
-          'pay_123',
-          'completely_invalid_signature'
-        )
-      ).rejects.toThrow('Invalid payment signature');
-    });
-
-    it('should throw NotFoundException if payment record does not exist', async () => {
-      const orderId = 'order_123';
-      const paymentId = 'pay_123';
-      const validSignature = crypto
-        .createHmac('sha256', mockSecret)
-        .update(`${orderId}|${paymentId}`)
-        .digest('hex');
-
-      mockDb.select.mockReturnValue({
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([]),
-      });
-
-      await expect(
-        paymentsService.verifyPayment('user-1', orderId, paymentId, validSignature)
-      ).rejects.toThrow('Payment record not found');
-    });
-
-    it('should successfully verify payment, mark captured, and activate new subscription', async () => {
-      const orderId = 'order_valid_123';
-      const paymentId = 'pay_valid_456';
-      const validSignature = crypto
-        .createHmac('sha256', mockSecret)
-        .update(`${orderId}|${paymentId}`)
-        .digest('hex');
-
-      const paymentRecord = {
-        id: 'payment-row-uuid',
-        userId: 'user-1',
-        planId: 'gold-plan-uuid',
-        status: 'created',
-        amountPaise: 49900,
-      };
-
-      const goldPlan = {
-        id: 'gold-plan-uuid',
-        name: 'Gold',
-        slug: 'gold',
-        durationDays: 180,
-      };
-
-      let selectCount = 0;
-      mockDb.select.mockImplementation(() => {
-        selectCount++;
-        if (selectCount === 1) {
-          // payments select
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([paymentRecord]),
-          };
-        } else {
-          // plans select
-          return {
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([goldPlan]),
-          };
-        }
-      });
-
-      mockDb.update.mockReturnValue({
-        set: jest.fn().mockReturnThis(),
-        where: jest.fn().mockResolvedValue(undefined),
-      });
-
-      const mockInsertValues = jest.fn().mockResolvedValue(undefined);
-      mockDb.insert.mockReturnValue({ values: mockInsertValues });
-
-      const result = await paymentsService.verifyPayment(
-        'user-1',
-        orderId,
-        paymentId,
-        validSignature
-      );
-
-      expect(result).toEqual({
-        success: true,
-        planName: 'Gold',
-        planSlug: 'gold',
-      });
-
-      // Verifies old subscriptions are marked expired
-      expect(mockDb.update).toHaveBeenCalledWith(subscriptions);
-
-      // Verifies new subscription is inserted
-      expect(mockDb.insert).toHaveBeenCalledWith(subscriptions);
-      expect(mockInsertValues).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId: 'user-1',
-          planId: 'gold-plan-uuid',
-          paymentId: 'payment-row-uuid',
-          status: 'active',
-        })
+  describe('verifyOrder', () => {
+    it('throws if the payment is missing', async () => {
+      queueSelect(mockDb, [[]]);
+      await expect(paymentsService.verifyOrder('user-1', 'cf_order_1')).rejects.toThrow(
+        NotFoundException,
       );
     });
 
-    it('should return already processed if payment was already captured (idempotency)', async () => {
-      const orderId = 'order_captured_123';
-      const paymentId = 'pay_captured_456';
-      const validSignature = crypto
-        .createHmac('sha256', mockSecret)
-        .update(`${orderId}|${paymentId}`)
-        .digest('hex');
-
-      const paymentRecord = {
-        id: 'payment-row-uuid',
-        status: 'captured',
-      };
-
-      mockDb.select.mockReturnValue({
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([paymentRecord]),
-      });
-
-      const result = await paymentsService.verifyPayment(
-        'user-1',
-        orderId,
-        paymentId,
-        validSignature
+    it('throws if another user owns the payment', async () => {
+      queueSelect(mockDb, [[{ ...createdPayment, userId: 'other' }]]);
+      await expect(paymentsService.verifyOrder('user-1', 'cf_order_1')).rejects.toThrow(
+        ForbiddenException,
       );
+    });
 
-      expect(result).toEqual({
-        success: true,
-        message: 'Payment already processed',
+    it('returns already processed when captured', async () => {
+      queueSelect(mockDb, [[{ ...createdPayment, status: 'captured' }]]);
+      const result = await paymentsService.verifyOrder('user-1', 'cf_order_1');
+      expect(result).toEqual({ success: true, message: 'Payment already processed' });
+      expect(cf().PGFetchOrder).not.toHaveBeenCalled();
+    });
+
+    it('captures and activates on PAID', async () => {
+      queueSelect(mockDb, [[createdPayment], [paidPlan]]);
+      const result = await paymentsService.verifyOrder('user-1', 'cf_order_1');
+      expect(cf().PGFetchOrder).toHaveBeenCalledWith('cf_order_1', expect.any(String));
+      expect(cf().PGOrderFetchPayments).toHaveBeenCalled();
+      expect(result).toEqual({ success: true, planName: 'Silver', planSlug: 'silver' });
+    });
+
+    it('rejects amount/currency mismatch', async () => {
+      queueSelect(mockDb, [[createdPayment]]);
+      cf().PGFetchOrder.mockResolvedValue({
+        data: { order_status: 'PAID', order_amount: 1, order_currency: 'INR' },
       });
+      await expect(paymentsService.verifyOrder('user-1', 'cf_order_1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('returns pending status for non-PAID orders', async () => {
+      queueSelect(mockDb, [[createdPayment]]);
+      cf().PGFetchOrder.mockResolvedValue({
+        data: { order_status: 'ACTIVE', order_amount: 299, order_currency: 'INR' },
+      });
+      const result = await paymentsService.verifyOrder('user-1', 'cf_order_1');
+      expect(result).toMatchObject({ success: false, status: 'ACTIVE' });
     });
   });
 
-  describe('getUserSubscription', () => {
-    it('should return Free plan details when no active subscription is present', async () => {
-      mockDb.select.mockReturnValue({
-        from: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([]),
-      });
+  describe('handleWebhook', () => {
+    const nowTs = () => String(Math.floor(Date.now() / 1000));
+    const raw = Buffer.from(
+      JSON.stringify({
+        type: 'PAYMENT_SUCCESS_WEBHOOK',
+        data: {
+          order: { order_id: 'cf_order_1', order_amount: 299, order_currency: 'INR' },
+          payment: { cf_payment_id: 'cfpay_1', payment_status: 'SUCCESS' },
+        },
+      }),
+    );
 
-      const sub = await paymentsService.getUserSubscription('user-1');
-
-      expect(sub).toEqual({
-        id: 'free',
-        planId: 'free',
-        planSlug: 'free',
-        planName: 'Free',
-        status: 'active',
-        startsAt: null,
-        expiresAt: null,
-      });
+    it('rejects missing signature or timestamp', async () => {
+      await expect(paymentsService.handleWebhook(raw, {})).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should return active paid subscription details when found', async () => {
-      const activeRecord = {
-        id: 'sub-uuid-1',
-        planId: 'gold-uuid',
-        status: 'active',
-        startsAt: new Date('2026-01-01'),
-        expiresAt: new Date('2026-07-01'),
-        plan: {
-          id: 'gold-uuid',
-          slug: 'gold',
-          name: 'Gold',
+    it('rejects timestamps outside the replay window', async () => {
+      const old = String(Math.floor(Date.now() / 1000) - 20 * 60);
+      await expect(
+        paymentsService.handleWebhook(raw, {
+          'x-webhook-signature': 'sig',
+          'x-webhook-timestamp': old,
+        }),
+      ).rejects.toThrow('Webhook timestamp out of replay window');
+    });
+
+    it('rejects invalid signatures', async () => {
+      cf().PGVerifyWebhookSignature.mockImplementation(() => {
+        throw new Error('bad sig');
+      });
+      await expect(
+        paymentsService.handleWebhook(raw, {
+          'x-webhook-signature': 'sig',
+          'x-webhook-timestamp': nowTs(),
+        }),
+      ).rejects.toThrow('Invalid webhook signature');
+    });
+
+    it('ignores duplicate event ids', async () => {
+      cf().PGVerifyWebhookSignature.mockReturnValue({
+        type: 'PAYMENT_SUCCESS_WEBHOOK',
+        object: JSON.parse(raw.toString()),
+      });
+      queueSelect(mockDb, [[{ id: 'pay-1' }]]);
+      const result = await paymentsService.handleWebhook(raw, {
+        'x-webhook-signature': 'sig',
+        'x-webhook-timestamp': nowTs(),
+      });
+      expect(result).toEqual({ received: true, alreadyProcessed: true });
+    });
+
+    it('captures and activates on PAYMENT_SUCCESS_WEBHOOK', async () => {
+      cf().PGVerifyWebhookSignature.mockReturnValue({
+        type: 'PAYMENT_SUCCESS_WEBHOOK',
+        object: JSON.parse(raw.toString()),
+      });
+      queueSelect(mockDb, [[], [createdPayment], [paidPlan]]);
+      const result = await paymentsService.handleWebhook(raw, {
+        'x-webhook-signature': 'sig',
+        'x-webhook-timestamp': nowTs(),
+      });
+      expect(result).toEqual({ received: true });
+      expect(mockDb.update).toHaveBeenCalled();
+    });
+
+    it('flags a discrepancy on amount mismatch', async () => {
+      const mismatch = {
+        type: 'PAYMENT_SUCCESS_WEBHOOK',
+        data: {
+          order: { order_id: 'cf_order_1', order_amount: 1, order_currency: 'INR' },
+          payment: { cf_payment_id: 'cfpay_1' },
         },
       };
-
-      mockDb.select.mockReturnValue({
-        from: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockResolvedValue([activeRecord]),
+      cf().PGVerifyWebhookSignature.mockReturnValue({ type: 'PAYMENT_SUCCESS_WEBHOOK', object: mismatch });
+      queueSelect(mockDb, [[], [createdPayment]]);
+      const result = await paymentsService.handleWebhook(Buffer.from(JSON.stringify(mismatch)), {
+        'x-webhook-signature': 'sig',
+        'x-webhook-timestamp': nowTs(),
       });
+      expect(result).toEqual({ received: true, discrepancy: true });
+    });
 
-      const sub = await paymentsService.getUserSubscription('user-1');
+    it('marks failed on PAYMENT_FAILED_WEBHOOK', async () => {
+      const payload = {
+        type: 'PAYMENT_FAILED_WEBHOOK',
+        data: {
+          order: { order_id: 'cf_order_1', order_amount: 299, order_currency: 'INR' },
+          payment: { payment_status: 'FAILED', error_message: 'bank declined' },
+        },
+      };
+      cf().PGVerifyWebhookSignature.mockReturnValue({ type: 'PAYMENT_FAILED_WEBHOOK', object: payload });
+      queueSelect(mockDb, [[], [createdPayment]]);
+      await paymentsService.handleWebhook(Buffer.from(JSON.stringify(payload)), {
+        'x-webhook-signature': 'sig',
+        'x-webhook-timestamp': nowTs(),
+      });
+      expect(mockDb.update).toHaveBeenCalled();
+    });
 
-      expect(sub.id).toBe('sub-uuid-1');
-      expect(sub.planSlug).toBe('gold');
-      expect(sub.planName).toBe('Gold');
-      expect(sub.status).toBe('active');
+    it('does not activate entitlement on PAYMENT_FLAGGED_WEBHOOK', async () => {
+      const payload = {
+        type: 'PAYMENT_FLAGGED_WEBHOOK',
+        data: {
+          order: { order_id: 'cf_order_1', order_amount: 299, order_currency: 'INR' },
+          payment: { payment_status: 'FLAGGED' },
+        },
+      };
+      cf().PGVerifyWebhookSignature.mockReturnValue({ type: 'PAYMENT_FLAGGED_WEBHOOK', object: payload });
+      queueSelect(mockDb, [[], [createdPayment]]);
+      await paymentsService.handleWebhook(Buffer.from(JSON.stringify(payload)), {
+        'x-webhook-signature': 'sig',
+        'x-webhook-timestamp': nowTs(),
+      });
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(cf().PGOrderFetchPayments).not.toHaveBeenCalled();
+    });
+
+    it('revokes subscription on USER_REFUNDED_WEBHOOK', async () => {
+      const payload = {
+        type: 'USER_REFUNDED_WEBHOOK',
+        data: {
+          order: { order_id: 'cf_order_1', order_amount: 299, order_currency: 'INR' },
+        },
+      };
+      cf().PGVerifyWebhookSignature.mockReturnValue({ type: 'USER_REFUNDED_WEBHOOK', object: payload });
+      queueSelect(mockDb, [[], [{ ...createdPayment, status: 'captured' }]]);
+      await paymentsService.handleWebhook(Buffer.from(JSON.stringify(payload)), {
+        'x-webhook-signature': 'sig',
+        'x-webhook-timestamp': nowTs(),
+      });
+      expect(mockDb.update).toHaveBeenCalled();
+    });
+
+    it('logs and ignores unknown event types', async () => {
+      const payload = {
+        type: 'SOMETHING_ELSE',
+        data: { order: { order_id: 'cf_order_1', order_amount: 299, order_currency: 'INR' } },
+      };
+      cf().PGVerifyWebhookSignature.mockReturnValue({ type: 'SOMETHING_ELSE', object: payload });
+      queueSelect(mockDb, [[], [createdPayment]]);
+      const result = await paymentsService.handleWebhook(Buffer.from(JSON.stringify(payload)), {
+        'x-webhook-signature': 'sig',
+        'x-webhook-timestamp': nowTs(),
+      });
+      expect(result).toEqual({ received: true });
     });
   });
 
-  describe('getUserInvoices', () => {
-    it('should return formatted invoices for captured payments', async () => {
-      const mockPaymentRows = [
-        {
-          id: 'pay-1',
-          amountPaise: 49900,
-          currency: 'INR',
-          status: 'captured',
-          provider: 'razorpay',
-          providerOrderId: 'order_123',
-          createdAt: new Date('2026-03-01T10:00:00Z'),
-          planName: 'Gold',
-          planSlug: 'gold',
-        },
-      ];
+  describe('reconcileOrder', () => {
+    it('captures PAID stuck orders via PGOrderFetchPayments', async () => {
+      queueSelect(mockDb, [[paidPlan]]);
+      const result = await paymentsService.reconcileOrder(createdPayment as any);
+      expect(cf().PGFetchOrder).toHaveBeenCalled();
+      expect(cf().PGOrderFetchPayments).toHaveBeenCalled();
+      expect(result).toEqual({ captured: true });
+    });
 
-      mockDb.select.mockReturnValue({
-        from: jest.fn().mockReturnThis(),
-        innerJoin: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockResolvedValue(mockPaymentRows),
+    it('marks EXPIRED orders as failed', async () => {
+      cf().PGFetchOrder.mockResolvedValue({
+        data: { order_status: 'EXPIRED', order_amount: 299, order_currency: 'INR' },
       });
+      const result = await paymentsService.reconcileOrder(createdPayment as any);
+      expect(result).toEqual({ failed: true });
+    });
 
-      const invoices = await paymentsService.getUserInvoices('user-1');
+    it('flags discrepancy on amount mismatch', async () => {
+      cf().PGFetchOrder.mockResolvedValue({
+        data: { order_status: 'PAID', order_amount: 1, order_currency: 'INR' },
+      });
+      const result = await paymentsService.reconcileOrder(createdPayment as any);
+      expect(result).toEqual({ discrepancy: true });
+    });
 
-      expect(invoices.length).toBe(1);
-      expect(invoices[0].amount).toBe('₹499');
-      expect(invoices[0].method).toBe('Razorpay');
-      expect(invoices[0].status).toBe('paid');
-      expect(invoices[0].planName).toBe('Gold');
+    it('terminates ACTIVE orders older than 20 minutes', async () => {
+      cf().PGFetchOrder.mockResolvedValue({
+        data: { order_status: 'ACTIVE', order_amount: 299, order_currency: 'INR' },
+      });
+      cf().PGTerminateOrder.mockResolvedValue({ data: { order_status: 'TERMINATION_REQUESTED' } });
+      const stale = {
+        ...createdPayment,
+        createdAt: new Date(Date.now() - 25 * 60_000),
+      };
+      const result = await paymentsService.reconcileOrder(stale as any);
+      expect(cf().PGTerminateOrder).toHaveBeenCalled();
+      expect(result).toMatchObject({ pending: true, status: 'ACTIVE' });
+    });
+  });
+
+  describe('withRateLimit', () => {
+    beforeEach(() => {
+      jest.spyOn(global, 'setTimeout').mockImplementation((fn: any) => {
+        if (typeof fn === 'function') fn();
+        return 0 as any;
+      });
+    });
+
+    afterEach(() => {
+      (global.setTimeout as unknown as jest.Mock).mockRestore();
+    });
+
+    it('retries on 429 using x-ratelimit-retry', async () => {
+      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      cf()
+        .PGCreateOrder.mockRejectedValueOnce({
+          response: { status: 429, headers: { 'x-ratelimit-retry': '1' }, data: { type: 'rate_limit_error' } },
+        })
+        .mockResolvedValueOnce({
+          data: { order_id: 'cf_order_1', payment_session_id: 'sess_1', order_status: 'ACTIVE' },
+          headers: {},
+        });
+      const result = await paymentsService.createOrder('user-1', 'silver');
+      expect(result.orderId).toBe('cf_order_1');
+      expect(cf().PGCreateOrder).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws after 3 failed 429 attempts', async () => {
+      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      cf().PGCreateOrder.mockRejectedValue({
+        response: { status: 429, headers: { 'x-ratelimit-retry': '1' }, data: { type: 'rate_limit_error' } },
+      });
+      await expect(paymentsService.createOrder('user-1', 'silver')).rejects.toThrow(
+        InternalServerErrorException,
+      );
+      expect(cf().PGCreateOrder).toHaveBeenCalledTimes(3);
+    });
+
+    it('passes through non-429 errors immediately', async () => {
+      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      cf().PGCreateOrder.mockRejectedValue({ response: { status: 500, data: { message: 'nope' } } });
+      await expect(paymentsService.createOrder('user-1', 'silver')).rejects.toThrow(
+        InternalServerErrorException,
+      );
+      expect(cf().PGCreateOrder).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -8,7 +8,9 @@ module.exports = {
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
+    '^@nestjs/schedule$': '<rootDir>/test/mocks/nestjs-schedule.ts',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@astalakshimi/database$': '<rootDir>/../../packages/database/dist/index',
     '^@astalakshimi/database/(.*)$': '<rootDir>/../../packages/database/dist/$1',

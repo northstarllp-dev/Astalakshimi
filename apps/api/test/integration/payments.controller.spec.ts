@@ -1,11 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { UnauthorizedException } from '@nestjs/common';
 import { PaymentsController } from '../../src/payments/payments.controller';
 import { PaymentsService } from '../../src/payments/payments.service';
 import type { UserSession } from '@astalakshimi/types';
 
-describe('Feature 4: Payments - PaymentsController (Integration Tests)', () => {
+describe('PaymentsController (Cashfree)', () => {
   let controller: PaymentsController;
   let paymentsService: jest.Mocked<PaymentsService>;
+  let configService: { get: jest.Mock };
 
   const mockUserSession: UserSession = {
     userId: 'user-uuid-1',
@@ -14,120 +17,132 @@ describe('Feature 4: Payments - PaymentsController (Integration Tests)', () => {
   };
 
   beforeEach(async () => {
+    configService = {
+      get: jest.fn((key: string) => {
+        if (key === 'payments.webhookIpAllowlistEnabled') return false;
+        if (key === 'payments.cashfreeWebhookIps') return [];
+        return undefined;
+      }),
+    };
+
     const mockPaymentsService = {
       createOrder: jest.fn(),
-      verifyPayment: jest.fn(),
+      verifyOrder: jest.fn(),
       getUserSubscription: jest.fn(),
       getUserInvoices: jest.fn(),
+      createRefund: jest.fn(),
+      handleWebhook: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PaymentsController],
       providers: [
-        {
-          provide: PaymentsService,
-          useValue: mockPaymentsService,
-        },
+        { provide: PaymentsService, useValue: mockPaymentsService },
+        { provide: ConfigService, useValue: configService },
       ],
     }).compile();
 
-    controller = module.get<PaymentsController>(PaymentsController);
+    controller = module.get(PaymentsController);
     paymentsService = module.get(PaymentsService);
   });
 
   describe('POST /payments/orders', () => {
-    it('should create an order for the selected plan', async () => {
+    it('returns Cashfree session data', async () => {
       const expected = {
-        orderId: 'order_123',
+        orderId: 'cf_order_1',
+        paymentSessionId: 'sess_1',
         amount: 29900,
         currency: 'INR',
-        keyId: 'rzp_key',
         planId: 'plan-1',
         planSlug: 'silver',
         planName: 'Silver',
       };
-
-      paymentsService.createOrder.mockResolvedValue(expected);
+      paymentsService.createOrder.mockResolvedValue(expected as any);
 
       const result = await controller.createOrder(mockUserSession, { planId: 'silver' });
 
-      expect(paymentsService.createOrder).toHaveBeenCalledWith(
-        mockUserSession.userId,
-        'silver'
-      );
+      expect(paymentsService.createOrder).toHaveBeenCalledWith(mockUserSession.userId, 'silver');
       expect(result).toEqual(expected);
     });
   });
 
   describe('POST /payments/verify', () => {
-    it('should verify payment signature and activate subscription', async () => {
-      const body = {
-        razorpayOrderId: 'order_123',
-        razorpayPaymentId: 'pay_123',
-        razorpaySignature: 'sig_123',
-      };
+    it('verifies the order server-side', async () => {
+      const expected = { success: true, planName: 'Silver', planSlug: 'silver' };
+      paymentsService.verifyOrder.mockResolvedValue(expected as any);
 
-      const expected = {
-        success: true,
-        planName: 'Silver',
-        planSlug: 'silver',
-      };
+      const result = await controller.verifyOrder(mockUserSession, { orderId: 'cf_order_1' });
 
-      paymentsService.verifyPayment.mockResolvedValue(expected);
-
-      const result = await controller.verifyPayment(mockUserSession, body);
-
-      expect(paymentsService.verifyPayment).toHaveBeenCalledWith(
-        mockUserSession.userId,
-        body.razorpayOrderId,
-        body.razorpayPaymentId,
-        body.razorpaySignature
-      );
+      expect(paymentsService.verifyOrder).toHaveBeenCalledWith(mockUserSession.userId, 'cf_order_1');
       expect(result).toEqual(expected);
+    });
+  });
+
+  describe('POST /payments/webhook/cashfree', () => {
+    it('forwards a valid signature payload', async () => {
+      paymentsService.handleWebhook.mockResolvedValue({ received: true } as any);
+      const req = {
+        rawBody: Buffer.from('{"type":"PAYMENT_SUCCESS_WEBHOOK"}'),
+        headers: {},
+        ip: '127.0.0.1',
+      } as any;
+
+      const result = await controller.webhook(req, {
+        'x-webhook-signature': 'sig',
+        'x-webhook-timestamp': '123',
+      });
+
+      expect(paymentsService.handleWebhook).toHaveBeenCalled();
+      expect(result).toEqual({ received: true });
+    });
+
+    it('returns 401 when the signature handler rejects', async () => {
+      paymentsService.handleWebhook.mockRejectedValue(new UnauthorizedException('Invalid webhook signature'));
+      const req = {
+        rawBody: Buffer.from('{"type":"PAYMENT_SUCCESS_WEBHOOK"}'),
+        headers: {},
+        ip: '127.0.0.1',
+      } as any;
+
+      await expect(
+        controller.webhook(req, { 'x-webhook-signature': 'bad', 'x-webhook-timestamp': '123' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects missing raw body', async () => {
+      await expect(controller.webhook({ headers: {}, ip: '1.1.1.1' } as any, {})).rejects.toThrow(
+        'Missing webhook body',
+      );
+    });
+
+    it('rejects non-allowlisted IPs when the allow-list is enabled', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'payments.webhookIpAllowlistEnabled') return true;
+        if (key === 'payments.cashfreeWebhookIps') return ['52.66.25.127'];
+        return undefined;
+      });
+      const req = {
+        rawBody: Buffer.from('{}'),
+        headers: { 'x-forwarded-for': '1.2.3.4' },
+        ip: '1.2.3.4',
+      } as any;
+      await expect(controller.webhook(req, {})).rejects.toThrow('IP not allowed');
     });
   });
 
   describe('GET /payments/subscription', () => {
-    it('should return the user subscription', async () => {
-      const expected = {
-        id: 'sub-1',
-        planId: 'silver',
-        planSlug: 'silver',
-        planName: 'Silver',
-        status: 'active',
-        startsAt: new Date(),
-        expiresAt: new Date(),
-      };
-
+    it('returns the user subscription', async () => {
+      const expected = { id: 'sub-1', planSlug: 'silver', status: 'active' };
       paymentsService.getUserSubscription.mockResolvedValue(expected as any);
-
-      const result = await controller.getSubscription(mockUserSession);
-
-      expect(paymentsService.getUserSubscription).toHaveBeenCalledWith(mockUserSession.userId);
-      expect(result).toEqual(expected);
+      await expect(controller.getSubscription(mockUserSession)).resolves.toEqual(expected);
     });
   });
 
   describe('GET /payments/invoices', () => {
-    it('should return invoice list for user', async () => {
-      const expected = [
-        {
-          id: 'pay-1',
-          planId: 'silver',
-          planName: 'Silver',
-          amount: '₹299',
-          method: 'Razorpay',
-          status: 'paid',
-          paidAt: new Date().toISOString(),
-        },
-      ];
-
-      paymentsService.getUserInvoices.mockResolvedValue(expected);
-
-      const result = await controller.getInvoices(mockUserSession);
-
-      expect(paymentsService.getUserInvoices).toHaveBeenCalledWith(mockUserSession.userId);
-      expect(result).toEqual(expected);
+    it('returns invoices', async () => {
+      const expected = [{ id: 'pay-1', method: 'Cashfree', status: 'paid' }];
+      paymentsService.getUserInvoices.mockResolvedValue(expected as any);
+      await expect(controller.getInvoices(mockUserSession)).resolves.toEqual(expected);
     });
   });
 });

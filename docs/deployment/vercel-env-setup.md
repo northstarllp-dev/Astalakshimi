@@ -33,9 +33,7 @@ not in chat history.
 | `APITXT_CHANNEL`             | `sms`                                                                             | |
 | `APITXT_COUNTRY`             | `91`                                                                              | |
 | `APITXT_TEMPLATE_ID`         | (your verified DLT template id — leave blank for default config)                  | Optional. |
-| `RAZORPAY_KEY_ID`            | `rzp_live_...`                                                                    | |
-| `RAZORPAY_KEY_SECRET`        | Razorpay dashboard                                                                | |
-| `RAZORPAY_WEBHOOK_SECRET`    | Razorpay → Settings → Webhooks                                                     | For future webhook. |
+| `NEXT_PUBLIC_CASHFREE_ENVIRONMENT` | `sandbox` or `production`                                                   | Web SDK mode when checkout is wired. Payment secrets stay on the API. |
 | `AWS_REGION`                 | `ap-south-1`                                                                      | **Server-only** (no `NEXT_PUBLIC_`). Used by S3 presign. |
 | `AWS_ACCESS_KEY_ID`          | IAM → Users → Security credentials → rotate                                         | Rotated — paste the new one. |
 | `AWS_SECRET_ACCESS_KEY`      | Same as above                                                                     | Rotated. |
@@ -78,7 +76,7 @@ Don't override these on Vercel — the platform controls them:
 
 ```text
 1. Rotate AWS keys in IAM.
-2. Rotate Razorpay live secret in Razorpay dashboard.
+2. Rotate Cashfree live secret in the merchant dashboard (API `.env` on EC2, not Vercel).
 3. Rotate JWT_SECRET (generate new, paste to env).
 4. Paste all rotated secrets into Vercel Production.
 5. Redeploy.

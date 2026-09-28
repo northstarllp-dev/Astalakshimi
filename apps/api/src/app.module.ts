@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { configs } from './config/index';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -37,6 +38,7 @@ import { JwtAuthGuard } from './common/guards/auth.guard';
       envFilePath: ['../../.env', '.env'],
     }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
+    ScheduleModule.forRoot(),
     CommonModule,
     DatabaseModule,
     HealthModule,

@@ -48,7 +48,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/dashboard` | Discover  search & browse |
 | `/search` | search + filters |
 | `/inbox`, `/inbox/[threadId]` | interests + mock chat |
-| `/plans`, `/checkout` | Membership  Free/Silver/Gold/Platinum, Razorpay demo, invoices, refer & earn |
+| `/plans`, `/checkout` | Membership  Free/Silver/Gold/Platinum, Cashfree adapter (paywall not wired), invoices, refer & earn |
 | `/profile`, `/profile/edit` | my profile |
 | `/settings` | privacy + alerts |
 | `/shortlist` | saved matches |

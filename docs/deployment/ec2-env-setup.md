@@ -68,13 +68,19 @@ and fails closed if delivery is not configured.
 | `AWS_S3_VAULT_BUCKET`     | `ashtalakshmi-verification`                  |
 | `CLOUDFRONT_URL`          | *(empty or your CDN)*                        |
 
-### Payments (Razorpay)
+### Payments (Cashfree)
 
-| Var                            | Production              | Notes |
-| ------------------------------ | ----------------------- | ----- |
-| `RAZORPAY_KEY_ID`              | `rzp_live_...`           | Required by PaymentsService. |
-| `RAZORPAY_KEY_SECRET`          | *(Razorpay — rotate)*   | **Production fail-fast:** API refuses to start without this. |
-| `RAZORPAY_WEBHOOK_SECRET`      | *(set on Razorpay side)*| Future webhook support. |
+| Var | Production | Notes |
+| --- | --- | --- |
+| `CASHFREE_CLIENT_ID` | Merchant App ID | **Fail-fast:** API refuses to start without this. |
+| `CASHFREE_CLIENT_SECRET` | Merchant secret | **Fail-fast.** |
+| `CASHFREE_WEBHOOK_SECRET` | Dashboard webhook secret | Usually the client secret. Unsigned webhooks are rejected until set. |
+| `CASHFREE_ENVIRONMENT` | `production` | Must be `sandbox` or `production`. |
+| `CASHFREE_API_VERSION` | `2025-01-01` | Team collection version. |
+| `PAYMENTS_WEBHOOK_IP_ALLOWLIST_ENABLED` | `true` in prod | Optional in sandbox. |
+| `CASHFREE_WEBHOOK_IPS` | Prod source IPs | See `docs/payments/cashfree-runbook.md`. |
+| `FRONTEND_URL` | Public web origin | Used as Cashfree `return_url`. |
+| `API_PUBLIC_URL` | Public API origin including `/api` | Used as Cashfree `notify_url`. |
 
 ### App
 
@@ -111,7 +117,7 @@ The API **refuses to boot** in production if any of these is missing/weak:
 1. `JWT_SECRET` < 32 chars or starts with `astalakshimi-`
 2. `SMS_PROVIDER` unset (use `apitxt` with `APITXT_AUTH_KEY`)
 3. `SMS_PROVIDER=apitxt` and `APITXT_AUTH_KEY` is missing  → SmsService throws on first OTP
-4. `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` missing  → PaymentsConfig throws
+4. `CASHFREE_CLIENT_ID`/`CASHFREE_CLIENT_SECRET` missing  → PaymentsConfig throws
 
 In **development** JWT falls back to a dev secret, but SMS still fails closed —
 set `SMS_PROVIDER=apitxt` + `APITXT_AUTH_KEY` in `.env` or send-otp returns 500.

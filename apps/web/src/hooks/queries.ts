@@ -1200,21 +1200,8 @@ export function useUnlockContactMutation() {
 export function usePayExtraContactUnlockMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (targetProfileId: string) => {
-      const order = await apiClient.contacts.createPaidOrder(targetProfileId)
-      const { openRazorpayCheckout } = await import("@/lib/razorpay")
-      const paid = await openRazorpayCheckout({
-        keyId: order.keyId,
-        orderId: order.orderId,
-        amount: order.amount,
-        currency: order.currency,
-        description: "Extra contact unlock",
-      })
-      const verified = await apiClient.contacts.verifyPaidUnlock({
-        targetProfileId,
-        ...paid,
-      })
-      return { success: verified.success, contactPhone: verified.contactPhone ?? null }
+    mutationFn: async (_targetProfileId: string): Promise<{ success: boolean; contactPhone: string | null }> => {
+      throw new Error("Paid contact unlock is not available yet.")
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.contactUsage })
