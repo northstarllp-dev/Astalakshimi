@@ -68,7 +68,16 @@ describe('Feature 7: Shortlisting - ShortlistsService (Unit Tests)', () => {
           },
         },
       ];
-      const mockPhotos = [{ profileId: 'prof-target', s3Key: 'photo-url.jpg' }];
+      const mockPhotos = [
+        {
+          profileId: 'prof-target',
+          id: '11111111-2222-3333-4444-555555555555',
+          s3Key: 'profiles/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/photos/11111111-2222-3333-4444-555555555555.jpg',
+          isPrimary: true,
+          displayOrder: 0,
+          status: 'approved',
+        },
+      ];
 
       mockDb.select = mockQueryBuilder([
         [{ id: 'prof-curr' }], // getProfileId
@@ -83,7 +92,9 @@ describe('Feature 7: Shortlisting - ShortlistsService (Unit Tests)', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].fullName).toBe('Target User');
-      expect(result[0].photos).toEqual(['photo-url.jpg']);
+      expect(result[0].photos).toEqual([
+        'profiles/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/photos/11111111-2222-3333-4444-555555555555.jpg',
+      ]);
       expect(result[0].age).toBeGreaterThanOrEqual(30);
       expect((result[0] as { matchPercent?: number }).matchPercent).toBeUndefined();
     });

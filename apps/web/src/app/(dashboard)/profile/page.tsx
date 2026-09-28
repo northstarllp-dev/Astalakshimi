@@ -8,6 +8,7 @@ import Link from "next/link"
 import { displayHeight, formatHeightFromCm } from "@/lib/input-units"
 import { maritalAsksChildren } from "@/lib/identity-fields"
 import { getMediaUrl } from "@/lib/utils"
+import { ProfilePhotoMark } from "@/components/profile/profile-photo-mark"
 import { useProfileQuery } from "@/hooks/queries"
 import { emptySignupData, VERIFICATION_SLA_HOURS, formatSiblings, getPrimaryPhotoSrc, PHOTO_PRIVACY } from "@/lib/profile-store"
 import { CompletenessRing } from "@/components/profile/completeness-ring"
@@ -139,21 +140,15 @@ export default function MyProfilePage() {
         <div className="px-4 pt-5 sm:px-6 sm:pt-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-muted sm:h-24 sm:w-24">
-                {primaryPhoto ? (
-                  <Image
-                    src={getMediaUrl(primaryPhoto)}
-                    alt=""
-                    fill
-                    className={`object-cover ${pending ? "blur-[2px]" : ""}`}
-                    sizes="96px"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center font-serif text-2xl font-bold text-primary">
-                    {(data.fullName || "M")[0]}
-                  </div>
-                )}
-              </div>
+              <ProfilePhotoMark
+                src={primaryPhoto}
+                name={data.fullName}
+                blur={pending}
+                alt={data.fullName || "Profile photo"}
+                sizes="96px"
+                className="h-20 w-20 shrink-0 rounded-2xl border border-border sm:h-24 sm:w-24"
+                letterClassName="font-serif text-2xl"
+              />
               <div className="min-w-0">
                 <h1 className="font-serif text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
                   {data.fullName || "Member"}

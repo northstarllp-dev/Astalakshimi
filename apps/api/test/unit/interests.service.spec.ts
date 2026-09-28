@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InterestsService } from '../../src/interests/interests.service';
+import { resolveInterestWindow } from '../../src/entitlements/interest-window';
 import { interests, profiles, profilePhotos } from '@astalakshimi/database';
 
 describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
@@ -15,6 +16,7 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
     fullName: 'Karthik Loganathan',
     dob: '1995-06-15',
     city: 'Chennai',
+    createdAt: new Date('2026-01-10T10:00:00.000Z'),
   };
 
   const targetProfile = {
@@ -44,7 +46,10 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
       getUserPlan: jest.fn().mockResolvedValue({
         slug: 'free',
         interestQuota: 30,
+        startsAt: null,
+        expiresAt: null,
       }),
+      getLastEndedSubscriptionAt: jest.fn().mockResolvedValue(null),
     };
 
     mockNotificationsService = {
@@ -189,6 +194,91 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
       await expect(
         interestsService.sendInterest('sender-user-id', { targetProfileId: targetProfile.id })
       ).rejects.toThrow('You have reached your interest quota limit of 100');
+    });
+
+    it('should throw ForbiddenException if user on Gold plan has reached their interest quota limit of 500', async () => {
+      mockEntitlementsService.getUserPlan.mockResolvedValue({
+        slug: 'gold',
+        interestQuota: 500,
+        startsAt: new Date('2026-09-01T00:00:00.000Z'),
+        expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+      });
+
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([senderProfile]),
+          };
+        } else if (selectCount === 2) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([targetProfile]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue([{ count: 500 }]),
+        };
+      });
+
+      await expect(
+        interestsService.sendInterest('sender-user-id', { targetProfileId: targetProfile.id })
+      ).rejects.toThrow('You have reached your interest quota limit of 500 for this Gold plan');
+    });
+
+    it('does not apply an interest cap for Platinum unlimited', async () => {
+      mockEntitlementsService.getUserPlan.mockResolvedValue({
+        slug: 'platinum',
+        interestQuota: null,
+        startsAt: new Date('2026-09-01T00:00:00.000Z'),
+        expiresAt: new Date('2026-12-01T00:00:00.000Z'),
+      });
+
+      let selectCount = 0;
+      mockDb.select.mockImplementation(() => {
+        selectCount++;
+        if (selectCount === 1) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([senderProfile]),
+          };
+        }
+        if (selectCount === 2) {
+          return {
+            from: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockResolvedValue([targetProfile]),
+          };
+        }
+        return {
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([]),
+        };
+      });
+      mockDb.insert.mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([
+            {
+              id: 'interest-1',
+              senderProfileId: senderProfile.id,
+              receiverProfileId: targetProfile.id,
+              status: 'pending',
+            },
+          ]),
+        }),
+      });
+
+      const result = await interestsService.sendInterest('sender-user-id', {
+        targetProfileId: targetProfile.id,
+      });
+      expect(result.status).toBe('pending');
     });
 
     it('should auto-accept into mutual match if target user already sent a pending interest', async () => {
@@ -914,6 +1004,8 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
       mockEntitlementsService.getUserPlan.mockResolvedValue({
         slug: 'free',
         interestQuota: 30,
+        startsAt: null,
+        expiresAt: null,
       });
 
       let selectCount = 0;
@@ -923,7 +1015,7 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
           return {
             from: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([{ id: senderProfile.id }]),
+            limit: jest.fn().mockResolvedValue([{ id: senderProfile.id, createdAt: senderProfile.createdAt }]),
           };
         }
         return {
@@ -932,11 +1024,20 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
         };
       });
 
+      const window = resolveInterestWindow({
+        slug: 'free',
+        interestQuota: 30,
+        profileCreatedAt: senderProfile.createdAt,
+      });
+
       await expect(interestsService.getUsage('sender-user-id')).resolves.toEqual({
         planSlug: 'free',
         limit: 30,
         used: 7,
         remaining: 23,
+        periodStart: window.start?.toISOString() ?? null,
+        periodEnd: window.end?.toISOString() ?? null,
+        periodLabel: 'this 30 days',
       });
     });
 
@@ -952,9 +1053,92 @@ describe('Feature 3: Interest System - InterestsService (Unit Tests)', () => {
         limit: 30,
         used: 0,
         remaining: 30,
+        periodStart: null,
+        periodEnd: null,
+        periodLabel: 'this 30 days',
+      });
+    });
+
+    it('ignores sends from the previous 30-day cycle', async () => {
+      mockEntitlementsService.getUserPlan.mockResolvedValue({
+        slug: 'free',
+        interestQuota: 30,
+        startsAt: null,
+        expiresAt: null,
+      });
+      mockDb.select.mockImplementation(() => ({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: senderProfile.id, createdAt: senderProfile.createdAt }]),
+      }));
+      mockDb.select
+        .mockImplementationOnce(() => ({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([{ id: senderProfile.id, createdAt: senderProfile.createdAt }]),
+        }))
+        .mockImplementationOnce(() => ({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue([{ count: 2 }]),
+        }));
+
+      const usage = await interestsService.getUsage('sender-user-id');
+      expect(usage.used).toBe(2);
+      expect(usage.periodLabel).toBe('this 30 days');
+    });
+
+    it('starts Silver usage at zero after an upgrade', async () => {
+      const startsAt = new Date('2026-09-28T00:00:00.000Z');
+      mockEntitlementsService.getUserPlan.mockResolvedValue({
+        slug: 'silver',
+        interestQuota: 100,
+        startsAt,
+        expiresAt: new Date('2026-12-27T00:00:00.000Z'),
+      });
+      mockDb.select
+        .mockImplementationOnce(() => ({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([{ id: senderProfile.id, createdAt: senderProfile.createdAt }]),
+        }))
+        .mockImplementationOnce(() => ({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockResolvedValue([{ count: 0 }]),
+        }));
+
+      await expect(interestsService.getUsage('sender-user-id')).resolves.toMatchObject({
+        planSlug: 'silver',
+        limit: 100,
+        used: 0,
+        remaining: 100,
+        periodLabel: 'this Silver plan',
+        periodStart: startsAt.toISOString(),
+      });
+    });
+
+    it('does not count Platinum interests', async () => {
+      mockEntitlementsService.getUserPlan.mockResolvedValue({
+        slug: 'platinum',
+        interestQuota: null,
+        startsAt: new Date(),
+        expiresAt: new Date(Date.now() + 86400000),
+      });
+      mockDb.select.mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([{ id: senderProfile.id, createdAt: senderProfile.createdAt }]),
+      });
+
+      await expect(interestsService.getUsage('sender-user-id')).resolves.toMatchObject({
+        planSlug: 'platinum',
+        limit: null,
+        used: 0,
+        remaining: null,
+        periodLabel: 'unlimited',
       });
     });
   });
+
   describe('getSummary & list methods', () => {
     it('should compute summary with received, sent, mutual counts', async () => {
       jest.spyOn(interestsService, 'getReceivedInterests').mockResolvedValue([

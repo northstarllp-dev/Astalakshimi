@@ -6,6 +6,7 @@ import {
   text,
   pgEnum,
   uniqueIndex,
+  index,
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
 
@@ -37,6 +38,8 @@ export const interests = pgTable(
       table.senderProfileId,
       table.receiverProfileId
     ),
+    index('interests_sender_status_idx').on(table.senderProfileId, table.status),
+    index('interests_receiver_status_idx').on(table.receiverProfileId, table.status),
   ]
 );
 

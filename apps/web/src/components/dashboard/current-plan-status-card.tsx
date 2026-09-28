@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { getPlanById, type PlanId } from "@/lib/plans"
+import { formatInterestQuotaUsage, interestQuotaHint, isInterestQuotaExhausted } from "@/lib/interest-quota"
+import { contactQuotaHint, formatContactQuotaUsage, isContactQuotaExhausted } from "@/lib/contact-quota"
 import { useSubscriptionQuery, useContactUsageQuery, useInterestUsageQuery } from "@/hooks/queries"
 import { Check, Lock, Sparkles } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 const TIER_ORDER: PlanId[] = ["free", "silver", "gold", "platinum", "diamond"]
 const RENEWAL_WINDOW_DAYS = 7
@@ -26,20 +29,30 @@ const formatExpiry = (date: any) => {
   })
 }
 
-const formatQuotaUsage = (used: number, limit: number | null | undefined) => {
-  if (limit == null) return `${used} · Unlimited`
-  return `${used} / ${limit}`
-}
-
 const shouldShowRenewal = (date: any) => {
   if (!date) return false
   const days = daysRemaining(date)
   return days > 0 && days <= RENEWAL_WINDOW_DAYS
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+function Stat({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string
+  value: React.ReactNode
+  tone?: "default" | "warn"
+}) {
   return (
-    <div className="rounded-xl border border-secondary/20 bg-secondary/5 p-3 sm:p-4">
+    <div
+      className={cn(
+        "rounded-xl border p-3 sm:p-4",
+        tone === "warn"
+          ? "border-amber-200 bg-amber-50"
+          : "border-secondary/20 bg-secondary/5",
+      )}
+    >
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 font-semibold">{value}</p>
     </div>
@@ -62,6 +75,10 @@ export function CurrentPlanStatusCard() {
   const remaining = sub ? daysRemaining(sub.expiresAt) : 0
   const showRenewal = sub ? shouldShowRenewal(sub.expiresAt) : false
   const unlockedLabels = current?.features ?? []
+  const interestExhausted = isInterestQuotaExhausted(interestUsage)
+  const interestHint = interestQuotaHint(interestUsage)
+  const contactExhausted = isContactQuotaExhausted(contactUsage)
+  const contactHint = contactQuotaHint(contactUsage)
 
   const choosePlan = () => {
     router.push("/plans")
@@ -94,13 +111,37 @@ export function CurrentPlanStatusCard() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Stat
               label="Connection requests used"
-              value={formatQuotaUsage(interestUsage?.used ?? 0, interestUsage?.limit)}
+              tone={interestExhausted ? "warn" : "default"}
+              value={formatInterestQuotaUsage(interestUsage)}
             />
             <Stat
               label="Contact unlocks used"
-              value={formatQuotaUsage(contactUsage?.usedThisMonth ?? 0, contactUsage?.limit)}
+              tone={contactExhausted ? "warn" : "default"}
+              value={formatContactQuotaUsage(contactUsage)}
             />
           </div>
+          {contactExhausted && contactHint ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Contact unlocks used up</p>
+              <p className="mt-1 text-amber-900/80">{contactHint}</p>
+              {currentPlanId !== "diamond" ? (
+                <Button size="sm" className="mt-3" onClick={choosePlan}>
+                  Upgrade plan
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          {interestExhausted && interestHint ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Interest quota used up</p>
+              <p className="mt-1 text-amber-900/80">{interestHint}</p>
+              {currentPlanId !== "diamond" ? (
+                <Button size="sm" className="mt-3" onClick={choosePlan}>
+                  Upgrade plan
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           <div>
             <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Features unlocked</p>
             <div className="mt-2 flex flex-wrap gap-2">

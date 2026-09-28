@@ -113,6 +113,20 @@
       "when": 1790000000000,
       "tag": "0018_cashfree_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790100000000,
+      "tag": "0019_subscription_payment_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790200000000,
+      "tag": "0020_query_performance_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -43,6 +43,7 @@ vi.mock('@/hooks/queries', async (importOriginal) => {
     useSearchQuery: () => ({ data: { profiles: [], totalCount: 0 }, isLoading: false }),
     useUnlockedContactsQuery: () => ({ data: [] }),
     useContactUsageQuery: () => ({ data: null }),
+    useInterestUsageQuery: () => ({ data: { planSlug: "free", limit: 30, used: 0, remaining: 30, periodLabel: "this 30 days" } }),
   }
 })
 

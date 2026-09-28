@@ -18,6 +18,7 @@ jest.mock('../matches/match-scoring', () => ({
 
 jest.mock('../common/photo-access', () => ({
   getApprovedPrimaryPhotos: jest.fn(),
+  getAllApprovedPhotosForProfiles: jest.fn().mockResolvedValue(new Map()),
   computeBlurDecision: jest.fn().mockReturnValue({ blurPhoto: false, withholdKey: false }),
 }));
 

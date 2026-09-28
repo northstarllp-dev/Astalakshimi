@@ -5,6 +5,7 @@ import {
   varchar,
   text,
   boolean,
+  index,
 } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { profiles } from './profiles';
@@ -24,7 +25,9 @@ export const notifications = pgTable('notifications', {
   actorProfileId: uuid('actor_profile_id')
     .references(() => profiles.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  userCreatedIdx: index('notifications_user_created_idx').on(table.userId, table.createdAt),
+}));
 
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;

@@ -326,7 +326,13 @@ describe('Feature 5: Chat - ChatService (Unit Tests)', () => {
           // photos (getApprovedPrimaryPhotos)
           return {
             from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockResolvedValue([{ profileId: partnerProfile.id, s3Key: 'photo1.jpg', id: 'ph-1' }]),
+            where: jest.fn().mockResolvedValue([
+              {
+                profileId: partnerProfile.id,
+                s3Key: 'profiles/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/photos/11111111-2222-3333-4444-555555555555.jpg',
+                id: '11111111-2222-3333-4444-555555555555',
+              },
+            ]),
           };
         } else {
           // fallback (e.g. unread count if called separately)
@@ -343,7 +349,9 @@ describe('Feature 5: Chat - ChatService (Unit Tests)', () => {
       expect(threads[0].profile.fullName).toBe('Ananya Sharma');
       expect(threads[0].lastMessage).toBe('Latest message text');
       expect(threads[0].unreadCount).toBe(2);
-      expect(threads[0].profile.photo).toBe('photo1.jpg');
+      expect(threads[0].profile.photo).toBe(
+        'profiles/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/photos/11111111-2222-3333-4444-555555555555.jpg',
+      );
     });
   });
 

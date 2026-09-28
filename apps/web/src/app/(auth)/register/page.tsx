@@ -48,7 +48,15 @@ import { ChildrenFields } from "@/components/profile/children-fields"
 import { MultiSelect } from "@/components/profile/multi-select"
 import { SearchableSelect } from "@/components/profile/searchable-select"
 import { Step4Verify, VerificationSubmitted } from "@/components/signup/step-verify"
-import { useSaveProfileMutation } from "@/hooks/queries"
+import {
+  HomeEntrance,
+  isHomeHandoffPending,
+  markHomeHandoffPending,
+  clearHomeHandoffPending,
+  waitForHomeHandoff,
+} from "@/components/dashboard/home-entrance"
+import { prefetchHomeArrival, useSaveProfileMutation } from "@/hooks/queries"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   signupStep1Schema,
   signupStep2Schema,
@@ -78,20 +86,37 @@ function SignupPageInner() {
   const [submitted, setSubmitted] = useState(false)
   const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [data, setData] = useState<SignupData>(emptySignupData)
+  const [openingHome, setOpeningHome] = useState(false)
   const saveProfileMutation = useSaveProfileMutation()
+  const queryClient = useQueryClient()
+  const openingStarted = React.useRef(false)
+
+  const beginHomeHandoff = React.useCallback((replace = false) => {
+    if (openingStarted.current) return
+    openingStarted.current = true
+    setOpeningHome(true)
+    markHomeHandoffPending()
+    void (async () => {
+      try {
+        await apiClient.auth.syncEnrollment()
+      } catch {
+        /* still try home; middleware will bounce if incomplete */
+      }
+      await waitForHomeHandoff(prefetchHomeArrival(queryClient))
+      clearHomeHandoffPending()
+      if (replace) router.replace("/home")
+      else router.push("/home")
+    })()
+  }, [queryClient, router])
 
   React.useEffect(() => {
     const draft = loadSignupDraft()
-    if (draft?.data.submittedAt) {
-      clearSignupDraft()
-      void (async () => {
-        try {
-          await apiClient.auth.syncEnrollment()
-        } catch {
-          /* still try home; middleware will bounce if incomplete */
-        }
-        router.replace("/home")
-      })()
+    if (draft?.data.submittedAt || isHomeHandoffPending()) {
+      if (draft?.data.submittedAt) {
+        markHomeHandoffPending()
+        clearSignupDraft()
+      }
+      beginHomeHandoff(true)
       return
     }
     if (draft) {
@@ -124,7 +149,7 @@ function SignupPageInner() {
       setData({ ...emptySignupData(), phone: presetPhone })
     }
     setHydrated(true)
-  }, [router, presetPhone, fromLogin])
+  }, [router, presetPhone, fromLogin, beginHomeHandoff])
 
   // Heal: already-enrolled users (or missing has_profile cookie) shouldn't stay on onboarding.
   React.useEffect(() => {
@@ -232,6 +257,10 @@ function SignupPageInner() {
     }
   }
 
+  if (openingHome) {
+    return <HomeEntrance />
+  }
+
   if (!hydrated) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background text-sm text-muted-foreground">
@@ -282,7 +311,7 @@ function SignupPageInner() {
             className="flex w-full flex-1 flex-col"
           >
             {submitted ? (
-              <VerificationSubmitted onContinue={() => router.push("/home")} />
+              <VerificationSubmitted onContinue={() => beginHomeHandoff(false)} />
             ) : (
               <>
                 {step === 1 && (

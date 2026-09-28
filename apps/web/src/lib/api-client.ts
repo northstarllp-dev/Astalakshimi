@@ -379,6 +379,9 @@ class ApiClient {
         limit: number | null
         used: number
         remaining: number | null
+        periodStart: string | null
+        periodEnd: string | null
+        periodLabel: string
       }>('/interests/usage'),
 
     getReceived: (status?: string) => {
@@ -527,6 +530,9 @@ class ApiClient {
         remaining: number | null
         extraContactFeePaise: number
         canPayExtra: boolean
+        periodStart: string
+        periodEnd: string
+        periodLabel: string
       }>('/contacts/usage'),
 
     unlock: (targetProfileId: string) =>

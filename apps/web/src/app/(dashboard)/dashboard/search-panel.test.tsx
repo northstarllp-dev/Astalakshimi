@@ -51,6 +51,7 @@ vi.mock('@/hooks/queries', async (importOriginal) => {
     useSubscriptionQuery: vi.fn(),
     useContactUsageQuery: () => ({ data: null }),
     useUnlockedContactsQuery: () => ({ data: [] }),
+    useInterestUsageQuery: () => ({ data: { planSlug: "free", limit: 30, used: 0, remaining: 30, periodLabel: "this 30 days" } }),
     useSkipMatchMutation: () => ({ mutate: vi.fn() }),
     useSendInterestMutation: () => ({ mutate: vi.fn(), isPending: false }),
     useAddSavedSearchMutation: () => ({ mutate: vi.fn() }),

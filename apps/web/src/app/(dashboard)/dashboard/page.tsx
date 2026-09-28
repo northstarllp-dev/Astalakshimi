@@ -4,6 +4,7 @@ import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { canInteract, getOnboardingState } from "@/lib/portal-access"
 import { Button } from "@/components/ui/button"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
+import { InterestQuotaBanner } from "@/components/dashboard/interest-quota-banner"
 import { MatchSnapFeed, MatchSnapSlide } from "@/components/dashboard/match-snap-feed"
 import * as React from "react"
 import Link from "next/link"
@@ -11,6 +12,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   useAddSavedSearchMutation,
+  useInterestUsageQuery,
   useInterestsQuery,
   usePaidQuery,
   useProfileQuery,
@@ -26,6 +28,7 @@ import {
   queryKeys,
 } from "@/hooks/queries"
 import { discoverQuickSchema } from "@/lib/validation"
+import { isInterestQuotaExhausted } from "@/lib/interest-quota"
 import { apiClient } from "@/lib/api-client"
 import { VERIFICATION_SLA_HOURS, INCOME_BANDS, DIETS, STARS, EDUCATION_LEVELS, MARITAL_STATUSES, EMPLOYMENT_STATUSES, FAMILY_TYPES, FAMILY_VALUES, FAMILY_STATUS, MOTHER_TONGUES, COMPLEXIONS, RASHIS } from "@/lib/profile-store"
 import {
@@ -227,12 +230,14 @@ function DiscoverPage() {
   const { data: skipped = [] } = useSkippedQuery()
   const { data: interests } = useInterestsQuery()
   const { data: shortlist = [] } = useShortlistQuery()
+  const { data: interestUsage } = useInterestUsageQuery()
   const skipMutation = useSkipMatchMutation()
   const connectMutation = useSendInterestMutation()
 
   const onboardingState = getOnboardingState(profile)
   const interactionsLocked = !canInteract(profile)
   const firstName = profile?.fullName?.split(" ")[0] || "Member"
+  const quotaExhausted = isInterestQuotaExhausted(interestUsage)
   
   const { data: activitySummary } = useActivitySummaryQuery()
   
@@ -246,6 +251,10 @@ function DiscoverPage() {
   }
   const handleConnect = (id: string) => {
     if (interactionsLocked) return
+    if (quotaExhausted) {
+      router.push("/plans")
+      return
+    }
     connectMutation.mutate(id)
   }
 
@@ -297,7 +306,7 @@ function DiscoverPage() {
 
       <DiscoverViewTabs view={view} onChange={setView} />
 
-
+      <InterestQuotaBanner />
 
       {view === "matches" ? (
         <TopMatchesPanel

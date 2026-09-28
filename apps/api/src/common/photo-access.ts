@@ -74,6 +74,14 @@ export function computeBlurDecision(params: {
   return { blurPhoto: true, withholdKey: false };
 }
 
+const REAL_PROFILE_PHOTO_KEY =
+  /^profiles\/[0-9a-fA-F-]{36}\/photos\/[0-9a-fA-F-]{36}\.(jpeg|jpg|png|webp)$/;
+
+/** Demo seeds used keys such as `demo/female/01/primary.webp` that were never uploaded. */
+export function isStoredProfilePhotoKey(s3Key: string | null | undefined): boolean {
+  return typeof s3Key === 'string' && REAL_PROFILE_PHOTO_KEY.test(s3Key);
+}
+
 /**
  * Fetches approved primary photos for many profiles in one query.
  * Returns a Map so callers get O(1) lookup instead of an O(n^2) `.find()`.
@@ -104,6 +112,7 @@ export async function getApprovedPrimaryPhotos(
     );
 
   for (const row of rows) {
+    if (!isStoredProfilePhotoKey(row.s3Key)) continue;
     map.set(row.profileId, { s3Key: row.s3Key, id: row.id });
   }
   return map;
@@ -133,6 +142,7 @@ export async function getAllApprovedPhotosForProfiles(
     );
 
   for (const row of rows) {
+    if (!isStoredProfilePhotoKey(row.s3Key)) continue;
     if (!map.has(row.profileId)) {
       map.set(row.profileId, []);
     }
@@ -167,7 +177,8 @@ export async function getApprovedPhotos(
     })
     .from(profilePhotos)
     .where(and(eq(profilePhotos.profileId, profileId), eq(profilePhotos.status, 'approved')))
-    .orderBy(profilePhotos.displayOrder);
+    .orderBy(profilePhotos.displayOrder)
+    .then((rows) => rows.filter((row) => isStoredProfilePhotoKey(row.s3Key)));
 }
 
 /**
@@ -201,7 +212,8 @@ export async function getOwnerPhotos(
         inArray(profilePhotos.status, ['pending', 'approved']),
       ),
     )
-    .orderBy(profilePhotos.displayOrder);
+    .orderBy(profilePhotos.displayOrder)
+    .then((rows) => rows.filter((row) => isStoredProfilePhotoKey(row.s3Key)));
 }
 
 /**

@@ -1,4 +1,5 @@
 import { pgTable, uuid, varchar, boolean, integer, timestamp, pgEnum, index, text } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { profiles } from './profiles';
 
 export const photoStatusEnum = pgEnum('photo_status', ['pending', 'approved', 'rejected']);
@@ -19,6 +20,10 @@ export const profilePhotos = pgTable('profile_photos', {
   profilePhotoIdx: index('profile_photos_profile_idx').on(table.profileId, table.displayOrder),
   profilePrimaryPhotoIdx: index('profile_photos_primary_idx').on(table.profileId, table.isPrimary),
   profileContentHashIdx: index('profile_photos_content_hash_idx').on(table.profileId, table.contentHash),
+  profileStatusIdx: index('profile_photos_profile_status_idx').on(table.profileId, table.status),
+  primaryExistsIdx: index('profile_photos_primary_exists_idx')
+    .on(table.profileId)
+    .where(sql`${table.isPrimary} = true`),
 }));
 
 export type ProfilePhoto = typeof profilePhotos.$inferSelect;

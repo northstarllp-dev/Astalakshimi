@@ -7,8 +7,16 @@
  *   npx tsx scripts/backfill-female-profiles.ts --cleanup
  */
 import { config } from 'dotenv';
+import { randomUUID } from 'crypto';
+import { createRequire } from 'module';
 import { resolve } from 'path';
 import postgres from 'postgres';
+
+const require = createRequire(resolve(__dirname, '../../../apps/api/package.json'));
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3') as {
+  S3Client: new (opts: object) => { send: (cmd: unknown) => Promise<unknown> };
+  PutObjectCommand: new (input: object) => unknown;
+};
 
 config({ path: resolve(__dirname, '../../../.env') });
 
@@ -24,6 +32,41 @@ const sql = postgres(DATABASE_URL, {
     ? ('require' as const)
     : undefined,
 });
+
+const mediaBucket = process.env.AWS_S3_MEDIA_BUCKET;
+const mediaRegion = process.env.AWS_REGION || 'ap-south-1';
+const mediaAccessKey = process.env.AWS_ACCESS_KEY_ID;
+const mediaSecret = process.env.AWS_SECRET_ACCESS_KEY;
+if (!mediaBucket || !mediaAccessKey || !mediaSecret) {
+  throw new Error('AWS media bucket credentials are required to seed profile photos');
+}
+
+const s3 = new S3Client({
+  region: mediaRegion,
+  credentials: { accessKeyId: mediaAccessKey, secretAccessKey: mediaSecret },
+});
+
+const WOMAN_PORTRAITS = [12, 21, 32, 44, 55, 65, 72, 81, 90, 10];
+
+async function uploadPortrait(userId: string, suffix: string): Promise<string> {
+  const index = Math.max(0, parseInt(suffix, 10) - 1);
+  const portrait = WOMAN_PORTRAITS[index % WOMAN_PORTRAITS.length];
+  const response = await fetch(`https://randomuser.me/api/portraits/women/${portrait}.jpg`);
+  if (!response.ok) {
+    throw new Error(`Could not download portrait ${portrait}: ${response.status}`);
+  }
+  const key = `profiles/${userId}/photos/${randomUUID()}.jpg`;
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: mediaBucket,
+      Key: key,
+      Body: Buffer.from(await response.arrayBuffer()),
+      ContentType: 'image/jpeg',
+      CacheControl: 'public, max-age=31536000, immutable',
+    }),
+  );
+  return key;
+}
 
 type SeedProfile = {
   suffix: string;
@@ -251,9 +294,10 @@ async function seedOne(profile: SeedProfile) {
     RETURNING id
   `;
 
+  const photoKey = await uploadPortrait(user.id, profile.suffix);
   await sql`
     INSERT INTO profile_photos (profile_id, s3_key, is_primary, display_order, status)
-    VALUES (${row.id}, ${`demo/female/${profile.suffix}/primary.webp`}, true, 0, 'approved')
+    VALUES (${row.id}, ${photoKey}, true, 0, 'approved')
   `;
   await sql`
     INSERT INTO user_settings (user_id, photo_blur)

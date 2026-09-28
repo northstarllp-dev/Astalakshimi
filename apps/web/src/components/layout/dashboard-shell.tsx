@@ -3,12 +3,10 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import Image from "next/image"
-import { getMediaUrl } from "@/lib/utils"
 import { Logo } from "@/components/ui/logo"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
+import { ProfilePhotoMark } from "@/components/profile/profile-photo-mark"
 import { useProfileQuery, useUnreadCountQuery } from "@/hooks/queries"
 import { getPrimaryPhotoSrc } from "@/lib/profile-store"
 import { cn } from "@/lib/utils"
@@ -27,10 +25,10 @@ const desktopLinks = [
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { data: profile } = useProfileQuery()
+  const { data: profile, isPending: profilePending } = useProfileQuery()
   const { data: unread = 0 } = useUnreadCountQuery()
 
-  const firstName = profile?.fullName?.split(" ")[0] || "Member"
+  const firstName = profile?.fullName?.split(" ")[0] || ""
   const primaryPhoto = getPrimaryPhotoSrc(profile)
   const pending = profile?.verificationStatus === "pending"
   const isany = pathname.startsWith("/profiles/")
@@ -91,20 +89,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </Badge>
             )}
             <Link href="/profile" aria-label="My profile">
-              <Avatar className="size-9 border-2 border-primary/20">
-                {primaryPhoto ? (
-                  <Image
-                    src={getMediaUrl(primaryPhoto)}
-                    alt={firstName}
-                    width={36}
-                    height={36}
-                    className={cn("aspect-square size-full rounded-full object-cover", pending && "blur-[2px]")}
-                  />
-                ) : null}
-                <AvatarFallback className="bg-primary/10 text-sm font-bold text-primary">
-                  {firstName[0]}
-                </AvatarFallback>
-              </Avatar>
+              <ProfilePhotoMark
+                pending={profilePending && !profile}
+                src={primaryPhoto}
+                name={firstName}
+                blur={pending}
+                alt={firstName || "My profile"}
+                sizes="36px"
+                className="size-9 rounded-full border-2 border-primary/20"
+                letterClassName="text-sm"
+              />
             </Link>
           </div>
         </div>

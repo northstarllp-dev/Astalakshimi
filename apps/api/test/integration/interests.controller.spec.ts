@@ -86,7 +86,15 @@ describe('Feature 3: Interest System - InterestsController (Integration Tests)',
 
   describe('GET /interests/usage', () => {
     it('should return quota usage', async () => {
-      const expected = { planSlug: 'free', limit: 30, used: 2, remaining: 28 };
+      const expected = {
+        planSlug: 'free',
+        limit: 30,
+        used: 2,
+        remaining: 28,
+        periodStart: '2026-01-10T15:30:00.000Z',
+        periodEnd: '2026-02-09T15:30:00.000Z',
+        periodLabel: 'this 30 days',
+      };
       interestsService.getUsage.mockResolvedValue(expected);
 
       const result = await controller.getUsage(mockUserSession);

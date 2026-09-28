@@ -2,7 +2,8 @@ import { Injectable, Inject, NotFoundException, BadRequestException, ForbiddenEx
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { subscriptions, plans, profiles, users, unlockedContacts, chatSessions } from '@astalakshimi/database';
-import { eq, and, gt, gte, isNull, sql } from 'drizzle-orm';
+import { eq, and, gt, gte, lt, lte, desc, isNull, sql } from 'drizzle-orm';
+import { contactMonthWindow } from './contact-month';
 
 export const EXTRA_CONTACT_FEE_PAISE = 2900;
 
@@ -19,14 +20,26 @@ export type ContactAccess = {
   planSlug: string;
 };
 
+export type UserPlan = {
+  slug: string;
+  interestQuota: number | null;
+  contactUnlocks: number | null;
+  hasAdvancedFilters: boolean;
+  hasPriorityListing: boolean;
+  startsAt: Date | null;
+  expiresAt: Date | null;
+};
+
 @Injectable()
 export class EntitlementsService {
   constructor(@Inject(DB_CLIENT) private readonly db: Database) {}
 
-  async getUserPlan(userId: string) {
+  async getUserPlan(userId: string): Promise<UserPlan> {
     const activeSub = await this.db
       .select({
         plan: plans,
+        startsAt: subscriptions.startsAt,
+        expiresAt: subscriptions.expiresAt,
       })
       .from(subscriptions)
       .innerJoin(plans, eq(subscriptions.planId, plans.id))
@@ -34,9 +47,10 @@ export class EntitlementsService {
         and(
           eq(subscriptions.userId, userId),
           eq(subscriptions.status, 'active'),
-          gt(subscriptions.expiresAt, new Date())
-        )
+          gt(subscriptions.expiresAt, new Date()),
+        ),
       )
+      .orderBy(desc(subscriptions.startsAt))
       .limit(1);
 
     if (activeSub.length === 0) {
@@ -46,10 +60,31 @@ export class EntitlementsService {
         contactUnlocks: 3,
         hasAdvancedFilters: false,
         hasPriorityListing: false,
+        startsAt: null,
+        expiresAt: null,
       };
     }
 
-    return activeSub[0].plan;
+    const row = activeSub[0];
+    return {
+      slug: row.plan.slug,
+      interestQuota: row.plan.interestQuota,
+      contactUnlocks: row.plan.contactUnlocks,
+      hasAdvancedFilters: row.plan.hasAdvancedFilters,
+      hasPriorityListing: row.plan.hasPriorityListing,
+      startsAt: row.startsAt,
+      expiresAt: row.expiresAt,
+    };
+  }
+
+  async getLastEndedSubscriptionAt(userId: string): Promise<Date | null> {
+    const [row] = await this.db
+      .select({ expiresAt: subscriptions.expiresAt })
+      .from(subscriptions)
+      .where(and(eq(subscriptions.userId, userId), lte(subscriptions.expiresAt, new Date())))
+      .orderBy(desc(subscriptions.expiresAt))
+      .limit(1);
+    return row?.expiresAt ?? null;
   }
 
   hasMutualContactBenefit(plan: { slug?: string | null }) {
@@ -86,10 +121,8 @@ export class EntitlementsService {
     return records.length > 0;
   }
 
-  async getMonthlyContactUnlockCount(unlockerProfileId: string): Promise<number> {
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+  async getMonthlyContactUnlockCount(unlockerProfileId: string, now = new Date()): Promise<number> {
+    const window = contactMonthWindow(now);
 
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
@@ -98,7 +131,8 @@ export class EntitlementsService {
         and(
           eq(unlockedContacts.unlockerProfileId, unlockerProfileId),
           isNull(unlockedContacts.paymentId),
-          gte(unlockedContacts.createdAt, monthStart)
+          gte(unlockedContacts.createdAt, window.start),
+          lt(unlockedContacts.createdAt, window.end),
         )
       );
 
@@ -108,7 +142,7 @@ export class EntitlementsService {
   async getContactUnlockStatus(
     userId: string,
     targetProfileId: string,
-    isMutualConnect = false,
+    _isMutualConnect = false,
   ): Promise<ContactAccess> {
     const plan = await this.getUserPlan(userId);
     const limit = plan.contactUnlocks ?? null;
@@ -140,6 +174,7 @@ export class EntitlementsService {
     const remaining = limit === null ? null : Math.max(0, limit - usedThisMonth);
     const canUnlockWithQuota = !isUnlocked && (limit === null || (remaining !== null && remaining > 0));
     const canPayExtra = !isUnlocked && !canUnlockWithQuota && limit !== null;
+    // A mutual match does not reveal the phone. The number is returned only after an unlock row exists.
     const canView = isUnlocked;
 
     return {
@@ -170,6 +205,7 @@ export class EntitlementsService {
       ? await this.getMonthlyContactUnlockCount(viewerProfile.id)
       : 0;
     const remaining = limit === null ? null : Math.max(0, limit - usedThisMonth);
+    const window = contactMonthWindow();
 
     return {
       planSlug: plan.slug,
@@ -178,6 +214,9 @@ export class EntitlementsService {
       remaining,
       extraContactFeePaise: EXTRA_CONTACT_FEE_PAISE,
       canPayExtra: limit !== null && remaining === 0,
+      periodStart: window.start.toISOString(),
+      periodEnd: window.end.toISOString(),
+      periodLabel: window.label,
     };
   }
 

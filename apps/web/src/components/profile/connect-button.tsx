@@ -3,10 +3,15 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { useInterestsQuery, useSendInterestMutation } from "@/hooks/queries"
+import {
+  useInterestUsageQuery,
+  useInterestsQuery,
+  useSendInterestMutation,
+} from "@/hooks/queries"
 import { getConnectStatus } from "@/lib/connect-status"
+import { interestQuotaHint, isInterestQuotaExhausted } from "@/lib/interest-quota"
 import { cn } from "@/lib/utils"
-import { Check, Heart, HeartHandshake, Loader2 } from "lucide-react"
+import { Check, Heart, HeartHandshake, Loader2, Sparkles } from "lucide-react"
 
 type ConnectButtonProps = {
   profileId: string
@@ -35,13 +40,20 @@ export function ConnectButton({
 }: ConnectButtonProps) {
   const router = useRouter()
   const { data: interests } = useInterestsQuery()
+  const { data: usage } = useInterestUsageQuery()
   const connectMutation = useSendInterestMutation()
 
   const status = getConnectStatus(profileId, interests, { justSent })
   const sending = isSending || connectMutation.isPending
+  const quotaExhausted = isInterestQuotaExhausted(usage)
+  const quotaTitle = quotaExhausted ? interestQuotaHint(usage) : undefined
 
   const handleConnect = () => {
     if (disabled) return
+    if (quotaExhausted) {
+      router.push("/plans")
+      return
+    }
     if (onConnect) {
       onConnect()
       return
@@ -103,13 +115,18 @@ export function ConnectButton({
       size={size}
       className={className}
       disabled={sending || disabled}
-      title={title}
+      title={quotaTitle ?? title}
       onClick={handleConnect}
     >
       {sending ? (
         <>
           <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin sm:mr-2 sm:h-4 sm:w-4" />
           Sending...
+        </>
+      ) : quotaExhausted ? (
+        <>
+          <Sparkles className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
+          Upgrade to send
         </>
       ) : (
         <>

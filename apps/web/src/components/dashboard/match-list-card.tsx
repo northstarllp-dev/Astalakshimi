@@ -3,6 +3,7 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { cn, getMediaUrl } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +27,7 @@ import { LockedPhoto } from "@/components/profile/locked-photo"
 import { PhotoGuard } from "@/components/profile/photo-guard"
 import {
   useContactUsageQuery,
+  useInterestUsageQuery,
   useInterestsQuery,
   useSendInterestMutation,
   useShortlistQuery,
@@ -33,6 +35,7 @@ import {
   useUnlockedContactsQuery,
 } from "@/hooks/queries"
 import { getConnectStatus } from "@/lib/connect-status"
+import { interestQuotaHint, isInterestQuotaExhausted } from "@/lib/interest-quota"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -109,6 +112,7 @@ export function MatchListCard({
   /** Unverified teaser — disable interest / skip / contact unlock; keep shortlist. */
   interactionsLocked?: boolean
 }) {
+  const router = useRouter()
   const [activePhoto, setActivePhoto] = React.useState(0)
   const [paused, setPaused] = React.useState(false)
   const [contactDialogOpen, setContactDialogOpen] = React.useState(false)
@@ -124,7 +128,10 @@ export function MatchListCard({
   const { data: interests } = useInterestsQuery()
   const sendInterestMutation = useSendInterestMutation()
   const { data: contactUsage } = useContactUsageQuery()
+  const { data: interestUsage } = useInterestUsageQuery()
   const { data: unlockedContacts = [] } = useUnlockedContactsQuery()
+  const quotaExhausted = isInterestQuotaExhausted(interestUsage)
+  const quotaTitle = quotaExhausted ? interestQuotaHint(interestUsage) : undefined
 
   const isShortlisted = shortlistData.some((item: any) =>
     typeof item === "string" ? item === match.id : item.id === match.id || item.profileId === match.id
@@ -144,8 +151,23 @@ export function MatchListCard({
     toggleShortlistMutation.mutate(match.id)
   }
 
+  const openContact = (e?: React.MouseEvent) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    if (interactionsLocked) return
+    if (connectStatus !== "mutual") {
+      mutualUnlockDialog.prompt("contact")
+      return
+    }
+    setContactDialogOpen(true)
+  }
+
   const handleConnect = async () => {
     if (interactionsLocked || isConnected || isConnecting) return
+    if (quotaExhausted) {
+      router.push("/plans")
+      return
+    }
     if (onConnect) {
       onConnect(match.id)
       setJustConnected(true)
@@ -380,16 +402,7 @@ export function MatchListCard({
               {/* View Contact Button */}
               <button
                 type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  if (interactionsLocked) return
-                  if (connectStatus !== "mutual") {
-                    mutualUnlockDialog.prompt("contact")
-                    return
-                  }
-                  setContactDialogOpen(true)
-                }}
+                onClick={openContact}
                 disabled={interactionsLocked}
                 title={interactionsLocked ? "Verify to unlock contact" : undefined}
                 className="flex flex-col items-center gap-1 group active:scale-95 transition disabled:opacity-50"
@@ -411,7 +424,11 @@ export function MatchListCard({
                   handleConnect()
                 }}
                 disabled={isConnecting || interactionsLocked}
-                title={interactionsLocked ? "Verify to send interest" : undefined}
+                title={
+                  interactionsLocked
+                    ? "Verify to send interest"
+                    : quotaTitle
+                }
                 className="flex flex-col items-center gap-1 group active:scale-95 transition disabled:opacity-50"
               >
                 <div
@@ -429,7 +446,7 @@ export function MatchListCard({
                   )}
                 </div>
                 <span className="text-[10px] sm:text-[11px] font-semibold text-white/90 tracking-tight">
-                  {isConnected ? "Connected" : "Connect Now"}
+                  {isConnected ? "Connected" : quotaExhausted ? "Upgrade to send" : "Connect Now"}
                 </span>
               </button>
             </div>
@@ -596,12 +613,24 @@ export function MatchListCard({
                 <Bookmark className={cn("mr-1.5 h-3.5 w-3.5", isShortlisted && "fill-amber-400 text-amber-400")} />
                 {isShortlisted ? "Shortlisted" : "Shortlist"}
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 rounded-full border-secondary/40 px-4 text-xs font-semibold text-primary hover:bg-secondary/10"
+                disabled={interactionsLocked}
+                title={interactionsLocked ? "Verify to unlock contact" : undefined}
+                onClick={openContact}
+              >
+                <Phone className="mr-1.5 h-3.5 w-3.5" />
+                View Contact
+              </Button>
               <ConnectButton
                 profileId={match.id}
                 size="sm"
                 className="h-10 rounded-full px-5 text-xs font-semibold shadow-xs"
                 disabled={interactionsLocked}
-                title={interactionsLocked ? "Verify to send interest" : undefined}
+                title={interactionsLocked ? "Verify to send interest" : quotaTitle}
               />
             </div>
           </div>
@@ -623,9 +652,10 @@ export function MatchListCard({
                 usedThisMonth: contactUsage.usedThisMonth,
                 remaining: contactUsage.remaining,
                 canUnlockWithQuota:
-                  contactUsage.limit === null ||
-                  (contactUsage.remaining !== null && contactUsage.remaining > 0),
-                canPayExtra: contactUsage.canPayExtra,
+                  !isContactUnlocked &&
+                  (contactUsage.limit === null ||
+                    (contactUsage.remaining !== null && contactUsage.remaining > 0)),
+                canPayExtra: !isContactUnlocked && Boolean(contactUsage.canPayExtra),
                 extraContactFeePaise: contactUsage.extraContactFeePaise,
                 planSlug: contactUsage.planSlug,
               }

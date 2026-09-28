@@ -28,6 +28,7 @@ import {
   visibilitySql,
   type ViewerContext,
 } from './viewer-context';
+import { observeDb } from '../common/metrics/latency-histogram';
 
 const POOL_LIMIT = 200;
 const TOP_N = 8;
@@ -126,7 +127,7 @@ export class MatchesService {
       visibilitySql(viewer.viewerIsPaid),
     ];
 
-    const pool = await this.db
+    const pool = await observeDb('matches.pool', () => this.db
       .select({
         id: profiles.id,
         userId: profiles.userId,
@@ -151,7 +152,7 @@ export class MatchesService {
       .from(profiles)
       .where(and(...conditions))
       .orderBy(desc(profiles.createdAt))
-      .limit(POOL_LIMIT);
+      .limit(POOL_LIMIT));
 
     // 3. Hard filters + soft score, best first; recency breaks score ties.
     const ranked = pool
@@ -174,47 +175,56 @@ export class MatchesService {
     const profileIds = scoredProfiles.map((p) => p.id);
     const userIds = scoredProfiles.map((p) => p.userId);
 
-    const photos = await getAllApprovedPhotosForProfiles(this.db, profileIds);
-
-    const settings = await this.db
-      .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
-      .from(userSettings)
-      .where(inArray(userSettings.userId, userIds));
-
-    const activeSubs = await this.db
-      .select({ userId: subscriptions.userId, planSlug: plans.slug, planName: plans.name })
-      .from(subscriptions)
-      .innerJoin(plans, eq(subscriptions.planId, plans.id))
-      .where(
-        and(
-          inArray(subscriptions.userId, userIds),
-          eq(subscriptions.status, 'active'),
-          gt(subscriptions.expiresAt, new Date()),
-        ),
-      );
-
-    const connections = await this.db
-      .select()
-      .from(interests)
-      .where(
-        and(
-          or(eq(interests.senderProfileId, viewer.profileId), eq(interests.receiverProfileId, viewer.profileId)),
-          or(inArray(interests.senderProfileId, profileIds), inArray(interests.receiverProfileId, profileIds)),
-          eq(interests.status, 'accepted'),
-        ),
-      );
-
-    // Real verification state, so the badge reflects an actual review.
-    const verificationRows = await this.db
-      .select({ profileId: verifications.profileId, status: verifications.status })
-      .from(verifications)
-      .where(inArray(verifications.profileId, profileIds));
+    // Independent lookups. Running them together keeps this page to one
+    // round trip of pool wait instead of five.
+    const [photos, settings, activeSubs, connections, verificationRows] = await observeDb(
+      'matches.enrich',
+      () => Promise.all([
+        getAllApprovedPhotosForProfiles(this.db, profileIds),
+        this.db
+          .select({ userId: userSettings.userId, photoBlur: userSettings.photoBlur })
+          .from(userSettings)
+          .where(inArray(userSettings.userId, userIds)),
+        this.db
+          .select({ userId: subscriptions.userId, planSlug: plans.slug, planName: plans.name })
+          .from(subscriptions)
+          .innerJoin(plans, eq(subscriptions.planId, plans.id))
+          .where(
+            and(
+              inArray(subscriptions.userId, userIds),
+              eq(subscriptions.status, 'active'),
+              gt(subscriptions.expiresAt, new Date()),
+            ),
+          ),
+        this.db
+          .select()
+          .from(interests)
+          .where(
+            and(
+              or(eq(interests.senderProfileId, viewer.profileId), eq(interests.receiverProfileId, viewer.profileId)),
+              or(inArray(interests.senderProfileId, profileIds), inArray(interests.receiverProfileId, profileIds)),
+              eq(interests.status, 'accepted'),
+            ),
+          ),
+        this.db
+          .select({ profileId: verifications.profileId, status: verifications.status })
+          .from(verifications)
+          .where(inArray(verifications.profileId, profileIds)),
+      ]),
+    );
     const verificationByProfile = new Map(verificationRows.map((v) => [v.profileId, v.status]));
+    const settingsByUser = new Map<string, (typeof settings)[number]>();
+    for (const setting of settings) {
+      if (!settingsByUser.has(setting.userId)) settingsByUser.set(setting.userId, setting);
+    }
+    const subsByUser = new Map<string, (typeof activeSubs)[number]>();
+    for (const sub of activeSubs) {
+      if (!subsByUser.has(sub.userId)) subsByUser.set(sub.userId, sub);
+    }
 
     return ranked.map(({ profile: p, score }) => {
-      const primaryPhoto = photos.get(p.id);
-      const setting = settings.find((s) => s.userId === p.userId);
-      const userSub = activeSubs.find((s) => s.userId === p.userId);
+      const setting = settingsByUser.get(p.userId);
+      const userSub = subsByUser.get(p.userId);
       const isAccepted = connections.some(
         (c) => c.senderProfileId === p.id || c.receiverProfileId === p.id,
       );

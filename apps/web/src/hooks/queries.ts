@@ -1,5 +1,6 @@
 type UserSettings = any;
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useEffect, useLayoutEffect, useRef } from "react"
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { loadProfile, saveProfile, emptySignupData, DEMO_REJECTION_REASON, formatSiblings, type SignupData } from "@/lib/profile-store"
 import { apiClient, isVerificationPendingError } from "@/lib/api-client"
 import { formatHeightFromCm, parseHeightToCm, weightToKg, formatWeightFromKg } from "@/lib/input-units"
@@ -29,7 +30,25 @@ export const queryKeys = {
 }
 
 
+function cachedProfileHasIdentity(profile: SignupData | null): profile is SignupData {
+  if (!profile) return false
+  return Boolean(
+    profile.fullName?.trim() ||
+    profile.photoS3Keys?.some(Boolean) ||
+    profile.photos?.some(Boolean),
+  )
+}
+
 export function useProfileQuery() {
+  const queryClient = useQueryClient()
+  // Paint the last saved profile before the network round-trip. Runs after
+  // hydration so the server HTML stays a blank placeholder, not a fake initial.
+  useLayoutEffect(() => {
+    const cached = loadProfile()
+    if (!cachedProfileHasIdentity(cached)) return
+    queryClient.setQueryData(queryKeys.profile, (current: SignupData | undefined) => current ?? cached)
+  }, [queryClient])
+
   return useQuery({
     queryKey: queryKeys.profile,
     queryFn: async () => {
@@ -768,6 +787,7 @@ export function useInvoicesQuery() {
 export function useNotificationsQuery() {
   return useQuery({
     queryKey: queryKeys.notifications,
+    refetchInterval: 4_000,
     queryFn: async () => {
       if (!apiClient.getToken()) return [];
       return apiClient.notifications.getAll();
@@ -776,14 +796,31 @@ export function useNotificationsQuery() {
 }
 
 export function useUnreadCountQuery() {
-  return useQuery({
+  const queryClient = useQueryClient()
+  const seenUnread = useRef<number | null>(null)
+  const query = useQuery({
     queryKey: queryKeys.unread,
+    refetchInterval: 4_000,
     queryFn: async () => {
       if (!apiClient.getToken()) return 0;
       const items = await apiClient.notifications.getAll();
       return items.filter((n: any) => n.unread).length;
     },
   })
+
+  useEffect(() => {
+    if (query.data === undefined) return
+    if (seenUnread.current === null) {
+      seenUnread.current = query.data
+      return
+    }
+    if (seenUnread.current === query.data) return
+    seenUnread.current = query.data
+    void queryClient.invalidateQueries({ queryKey: queryKeys.interests })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.notifications, exact: true })
+  }, [query.data, queryClient])
+
+  return query
 }
 
 export function useNotificationMutations() {
@@ -955,9 +992,10 @@ export function useDeclineInterestMutation() {
   })
 }
 
-export function useInterestsQuery() {
+export function useInterestsQuery(options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: queryKeys.interests,
+    refetchInterval: options?.refetchInterval,
     queryFn: async () => {
       if (!apiClient.getToken()) {
         return {
@@ -985,6 +1023,7 @@ export function useInvalidateInterests() {
   return () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.interests })
     void queryClient.invalidateQueries({ queryKey: queryKeys.shortlists })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.interestUsage })
     void queryClient.invalidateQueries({ queryKey: ["activity"] })
   }
 }
@@ -1195,6 +1234,83 @@ export function useUnlockContactMutation() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.unlockedContacts })
     },
   })
+}
+
+/** Warm the queries Home paints on first view, so the page can appear already filled. */
+export function prefetchHomeArrival(queryClient: QueryClient) {
+  return Promise.allSettled([
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.paid,
+      queryFn: async () => {
+        if (!apiClient.getToken()) return false
+        try {
+          const sub = await apiClient.payments.getSubscription()
+          return Boolean(sub && sub.planSlug && sub.planSlug !== "free")
+        } catch {
+          return false
+        }
+      },
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.subscription,
+      queryFn: async () => {
+        if (!apiClient.getToken()) return null
+        try {
+          return await apiClient.payments.getSubscription()
+        } catch {
+          return null
+        }
+      },
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.topMatches,
+      queryFn: async () => {
+        if (!apiClient.getToken()) return []
+        return apiClient.matches.getTop()
+      },
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.activitySummary,
+      queryFn: async () => {
+        if (!apiClient.getToken()) {
+          return {
+            viewers: [],
+            youViewed: [],
+            interestsReceived: [],
+            shortlistedYou: [],
+          }
+        }
+        return apiClient.activity.getSummary()
+      },
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.interests,
+      queryFn: async () => {
+        if (!apiClient.getToken()) {
+          return {
+            received: [],
+            sent: [],
+            mutual: [],
+            pendingCount: 0,
+            shortlisted: [],
+            blocked: [],
+            notes: {},
+          }
+        }
+        const summary = await apiClient.interests.getSummary()
+        const shortlistItems = await apiClient.shortlists.getAll().catch(() => [])
+        return { ...summary, shortlisted: shortlistItems }
+      },
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.contactUsage,
+      queryFn: () => apiClient.contacts.getUsage(),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.interestUsage,
+      queryFn: () => apiClient.interests.getUsage(),
+    }),
+  ])
 }
 
 export function usePayExtraContactUnlockMutation() {

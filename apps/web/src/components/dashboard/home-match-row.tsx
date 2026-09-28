@@ -5,11 +5,13 @@ import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { cn, getMediaUrl } from "@/lib/utils"
-import { useSendInterestMutation, useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
-import { Bookmark, Heart } from "lucide-react"
+import { useInterestUsageQuery, useSendInterestMutation, useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
+import { Bookmark, Heart, Sparkles } from "lucide-react"
 import { PlanCrownBadge } from "@/components/profile/plan-crown-badge"
 import { LockedPhoto } from "@/components/profile/locked-photo"
 import { PhotoGuard } from "@/components/profile/photo-guard"
+import { interestQuotaHint, isInterestQuotaExhausted } from "@/lib/interest-quota"
+import { useRouter } from "next/navigation"
 
 import { formatHeightFromCm } from "@/lib/input-units"
 
@@ -28,7 +30,9 @@ export function HomeMatchRow({
   /** Unverified but complete — disable interest only; shortlist stays on. */
   interactionsLocked?: boolean
 }) {
+  const router = useRouter()
   const sendInterest = useSendInterestMutation()
+  const { data: usage } = useInterestUsageQuery()
   const { data: shortlistData = [] } = useShortlistQuery()
   const toggleShortlist = useToggleShortlistMutation()
   const [sent, setSent] = React.useState(false)
@@ -37,10 +41,15 @@ export function HomeMatchRow({
     typeof item === "string" ? item === match.id : item.id === match.id || item.profileId === match.id
   )
 
+  const quotaExhausted = isInterestQuotaExhausted(usage)
   const interestDisabled = locked || interactionsLocked || sent || sendInterest.isPending
   const shortlistDisabled = locked || toggleShortlist.isPending
   const profileHref = locked ? "/profile/edit" : `/profiles/${match.id}`
-  const interestTitle = interactionsLocked && !locked ? "Verify to send interest" : undefined
+  const interestTitle = interactionsLocked && !locked
+    ? "Verify to send interest"
+    : quotaExhausted
+      ? interestQuotaHint(usage)
+      : undefined
 
   const photo = match.photos?.[0]
   const isHidden = match.blurPhoto || !photo
@@ -109,13 +118,23 @@ export function HomeMatchRow({
             title={interestTitle}
             onClick={() => {
               if (interestDisabled) return
+              if (quotaExhausted) {
+                router.push("/plans")
+                return
+              }
               sendInterest.mutate(match.id, {
                 onSuccess: () => setSent(true),
               })
             }}
           >
-            <Heart className="mr-1 h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{sent ? "Interest sent" : "Send interest"}</span>
+            {quotaExhausted && !sent ? (
+              <Sparkles className="mr-1 h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <Heart className="mr-1 h-3.5 w-3.5 shrink-0" />
+            )}
+            <span className="truncate">
+              {sent ? "Interest sent" : quotaExhausted ? "Upgrade to send" : "Send interest"}
+            </span>
           </Button>
           <Link href={profileHref} className="flex-1 sm:flex-initial">
             <Button size="sm" variant="outline" className="h-8 w-full rounded-md border px-2 text-xs sm:h-9 sm:w-auto sm:px-4 sm:text-sm">

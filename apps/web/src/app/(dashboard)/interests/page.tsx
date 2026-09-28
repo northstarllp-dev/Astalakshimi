@@ -757,7 +757,7 @@ export default function InterestsPage() {
 
 function InterestsPageInner() {
   const [activeTab, setActiveTab] = React.useState<Tab>("received")
-  const { data, isLoading } = useInterestsQuery()
+  const { data, isLoading } = useInterestsQuery({ refetchInterval: 4_000 })
   const { data: shortlist = [] } = useShortlistQuery()
   const toggleShortlistMutation = useToggleShortlistMutation()
   const invalidate = useInvalidateInterests()

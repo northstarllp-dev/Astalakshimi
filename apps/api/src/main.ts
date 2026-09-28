@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import helmet from 'helmet';
+import compression = require('compression');
 import { AppModule } from './app.module';
 import { GlobalHttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -24,8 +25,9 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('app.apiPrefix') || 'api';
   const corsOrigins = configService.get<string[]>('app.corsOrigins') || ['http://localhost:3000'];
 
-  // Secure HTTP headers
+  // Secure HTTP headers, then gzip JSON responses before they hit the wire.
   app.use(helmet());
+  app.use(compression());
 
   // Global filters
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
@@ -43,8 +45,18 @@ async function bootstrap() {
     origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id', 'x-metrics-token'],
+    exposedHeaders: ['x-request-id', 'x-response-time', 'Server-Timing'],
   });
+
+  // Drain in-flight requests and close the Postgres pool on SIGTERM (ECS/Fargate).
+  app.enableShutdownHooks();
+
+  // ALB idle timeout is 60s. Node's default keepAliveTimeout is 5s, which
+  // races the load balancer and surfaces as intermittent 502s under load.
+  const server = app.getHttpServer();
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
 
   await app.listen(port, '0.0.0.0');
   logger.log(`🚀 Astalakshimi API server running on: http://localhost:${port}/${apiPrefix}`);

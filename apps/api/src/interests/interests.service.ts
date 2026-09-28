@@ -2,8 +2,9 @@ import { Injectable, Inject, NotFoundException, BadRequestException, ForbiddenEx
 import { DB_CLIENT } from '../database/database.constants';
 import type { Database } from '@astalakshimi/database';
 import { interests, profiles, userSettings, verifications } from '@astalakshimi/database';
-import { eq, or, and, sql, desc, inArray, ne } from 'drizzle-orm';
+import { eq, or, and, sql, desc, inArray, ne, gte, lt } from 'drizzle-orm';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { resolveInterestWindow, type InterestWindow } from '../entitlements/interest-window';
 import { NotificationsService } from '../notifications/notifications.service';
 
 import { BlocksService } from '../blocks/blocks.service';
@@ -56,6 +57,50 @@ export class InterestsService {
     throw new NotFoundException('Target profile not found');
   }
 
+  private async resolveSenderWindow(
+    userId: string,
+    profileCreatedAt: Date,
+    plan: {
+      slug: string;
+      interestQuota: number | null;
+      startsAt: Date | null;
+      expiresAt: Date | null;
+    },
+  ): Promise<InterestWindow> {
+    const lastEndedAt =
+      plan.interestQuota == null
+        ? null
+        : await this.entitlementsService.getLastEndedSubscriptionAt(userId);
+    return resolveInterestWindow({
+      slug: plan.slug,
+      interestQuota: plan.interestQuota,
+      startsAt: plan.startsAt,
+      expiresAt: plan.expiresAt,
+      profileCreatedAt,
+      lastEndedAt,
+    });
+  }
+
+  private async countSendsInWindow(senderProfileId: string, window: InterestWindow): Promise<number> {
+    const conditions = [
+      eq(interests.senderProfileId, senderProfileId),
+      or(eq(interests.status, 'pending'), eq(interests.status, 'accepted')),
+    ];
+    if (window.start) {
+      conditions.push(gte(interests.createdAt, window.start));
+    }
+    if (window.end) {
+      conditions.push(lt(interests.createdAt, window.end));
+    }
+
+    const [sentCountResult] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(interests)
+      .where(and(...conditions));
+
+    return sentCountResult?.count ?? 0;
+  }
+
   async sendInterest(
     userId: string,
     params: { targetProfileId?: string; targetUserId?: string; profileId?: string; message?: string },
@@ -75,21 +120,12 @@ export class InterestsService {
 
     // 1. Verify Plan & Quota Limits
     const plan = await this.entitlementsService.getUserPlan(userId);
-    if (plan.interestQuota !== null && plan.interestQuota !== undefined) {
-      const [sentCountResult] = await this.db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(interests)
-        .where(
-          and(
-            eq(interests.senderProfileId, sender.id),
-            or(eq(interests.status, 'pending'), eq(interests.status, 'accepted'))
-          )
-        );
-
-      const sentCount = sentCountResult?.count ?? 0;
+    const window = await this.resolveSenderWindow(userId, sender.createdAt, plan);
+    if (plan.interestQuota != null && window.start) {
+      const sentCount = await this.countSendsInWindow(sender.id, window);
       if (sentCount >= plan.interestQuota) {
         throw new ForbiddenException(
-          `You have reached your interest quota limit of ${plan.interestQuota}. Upgrade your plan to send more interests.`
+          `You have reached your interest quota limit of ${plan.interestQuota} for ${window.label}. Upgrade your plan to send more interests.`
         );
       }
     }
@@ -403,31 +439,32 @@ export class InterestsService {
     const limit = plan.interestQuota ?? null;
 
     const [profile] = await this.db
-      .select({ id: profiles.id })
+      .select({ id: profiles.id, createdAt: profiles.createdAt })
       .from(profiles)
       .where(eq(profiles.userId, userId))
       .limit(1);
 
     if (!profile) {
+      const emptyWindow = resolveInterestWindow({
+        slug: plan.slug,
+        interestQuota: plan.interestQuota,
+        startsAt: plan.startsAt,
+        expiresAt: plan.expiresAt,
+        profileCreatedAt: new Date(),
+      });
       return {
         planSlug: plan.slug,
         limit,
         used: 0,
         remaining: limit,
+        periodStart: null,
+        periodEnd: null,
+        periodLabel: emptyWindow.label,
       };
     }
 
-    const [sentCountResult] = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(interests)
-      .where(
-        and(
-          eq(interests.senderProfileId, profile.id),
-          or(eq(interests.status, 'pending'), eq(interests.status, 'accepted')),
-        ),
-      );
-
-    const used = sentCountResult?.count ?? 0;
+    const window = await this.resolveSenderWindow(userId, profile.createdAt, plan);
+    const used = window.start ? await this.countSendsInWindow(profile.id, window) : 0;
     const remaining = limit === null ? null : Math.max(0, limit - used);
 
     return {
@@ -435,6 +472,9 @@ export class InterestsService {
       limit,
       used,
       remaining,
+      periodStart: window.start?.toISOString() ?? null,
+      periodEnd: window.end?.toISOString() ?? null,
+      periodLabel: window.label,
     };
   }
 

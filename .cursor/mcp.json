@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "C:\\Users\\hareh\\AppData\\Roaming\\fnm\\aliases\\default\\node.exe",
+      "args": [
+        "C:\\Users\\hareh\\AppData\\Roaming\\fnm\\aliases\\default\\node_modules\\npm\\bin\\npx-cli.js",
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "env": {
+        "PATH": "C:\\Users\\hareh\\AppData\\Roaming\\fnm\\aliases\\default;C:\\WINDOWS\\system32;C:\\WINDOWS"
+      }
+    },
+    "chrome-devtools": {
+      "command": "C:\\Users\\hareh\\AppData\\Roaming\\fnm\\aliases\\default\\node.exe",
+      "args": [
+        "C:\\Users\\hareh\\AppData\\Roaming\\fnm\\aliases\\default\\node_modules\\npm\\bin\\npx-cli.js",
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ],
+      "env": {
+        "PATH": "C:\\Users\\hareh\\AppData\\Roaming\\fnm\\aliases\\default;C:\\WINDOWS\\system32;C:\\WINDOWS"
+      }
+    }
+  }
+}

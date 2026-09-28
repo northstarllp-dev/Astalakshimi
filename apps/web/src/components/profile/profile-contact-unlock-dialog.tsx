@@ -50,8 +50,9 @@ export function ProfileContactUnlockDialog({
   const remaining = access?.remaining ?? null
   const limit = access?.limit ?? 3
   const unlimited = limit === null
-  const canQuota = Boolean(access?.canUnlockWithQuota || unlimited)
-  const canPay = Boolean(access?.canPayExtra)
+  const isUnlocked = Boolean(access?.isUnlocked)
+  const canQuota = !isUnlocked && Boolean(access?.canUnlockWithQuota)
+  const canPay = !isUnlocked && Boolean(access?.canPayExtra)
   const fee = (access?.extraContactFeePaise ?? EXTRA_CONTACT_FEE * 100) / 100
   const busy = unlock.isPending || payExtra.isPending
 
@@ -91,16 +92,20 @@ export function ProfileContactUnlockDialog({
           <Phone className="mx-auto mb-1.5 h-4 w-4 text-primary" />
           <p className="font-mono text-sm font-semibold tracking-wide text-foreground">+91 ••••• •••••</p>
           <p className="mt-1.5 text-xs text-muted-foreground">
-            {unlimited
-              ? "Unlimited contact unlocks on your plan."
-              : `${Math.max(0, remaining ?? 0)} of ${limit} contact unlocks left this month.`}
+            {isUnlocked
+              ? "You already unlocked this number."
+              : unlimited
+                ? "Unlimited contact unlocks on your plan."
+                : `${Math.max(0, remaining ?? 0)} of ${limit} contact unlocks left this month.`}
           </p>
         </div>
 
         {error && <p className="text-center text-xs text-destructive">{error}</p>}
 
         <DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
-          {canQuota ? (
+          {isUnlocked ? (
+            <p className="text-center text-sm text-muted-foreground">This contact is already unlocked.</p>
+          ) : canQuota ? (
             <Button type="button" className="w-full" disabled={busy} onClick={() => void handleQuotaUnlock()}>
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {unlimited ? "Unlock contact" : `Use ${currentCredit}/${limit} credit to unlock contact`}

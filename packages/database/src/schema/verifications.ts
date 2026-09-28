@@ -1,4 +1,5 @@
-import { pgTable, uuid, varchar, text, timestamp, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, pgEnum, index } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { profiles } from './profiles';
 import { users } from './users';
 
@@ -27,7 +28,11 @@ export const verifications = pgTable('verifications', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  verifiedProfileIdx: index('verifications_verified_profile_idx')
+    .on(table.profileId)
+    .where(sql`${table.status} = 'verified'`),
+}));
 
 export type Verification = typeof verifications.$inferSelect;
 export type NewVerification = typeof verifications.$inferInsert;

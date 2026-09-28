@@ -7,6 +7,7 @@ import { getApprovedPrimaryPhotos, getAllApprovedPhotosForProfiles, computeBlurD
 import { dobBoundsForAgeWindow, loadViewerContext, visibilitySql } from '../matches/viewer-context';
 import { candidateAge, targetGenders } from '../matches/match-scoring';
 import { EntitlementsService } from '../entitlements/entitlements.service';
+import { observeDb } from '../common/metrics/latency-histogram';
 
 @Injectable()
 export class SearchService {
@@ -326,7 +327,7 @@ export class SearchService {
       .from(profiles)
       .where(and(...conditions));
 
-    const [rows, countResult] = await Promise.all([query, countQuery]);
+    const [rows, countResult] = await observeDb('search.query', () => Promise.all([query, countQuery]));
     totalCount = countResult[0]?.count ?? 0;
     result = rows;
 
@@ -396,13 +397,13 @@ export class SearchService {
 
       try {
         const [photosRes, settingsRes, subsRes, connectionsRes, verificationRes] =
-          await Promise.all([
+          await observeDb('search.enrich', () => Promise.all([
             photosPromise,
             settingsPromise,
             subsPromise,
             connectionsPromise.catch(() => []),
             verificationPromise,
-          ]);
+          ]));
         photos = photosRes;
         settings = settingsRes;
         activeSubs = subsRes;
@@ -421,11 +422,18 @@ export class SearchService {
     const verificationByProfile = new Map(
       verificationRows.map((v: any) => [v.profileId, v.status]),
     );
+    const settingsByUser = new Map<string, (typeof settings)[number]>();
+    for (const setting of settings) {
+      if (!settingsByUser.has(setting.userId)) settingsByUser.set(setting.userId, setting);
+    }
+    const subsByUser = new Map<string, (typeof activeSubs)[number]>();
+    for (const sub of activeSubs) {
+      if (!subsByUser.has(sub.userId)) subsByUser.set(sub.userId, sub);
+    }
 
     const mappedResult = result.map((profile: any) => {
-      const primaryPhoto = photos.get(profile.id);
-      const setting = settings.find((s) => s.userId === profile.userId);
-      const userSub = activeSubs.find((s) => s.userId === profile.userId);
+      const setting = settingsByUser.get(profile.userId);
+      const userSub = subsByUser.get(profile.userId);
       const isAccepted = connections.some(
         (c) => c.senderProfileId === profile.id || c.receiverProfileId === profile.id
       );

@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { HomeEntrance } from "@/components/dashboard/home-entrance"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 import { apiClient } from "@/lib/api-client"
 
@@ -11,6 +12,7 @@ import { apiClient } from "@/lib/api-client"
  */
 export default function DashboardGroupLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [ready, setReady] = React.useState(false)
 
   React.useEffect(() => {
@@ -44,10 +46,12 @@ export default function DashboardGroupLayout({ children }: { children: React.Rea
   }, [router])
 
   if (!ready) {
+    const openingHome = pathname === "/home"
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-background text-sm text-muted-foreground">
-        Checking your profile…
-      </div>
+      <HomeEntrance
+        title={openingHome ? "Opening your home" : "One moment"}
+        detail={openingHome ? "Gathering your matches" : "Loading your account"}
+      />
     )
   }
 

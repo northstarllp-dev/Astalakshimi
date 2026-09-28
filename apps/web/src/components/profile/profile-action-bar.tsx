@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ConnectButton } from "@/components/profile/connect-button"
 import {
-  useProfileQuery,
+  useInterestUsageQuery,
   useSendInterestMutation,
   useShortlistQuery,
   useSkipMatchMutation,
@@ -13,12 +13,14 @@ import {
   useInvalidateInterests,
 } from "@/hooks/queries"
 import { apiClient } from "@/lib/api-client"
+import { interestQuotaHint, isInterestQuotaError, isInterestQuotaExhausted } from "@/lib/interest-quota"
 import { cn } from "@/lib/utils"
 import { Bookmark } from "lucide-react"
 
 export function ProfileActionBar({ profileId }: { profileId: string }) {
   const router = useRouter()
   const { data: shortlist = [] } = useShortlistQuery()
+  const { data: interestUsage } = useInterestUsageQuery()
   const invalidateInterests = useInvalidateInterests()
   const skipMutation = useSkipMatchMutation()
   const toggleMutation = useToggleShortlistMutation()
@@ -27,12 +29,18 @@ export function ProfileActionBar({ profileId }: { profileId: string }) {
   const [justSent, setJustSent] = React.useState(false)
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
   const [isAccepting, setIsAccepting] = React.useState(false)
+  const quotaExhausted = isInterestQuotaExhausted(interestUsage)
+  const quotaHint = interestQuotaHint(interestUsage)
 
   const shortlisted = shortlist.some((item: any) =>
     typeof item === "string" ? item === profileId : item.id === profileId || item.profileId === profileId
   )
 
   const handleConnect = async () => {
+    if (quotaExhausted) {
+      router.push("/plans")
+      return
+    }
     setErrorMsg(null)
     try {
       await connectMutation.mutateAsync(profileId)
@@ -57,11 +65,17 @@ export function ProfileActionBar({ profileId }: { profileId: string }) {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-xl safe-bottom">
-      {errorMsg && (
+      {(quotaExhausted || errorMsg) && (
         <div className="mx-auto max-w-5xl px-4 pt-2">
-          <div className="flex items-center justify-between rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive">
-            <span>{errorMsg}</span>
-            {errorMsg.toLowerCase().includes("quota") || errorMsg.toLowerCase().includes("upgrade") ? (
+          <div
+            className={
+              quotaExhausted || isInterestQuotaError(errorMsg)
+                ? "flex items-center justify-between rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-950"
+                : "flex items-center justify-between rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive"
+            }
+          >
+            <span>{quotaHint || errorMsg}</span>
+            {quotaExhausted || (errorMsg && isInterestQuotaError(errorMsg)) ? (
               <Button
                 size="sm"
                 variant="outline"

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { RequireFullPortal } from "@/components/layout/require-full-portal"
 import { Button } from "@/components/ui/button"
 import { MatchListCard } from "@/components/dashboard/match-list-card"
+import { InterestQuotaBanner } from "@/components/dashboard/interest-quota-banner"
 import { useSendInterestMutation, useShortlistQuery, useToggleShortlistMutation } from "@/hooks/queries"
 import { Bookmark, Loader2, Compass } from "lucide-react"
 
@@ -63,6 +64,8 @@ function ShortlistPageInner() {
           </Link>
         )}
       </div>
+
+      <InterestQuotaBanner />
 
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 py-20 text-muted-foreground text-sm">

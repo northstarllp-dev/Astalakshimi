@@ -18,10 +18,13 @@ import {
 } from "@/lib/portal-access"
 import {
   useActivitySummaryQuery,
+  useContactUsageQuery,
+  useInterestUsageQuery,
   useInterestsQuery,
   usePaidQuery,
   useProfileQuery,
   useSubmitVerificationMutation,
+  useSubscriptionQuery,
   useTopMatchesQuery,
 } from "@/hooks/queries"
 import { cn, getMediaUrl } from "@/lib/utils"
@@ -38,6 +41,9 @@ import {
   Sparkles,
 } from "lucide-react"
 import { CurrentPlanStatusCard } from "@/components/dashboard/current-plan-status-card"
+import { ContactQuotaBanner } from "@/components/dashboard/contact-quota-banner"
+import { HomeEntrance } from "@/components/dashboard/home-entrance"
+import { InterestQuotaBanner } from "@/components/dashboard/interest-quota-banner"
 
 function InboxTile({
   label,
@@ -45,12 +51,14 @@ function InboxTile({
   href,
   locked,
   lockHint,
+  loading = false,
 }: {
   label: string
   profiles: any[]
   href: string
   locked?: boolean
   lockHint?: string
+  loading?: boolean
 }) {
   const displayProfiles = profiles.slice(0, 3)
   const remaining = Math.max(0, profiles.length - 3)
@@ -71,19 +79,28 @@ function InboxTile({
         </div>
       )}
       <div className={cn("flex h-8 items-center", locked && "blur-[3px]")}>
-        {displayProfiles.length > 0 ? (
+        {loading ? (
+          <div className="flex -space-x-2" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-8 w-8 animate-pulse rounded-full border-2 border-background bg-muted" />
+            ))}
+          </div>
+        ) : displayProfiles.length > 0 ? (
           <div className="flex -space-x-2">
             {displayProfiles.map((p, i) => {
               const photoUrl = p.photo ? getMediaUrl(p.photo) : (p.photos?.[0] ? getMediaUrl(p.photos[0]) : "")
-              const name = p.name || p.fullName || "M"
+              const name = p.name || p.fullName || ""
+              const letter = name.trim().charAt(0)
               return (
                 <div key={p.id || i} className="relative h-8 w-8 overflow-hidden rounded-full border-2 border-background bg-muted">
                   {photoUrl ? (
                     <Image src={photoUrl} alt={name} fill className="object-cover" sizes="32px" />
-                  ) : (
+                  ) : letter ? (
                     <span className="flex h-full w-full items-center justify-center bg-primary/10 text-[10px] font-semibold text-primary">
-                      {name.charAt(0)}
+                      {letter}
                     </span>
+                  ) : (
+                    <span className="block h-full w-full animate-pulse bg-muted" />
                   )}
                 </div>
               )
@@ -109,11 +126,30 @@ function InboxTile({
 
 export default function HomePage() {
   const router = useRouter()
-  const { data: profile = null, isLoading: profileLoading } = useProfileQuery()
-  const { data: paid = false } = usePaidQuery()
-  const { data: interests } = useInterestsQuery()
+  const { data: profile = null, isPending: profilePending } = useProfileQuery()
+  const { data: paid = false, isLoading: paidLoading } = usePaidQuery()
+  const { data: interests, isPending: interestsPending, isLoading: interestsLoading } = useInterestsQuery()
   const { data: topMatchesData, isLoading: matchesLoading } = useTopMatchesQuery()
-  const { data: activitySummary } = useActivitySummaryQuery()
+  const { data: activitySummary, isPending: activityPending, isLoading: activityLoading } = useActivitySummaryQuery()
+  const { isLoading: subscriptionLoading } = useSubscriptionQuery()
+  const { isLoading: contactUsageLoading } = useContactUsageQuery()
+  const { isLoading: interestUsageLoading } = useInterestUsageQuery()
+  const [releaseEntrance, setReleaseEntrance] = React.useState(false)
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setReleaseEntrance(true), 7000)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  const homeSettling =
+    (profilePending && !profile) ||
+    matchesLoading ||
+    activityLoading ||
+    paidLoading ||
+    subscriptionLoading ||
+    interestsLoading ||
+    contactUsageLoading ||
+    interestUsageLoading
   const carouselRef = React.useRef<HTMLDivElement>(null)
 
   const scrollCarousel = React.useCallback((direction: 'left' | 'right') => {
@@ -124,7 +160,7 @@ export default function HomePage() {
   }, [])
   const submitVerification = useSubmitVerificationMutation()
 
-  const firstName = profile?.fullName?.split(" ")[0] || "Member"
+  const firstName = profile?.fullName?.split(" ")[0] || ""
   const primaryPhotoSrc = getPrimaryPhotoSrc(profile)
   const lookingFor =
     profile?.gender === "Female" ? "grooms" : profile?.gender === "Male" ? "brides" : "matches"
@@ -155,17 +191,23 @@ export default function HomePage() {
           .filter((i: any) => i.status === "pending")
           .map((i: any) => ({
             id: i.profileId,
-            name: i.profile?.fullName ?? "Member",
+            name: i.profile?.fullName ?? "",
             photo: i.profile?.photo ?? "",
             subtitle: i.time,
           }))
 
+  if (homeSettling && !releaseEntrance) {
+    return <HomeEntrance />
+  }
+
   return (
-    <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 md:py-6">
+    <main className="animate-in mx-auto max-w-6xl px-3 py-4 sm:px-4 md:py-6">
       <div className="mb-5 flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          {primaryPhotoSrc ? (
-            <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border">
+          <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
+            {profilePending && !profile ? (
+              <span className="absolute inset-0 animate-pulse bg-muted" aria-hidden="true" />
+            ) : primaryPhotoSrc ? (
               <Image
                 src={getMediaUrl(primaryPhotoSrc)}
                 alt=""
@@ -173,15 +215,15 @@ export default function HomePage() {
                 className={cn("object-cover object-[center_18%]", pending && "blur-[2px]")}
                 sizes="48px"
               />
-            </span>
-          ) : null}
+            ) : null}
+          </span>
           <div className="min-w-0">
             <h1 className="font-serif text-2xl font-semibold leading-tight md:text-[1.75rem]">
               Your Top Matches
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
               A curated list of your best potential matches. Complete your profile to unlock more recommendations
-              {firstName !== "Member" ? `, ${firstName}` : ""}.
+              {firstName ? `, ${firstName}` : ""}.
             </p>
           </div>
         </div>
@@ -233,6 +275,9 @@ export default function HomePage() {
           </div>
         ) : null}
       </div>
+
+      <InterestQuotaBanner />
+      <ContactQuotaBanner />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
         <div className="min-w-0 space-y-4">
@@ -389,6 +434,7 @@ export default function HomePage() {
                 href="/interests"
                 locked={!unlocked}
                 lockHint={incomplete ? "Complete profile" : "Under review"}
+                loading={activityPending && interestsPending}
               />
               <InboxTile
                 label="Who viewed you"
@@ -396,6 +442,7 @@ export default function HomePage() {
                 href={paid ? "/notifications" : "/plans"}
                 locked={!unlocked || !paid}
                 lockHint={!paid ? "Premium" : incomplete ? "Complete profile" : "Under review"}
+                loading={activityPending}
               />
               <InboxTile
                 label="Shortlisted you"
@@ -403,6 +450,7 @@ export default function HomePage() {
                 href={paid ? "/interests?tab=shortlisted" : "/plans"}
                 locked={!unlocked || !paid}
                 lockHint={!paid ? "Premium" : incomplete ? "Complete profile" : "Under review"}
+                loading={activityPending}
               />
               <InboxTile
                 label="You viewed"
@@ -410,6 +458,7 @@ export default function HomePage() {
                 href="/dashboard"
                 locked={!unlocked}
                 lockHint={incomplete ? "Complete profile" : "Under review"}
+                loading={activityPending}
               />
             </section>
             

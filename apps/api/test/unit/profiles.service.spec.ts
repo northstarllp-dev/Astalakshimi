@@ -408,7 +408,7 @@ describe('Feature 2: Profiles - ProfilesService (Unit Tests)', () => {
       const mockPhotos = [
         {
           id: 'p1',
-          s3Key: 'profiles/user-1/photos/p1.jpeg',
+          s3Key: 'profiles/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/photos/11111111-2222-3333-4444-555555555555.jpeg',
           isPrimary: true,
           displayOrder: 0,
           status: 'pending',

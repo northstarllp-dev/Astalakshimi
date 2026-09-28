@@ -30,6 +30,7 @@
     "@nestjs/schedule": "^12.0.2",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.2.3",
+    "compression": "^1.8.1",
     "cashfree-pg": "^6.0.6",
     "crypto": "^1.0.1",
     "dotenv": "^16.4.7",

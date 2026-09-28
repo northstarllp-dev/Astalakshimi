@@ -126,11 +126,22 @@ describe('Feature 6: Search & Filtering - SearchService (Unit Tests)', () => {
     installSearchMock(mockDb, {
       viewer: { id: 'prof-curr', gender: 'Male' },
       pool: [{ id: 'prof-target', userId: 'user-target', createdAt: new Date() }],
-      photos: [{ profileId: 'prof-target', s3Key: 'photo-key-123.jpg', isPrimary: true }],
+      photos: [
+        {
+          profileId: 'prof-target',
+          id: '11111111-2222-3333-4444-555555555555',
+          s3Key: 'profiles/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/photos/11111111-2222-3333-4444-555555555555.jpg',
+          isPrimary: true,
+          displayOrder: 0,
+          status: 'approved',
+        },
+      ],
     });
 
     const result = await searchService.searchProfiles('curr-user-id', {});
-    expect(result.profiles[0].photos).toEqual(['photo-key-123.jpg']);
+    expect(result.profiles[0].photos).toEqual([
+      'profiles/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/photos/11111111-2222-3333-4444-555555555555.jpg',
+    ]);
   });
 
   it('unfiltered search still returns the opposite-gender pool', async () => {

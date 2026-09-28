@@ -22,6 +22,13 @@ vi.mock("@/hooks/queries", () => ({
   useSendInterestMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useShortlistQuery: () => ({ data: [] }),
   useToggleShortlistMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useInterestUsageQuery: () => ({
+    data: { planSlug: "free", limit: 30, used: 0, remaining: 30, periodLabel: "this 30 days" },
+  }),
+}))
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
 }))
 
 vi.mock("@/components/profile/plan-crown-badge", () => ({

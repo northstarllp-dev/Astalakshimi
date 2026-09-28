@@ -22,7 +22,8 @@ import {
   paymentDiscrepancies,
   paymentRefunds,
 } from '@astalakshimi/database';
-import { eq, and, gt, desc } from 'drizzle-orm';
+import { eq, and, gt, desc, ne } from 'drizzle-orm';
+import { isPlanDowngrade } from '../entitlements/interest-window';
 import { Cashfree, CFEnvironment } from 'cashfree-pg';
 import { randomUUID } from 'crypto';
 
@@ -58,6 +59,24 @@ export class PaymentsService {
     this.cashfree.XApiVersion = this.xApiVersion;
   }
 
+  private async getActiveSubscription(userId: string): Promise<{ slug: string; hasRow: boolean }> {
+    const [row] = await this.db
+      .select({ slug: plans.slug })
+      .from(subscriptions)
+      .innerJoin(plans, eq(subscriptions.planId, plans.id))
+      .where(
+        and(
+          eq(subscriptions.userId, userId),
+          eq(subscriptions.status, 'active'),
+          gt(subscriptions.expiresAt, new Date()),
+        ),
+      )
+      .orderBy(desc(subscriptions.startsAt))
+      .limit(1);
+    if (!row) return { slug: 'free', hasRow: false };
+    return { slug: row.slug, hasRow: true };
+  }
+
   async createOrder(userId: string, planIdentifier: string) {
     const [profile] = await this.db
       .select()
@@ -72,9 +91,18 @@ export class PaymentsService {
     const [plan] = await this.db.select().from(plans).where(planCondition).limit(1);
     if (!plan) throw new NotFoundException(`Plan '${planIdentifier}' not found`);
 
+    const current = await this.getActiveSubscription(userId);
+    if (isPlanDowngrade(current.slug, plan.slug)) {
+      throw new ForbiddenException(
+        'Cannot switch to a lower plan while a higher plan is still active',
+      );
+    }
+
     const amountPaise = plan.pricePaise;
     if (amountPaise === 0) {
-      await this.activatePlanSubscription(userId, plan);
+      if (!current.hasRow) {
+        await this.activatePlanSubscription(userId, plan);
+      }
       return {
         freeActivated: true,
         planId: plan.id,
@@ -181,13 +209,14 @@ export class PaymentsService {
     }
 
     const providerPaymentId = await this.fetchSuccessfulPaymentId(orderId);
-    await this.capturePayment(payment.id, providerPaymentId, 'client_callback');
+    const capturedNow = await this.capturePayment(payment.id, providerPaymentId, 'client_callback');
+    if (capturedNow) {
+      await this.grantCapturedEntitlements(payment);
+    }
 
     if (!payment.planId) throw new NotFoundException('Plan not found');
     const [plan] = await this.db.select().from(plans).where(eq(plans.id, payment.planId)).limit(1);
     if (!plan) throw new NotFoundException('Plan not found');
-
-    await this.activatePlanSubscription(userId, plan, payment.id);
     return { success: true, planName: plan.name, planSlug: plan.slug };
   }
 
@@ -280,15 +309,31 @@ export class PaymentsService {
     switch (eventType) {
       case 'PAYMENT_SUCCESS_WEBHOOK':
       case 'ORDER_PAID': {
-        if (payment.status !== 'captured') {
-          await this.capturePayment(payment.id, cfPaymentId || null, 'webhook');
-          if (payment.planId) {
-            const [plan] = await this.db.select().from(plans).where(eq(plans.id, payment.planId)).limit(1);
-            if (plan) await this.activatePlanSubscription(payment.userId, plan, payment.id);
-          }
-          if (payment.targetProfileId) {
-            await this.recordContactUnlock(payment.userId, payment.targetProfileId, payment.id);
-          }
+        const capturedNow = await this.capturePayment(payment.id, cfPaymentId || null, 'webhook');
+        if (capturedNow) {
+          await this.grantCapturedEntitlements(payment);
+        }
+        break;
+      }
+      case 'PAYMENT_USER_DROPPED_WEBHOOK': {
+        if (payment.status === 'created') {
+          const existingMeta =
+            payment.providerMetadata && typeof payment.providerMetadata === 'object'
+              ? payment.providerMetadata
+              : {};
+          await this.db
+            .update(payments)
+            .set({
+              providerStatus: data.order?.order_status || payment.providerStatus || 'ACTIVE',
+              providerMetadata: {
+                ...existingMeta,
+                lastDroppedAt: new Date().toISOString(),
+                lastDroppedPaymentId: cfPaymentId ?? null,
+                lastDroppedPaymentStatus: data.payment?.payment_status || 'USER_DROPPED',
+              },
+              updatedAt: new Date(),
+            })
+            .where(eq(payments.id, payment.id));
         }
         break;
       }
@@ -347,16 +392,10 @@ export class PaymentsService {
     }
 
     if (cfOrder.order_status === 'PAID') {
-      if (payment.status !== 'captured') {
-        const providerPaymentId = await this.fetchSuccessfulPaymentId(payment.providerOrderId);
-        await this.capturePayment(payment.id, providerPaymentId, 'reconciliation');
-        if (payment.planId) {
-          const [plan] = await this.db.select().from(plans).where(eq(plans.id, payment.planId)).limit(1);
-          if (plan) await this.activatePlanSubscription(payment.userId, plan, payment.id);
-        }
-        if (payment.targetProfileId) {
-          await this.recordContactUnlock(payment.userId, payment.targetProfileId, payment.id);
-        }
+      const providerPaymentId = await this.fetchSuccessfulPaymentId(payment.providerOrderId);
+      const capturedNow = await this.capturePayment(payment.id, providerPaymentId, 'reconciliation');
+      if (capturedNow) {
+        await this.grantCapturedEntitlements(payment);
       }
       return { captured: true };
     }
@@ -748,8 +787,8 @@ export class PaymentsService {
     paymentId: string,
     providerPaymentId: string | null,
     verifiedBy: VerifiedBy,
-  ) {
-    await this.db
+  ): Promise<boolean> {
+    const updated = await this.db
       .update(payments)
       .set({
         status: 'captured',
@@ -758,7 +797,19 @@ export class PaymentsService {
         verifiedBy,
         updatedAt: new Date(),
       })
-      .where(eq(payments.id, paymentId));
+      .where(and(eq(payments.id, paymentId), ne(payments.status, 'captured')))
+      .returning({ id: payments.id });
+    return updated.length > 0;
+  }
+
+  private async grantCapturedEntitlements(payment: Payment) {
+    if (payment.planId) {
+      const [plan] = await this.db.select().from(plans).where(eq(plans.id, payment.planId)).limit(1);
+      if (plan) await this.activatePlanSubscription(payment.userId, plan, payment.id);
+    }
+    if (payment.targetProfileId) {
+      await this.recordContactUnlock(payment.userId, payment.targetProfileId, payment.id);
+    }
   }
 
   private async activatePlanSubscription(
@@ -766,13 +817,22 @@ export class PaymentsService {
     plan: { id: string; durationDays: number; name: string; slug: string },
     paymentId?: string,
   ) {
+    if (paymentId) {
+      const [existing] = await this.db
+        .select({ id: subscriptions.id })
+        .from(subscriptions)
+        .where(eq(subscriptions.paymentId, paymentId))
+        .limit(1);
+      if (existing) return;
+    }
+
     const startsAt = new Date();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + plan.durationDays);
 
     await this.db
       .update(subscriptions)
-      .set({ status: 'expired' })
+      .set({ status: 'expired', expiresAt: new Date(), updatedAt: new Date() })
       .where(and(eq(subscriptions.userId, userId), eq(subscriptions.status, 'active')));
 
     await this.db.insert(subscriptions).values({

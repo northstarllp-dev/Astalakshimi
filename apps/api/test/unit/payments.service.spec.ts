@@ -53,8 +53,12 @@ function selectReturning(rows: unknown[]) {
   q.where.mockReturnValue(q);
   q.innerJoin.mockReturnValue(q);
   q.leftJoin.mockReturnValue(q);
-  q.orderBy.mockResolvedValue(rows);
+  q.orderBy.mockReturnValue(q);
   q.limit.mockResolvedValue(rows);
+  Object.assign(q, {
+    then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+      Promise.resolve(rows).then(resolve, reject),
+  });
   return q;
 }
 
@@ -116,12 +120,23 @@ describe('PaymentsService (Cashfree)', () => {
       }),
     };
 
+    const updateChain: Record<string, jest.Mock> = {
+      set: jest.fn(),
+      where: jest.fn(),
+      returning: jest.fn(),
+    };
+    updateChain.set.mockReturnValue(updateChain);
+    updateChain.where.mockReturnValue(updateChain);
+    updateChain.returning.mockResolvedValue([{ id: 'pay-1' }]);
+    Object.assign(updateChain, {
+      then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+        Promise.resolve(undefined).then(resolve, reject),
+    });
+
     mockDb = {
       select: jest.fn(),
       insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
-      update: jest.fn().mockReturnValue({
-        set: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-      }),
+      update: jest.fn().mockReturnValue(updateChain),
     };
 
     cf().PGCreateOrder.mockResolvedValue({
@@ -156,7 +171,7 @@ describe('PaymentsService (Cashfree)', () => {
     });
 
     it('activates a free plan without calling Cashfree', async () => {
-      queueSelect(mockDb, [[profile], [freePlan]]);
+      queueSelect(mockDb, [[profile], [freePlan], []]);
       const result = await paymentsService.createOrder('user-1', 'free');
       expect(result).toMatchObject({ freeActivated: true, planSlug: 'free', amount: 0 });
       expect(cf().PGCreateOrder).not.toHaveBeenCalled();
@@ -164,7 +179,7 @@ describe('PaymentsService (Cashfree)', () => {
     });
 
     it('creates a Cashfree order and stores paymentSessionId', async () => {
-      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      queueSelect(mockDb, [[profile], [paidPlan], [], [owner]]);
       const result = await paymentsService.createOrder('user-1', 'silver');
       expect(cf().PGCreateOrder).toHaveBeenCalled();
       expect(result).toEqual({
@@ -180,7 +195,7 @@ describe('PaymentsService (Cashfree)', () => {
     });
 
     it('surfaces Cashfree SDK failures as 500', async () => {
-      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      queueSelect(mockDb, [[profile], [paidPlan], [], [owner]]);
       cf().PGCreateOrder.mockRejectedValue({ response: { data: { message: 'boom' } } });
       await expect(paymentsService.createOrder('user-1', 'silver')).rejects.toThrow(
         InternalServerErrorException,
@@ -188,11 +203,26 @@ describe('PaymentsService (Cashfree)', () => {
     });
 
     it('maps idempotency_error to 400', async () => {
-      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      queueSelect(mockDb, [[profile], [paidPlan], [], [owner]]);
       cf().PGCreateOrder.mockRejectedValue({
         response: { data: { type: 'idempotency_error', code: 'request_invalid' } },
       });
       await expect(paymentsService.createOrder('user-1', 'silver')).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects a lower-tier purchase while a higher plan is active', async () => {
+      queueSelect(mockDb, [[profile], [paidPlan], [{ slug: 'gold' }]]);
+      await expect(paymentsService.createOrder('user-1', 'silver')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(cf().PGCreateOrder).not.toHaveBeenCalled();
+    });
+
+    it('allows same-tier Silver renewal', async () => {
+      queueSelect(mockDb, [[profile], [paidPlan], [{ slug: 'silver' }], [owner]]);
+      const result = await paymentsService.createOrder('user-1', 'silver');
+      expect(result.orderId).toBe('cf_order_1');
+      expect(cf().PGCreateOrder).toHaveBeenCalled();
     });
   });
 
@@ -219,7 +249,7 @@ describe('PaymentsService (Cashfree)', () => {
     });
 
     it('captures and activates on PAID', async () => {
-      queueSelect(mockDb, [[createdPayment], [paidPlan]]);
+      queueSelect(mockDb, [[createdPayment], [paidPlan], [], [paidPlan]]);
       const result = await paymentsService.verifyOrder('user-1', 'cf_order_1');
       expect(cf().PGFetchOrder).toHaveBeenCalledWith('cf_order_1', expect.any(String));
       expect(cf().PGOrderFetchPayments).toHaveBeenCalled();
@@ -302,7 +332,7 @@ describe('PaymentsService (Cashfree)', () => {
         type: 'PAYMENT_SUCCESS_WEBHOOK',
         object: JSON.parse(raw.toString()),
       });
-      queueSelect(mockDb, [[], [createdPayment], [paidPlan]]);
+      queueSelect(mockDb, [[], [createdPayment], [paidPlan], []]);
       const result = await paymentsService.handleWebhook(raw, {
         'x-webhook-signature': 'sig',
         'x-webhook-timestamp': nowTs(),
@@ -392,11 +422,33 @@ describe('PaymentsService (Cashfree)', () => {
       });
       expect(result).toEqual({ received: true });
     });
+
+    it('records USER_DROPPED without failing an ACTIVE order', async () => {
+      const payload = {
+        type: 'PAYMENT_USER_DROPPED_WEBHOOK',
+        data: {
+          order: { order_id: 'cf_order_1', order_amount: 299, order_currency: 'INR', order_status: 'ACTIVE' },
+          payment: { cf_payment_id: 'cfpay_drop', payment_status: 'USER_DROPPED' },
+        },
+      };
+      cf().PGVerifyWebhookSignature.mockReturnValue({
+        type: 'PAYMENT_USER_DROPPED_WEBHOOK',
+        object: payload,
+      });
+      queueSelect(mockDb, [[], [createdPayment]]);
+      const result = await paymentsService.handleWebhook(Buffer.from(JSON.stringify(payload)), {
+        'x-webhook-signature': 'sig',
+        'x-webhook-timestamp': nowTs(),
+      });
+      expect(result).toEqual({ received: true });
+      expect(mockDb.update).toHaveBeenCalled();
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
   });
 
   describe('reconcileOrder', () => {
     it('captures PAID stuck orders via PGOrderFetchPayments', async () => {
-      queueSelect(mockDb, [[paidPlan]]);
+      queueSelect(mockDb, [[paidPlan], []]);
       const result = await paymentsService.reconcileOrder(createdPayment as any);
       expect(cf().PGFetchOrder).toHaveBeenCalled();
       expect(cf().PGOrderFetchPayments).toHaveBeenCalled();
@@ -447,7 +499,7 @@ describe('PaymentsService (Cashfree)', () => {
     });
 
     it('retries on 429 using x-ratelimit-retry', async () => {
-      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      queueSelect(mockDb, [[profile], [paidPlan], [], [owner]]);
       cf()
         .PGCreateOrder.mockRejectedValueOnce({
           response: { status: 429, headers: { 'x-ratelimit-retry': '1' }, data: { type: 'rate_limit_error' } },
@@ -462,7 +514,7 @@ describe('PaymentsService (Cashfree)', () => {
     });
 
     it('throws after 3 failed 429 attempts', async () => {
-      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      queueSelect(mockDb, [[profile], [paidPlan], [], [owner]]);
       cf().PGCreateOrder.mockRejectedValue({
         response: { status: 429, headers: { 'x-ratelimit-retry': '1' }, data: { type: 'rate_limit_error' } },
       });
@@ -473,7 +525,7 @@ describe('PaymentsService (Cashfree)', () => {
     });
 
     it('passes through non-429 errors immediately', async () => {
-      queueSelect(mockDb, [[profile], [paidPlan], [owner]]);
+      queueSelect(mockDb, [[profile], [paidPlan], [], [owner]]);
       cf().PGCreateOrder.mockRejectedValue({ response: { status: 500, data: { message: 'nope' } } });
       await expect(paymentsService.createOrder('user-1', 'silver')).rejects.toThrow(
         InternalServerErrorException,
