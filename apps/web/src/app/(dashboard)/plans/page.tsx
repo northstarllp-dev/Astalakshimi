@@ -7,6 +7,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { getPlanById, MEMBERSHIP_PLANS, PLAN_FEATURE_MATRIX, CURRENT_PLAN_ID, featureCell, computeAddonPrice, DURATION_ADDONS, PLAN_IDS, type PlanId } from "@/lib/plans"
 import { PlanCompare } from "@/components/plans/plan-compare"
+import { CurrentPlanStatusCard } from "@/components/dashboard/current-plan-status-card"
 import { planSelectSchema } from "@/lib/validation"
 import { useProfileQuery, useSubscriptionQuery, useInvoicesQuery, useContactUsageQuery, useInterestUsageQuery } from "@/hooks/queries"
 import {
@@ -58,6 +59,10 @@ export default function PlansPage() {
     router.push(`/checkout?plan=${parsed.data.planId}`)
   }
 
+  const scrollToCompare = () => {
+    document.getElementById("plan-compare")?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
   return (
     <main className="mx-auto max-w-6xl space-y-8 px-3 py-5 sm:px-4 md:py-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -75,14 +80,16 @@ export default function PlansPage() {
         )}
       </div>
 
+      <CurrentPlanStatusCard onUpgrade={scrollToCompare} />
 
-
-      <PlanCompare
-        currentPlanId={currentPlanId}
-        selectedPlanId={selectedCompare}
-        onSelect={setSelectedCompare}
-        onChoose={choosePlan}
-      />
+      <div id="plan-compare">
+        <PlanCompare
+          currentPlanId={currentPlanId}
+          selectedPlanId={selectedCompare}
+          onSelect={setSelectedCompare}
+          onChoose={choosePlan}
+        />
+      </div>
 
 
 

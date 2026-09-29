@@ -5,20 +5,8 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Menu, X, ChevronDown } from "lucide-react"
+import { Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-const browseLinks = [
-  { href: "/register", label: "By Community" },
-  { href: "/register", label: "By City" },
-  { href: "/register", label: "By Profession" },
-]
 
 export function SiteHeader({ variant = "marketing" }: { variant?: "marketing" | "auth" }) {
   const pathname = usePathname()
@@ -46,19 +34,9 @@ export function SiteHeader({ variant = "marketing" }: { variant?: "marketing" | 
 
         {variant === "marketing" && (
           <nav className="hidden items-center gap-7 text-sm font-medium text-foreground/80 md:flex">
-            <DropdownMenu>
-              <DropdownMenuTrigger className="group inline-flex items-center gap-1 outline-none transition-colors hover:text-primary data-[state=open]:text-primary">
-                Browse profiles{" "}
-                <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                {browseLinks.map((link) => (
-                  <DropdownMenuItem key={link.label} asChild>
-                    <Link href={link.href}>{link.label}</Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Link href="/register?fresh=1" className="hover:text-primary transition-colors">
+              Browse profiles
+            </Link>
             <Link href="#how" className="hover:text-primary transition-colors">
               How it works
             </Link>
@@ -97,8 +75,8 @@ export function SiteHeader({ variant = "marketing" }: { variant?: "marketing" | 
         )}
       >
         <nav className="flex flex-col gap-1 text-base font-medium">
-          <Link href="/register" className="rounded-xl px-4 py-3 hover:bg-muted hover:text-primary transition-colors">
-            Browse by community
+          <Link href="/register?fresh=1" className="rounded-xl px-4 py-3 hover:bg-muted hover:text-primary transition-colors">
+            Browse profiles
           </Link>
           <Link href="#how" className="rounded-xl px-4 py-3 hover:bg-muted hover:text-primary transition-colors">
             How it works

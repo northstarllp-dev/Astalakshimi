@@ -59,12 +59,15 @@ describe("ProfileContactUnlockDialog", () => {
     expect(mutateAsync).not.toHaveBeenCalled()
   })
 
-  it("does not offer pay or plans when the contact is already unlocked", () => {
+  it("does not offer pay or plans when the contact is already unlocked", async () => {
+    mutateAsync.mockReset()
+    mutateAsync.mockResolvedValue({ success: true, alreadyUnlocked: true, contactPhone: "9876543210" })
     render(
       <ProfileContactUnlockDialog
         open
         onOpenChange={vi.fn()}
         profileId="p1"
+        phone="9876543210"
         access={access({
           isUnlocked: true,
           canView: true,
@@ -75,8 +78,30 @@ describe("ProfileContactUnlockDialog", () => {
         })}
       />,
     )
-    expect(screen.getByText("This contact is already unlocked.")).toBeInTheDocument()
+    expect(screen.getByText("Contact unlocked")).toBeInTheDocument()
+    expect(screen.getByText("+91 98765 43210")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /call now/i })).toHaveAttribute("href", "tel:9876543210")
     expect(screen.queryByRole("button", { name: /pay ₹29/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /view plans/i })).not.toBeInTheDocument()
+  })
+
+  it("loads the phone when unlocked but no number was passed in", async () => {
+    mutateAsync.mockReset()
+    mutateAsync.mockResolvedValue({ success: true, alreadyUnlocked: true, contactPhone: "9123456780" })
+    render(
+      <ProfileContactUnlockDialog
+        open
+        onOpenChange={vi.fn()}
+        profileId="p1"
+        access={access({
+          isUnlocked: true,
+          canView: true,
+          canUnlockWithQuota: false,
+          canPayExtra: false,
+        })}
+      />,
+    )
+    expect(await screen.findByText("+91 91234 56780")).toBeInTheDocument()
+    expect(mutateAsync).toHaveBeenCalledWith("p1")
   })
 })

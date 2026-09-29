@@ -59,7 +59,12 @@ function Stat({
   )
 }
 
-export function CurrentPlanStatusCard() {
+export function CurrentPlanStatusCard({
+  onUpgrade,
+}: {
+  /** Override the Upgrade / Renew action (e.g. scroll to plan picker on /plans). */
+  onUpgrade?: () => void
+} = {}) {
   const router = useRouter()
   const { data: sub } = useSubscriptionQuery()
   const { data: contactUsage } = useContactUsageQuery()
@@ -81,6 +86,10 @@ export function CurrentPlanStatusCard() {
   const contactHint = contactQuotaHint(contactUsage)
 
   const choosePlan = () => {
+    if (onUpgrade) {
+      onUpgrade()
+      return
+    }
     router.push("/plans")
   }
 

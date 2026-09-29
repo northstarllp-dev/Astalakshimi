@@ -81,6 +81,7 @@ function SignupPageInner() {
   const searchParams = useSearchParams()
   const presetPhone = (searchParams.get("phone") ?? "").replace(/\D/g, "").slice(0, 10)
   const fromLogin = searchParams.get("new") === "1"
+  const freshStart = searchParams.get("fresh") === "1"
   const [hydrated, setHydrated] = useState(false)
   const [step, setStep] = useState(1)
   const [submitted, setSubmitted] = useState(false)
@@ -110,46 +111,94 @@ function SignupPageInner() {
   }, [queryClient, router])
 
   React.useEffect(() => {
-    const draft = loadSignupDraft()
-    if (draft?.data.submittedAt || isHomeHandoffPending()) {
-      if (draft?.data.submittedAt) {
-        markHomeHandoffPending()
+    let cancelled = false
+
+    const hydrate = async () => {
+      // Marketing "Browse profiles" (and any ?fresh=1 entry): start at Create
+      // your account. Clear leftover partial-signup draft/auth so Identity and
+      // later steps stay locked until OTP succeeds. Existing members go home.
+      if (freshStart) {
         clearSignupDraft()
-      }
-      beginHomeHandoff(true)
-      return
-    }
-    if (draft) {
-      const draftPhone = String(draft.data.phone ?? "").replace(/\D/g, "").slice(0, 10)
-      if (fromLogin && presetPhone && draftPhone && draftPhone !== presetPhone) {
-        setData({ ...emptySignupData(), phone: presetPhone })
-        setStep(1)
-      } else {
-        const restored: SignupData = {
-          ...draft.data,
-          phone: presetPhone || draft.data.phone,
-          photos: (draft.data.photoS3Keys?.length
-            ? draft.data.photoS3Keys
-            : draft.data.photos
-          )
-            .filter(Boolean)
-            .map((path) => getMediaUrl(path)),
-          selfiePhoto: directPreview(draft.data.selfiePhoto),
-          govtIdPhoto: directPreview(draft.data.govtIdPhoto),
+        clearHomeHandoffPending()
+        try {
+          const me = await apiClient.auth.getMe()
+          if (cancelled) return
+          if (me.hasProfile) {
+            await apiClient.auth.syncEnrollment()
+            router.replace("/home")
+            return
+          }
+        } catch {
+          /* not logged in — continue as new signup */
         }
-        // Seed the "same as me" preference pre-fills when resuming into (or
-        // past) the preferences step, so step 5 opens pre-filled and the draft
-        // carries them even if the member changes nothing.
-        setData({ ...restored, ...seedPreferenceDefaults(restored) })
-        // OTP is verified iff the auth token is present; skip the phone/OTP
-        // steps when authenticated, otherwise restart at phone entry.
-        setStep(apiClient.getToken() ? Math.max(draft.step, 3) : 1)
+        try {
+          await apiClient.auth.logout()
+        } catch {
+          apiClient.clearToken()
+        }
+        if (cancelled) return
+        setData(emptySignupData())
+        setStep(1)
+        setHydrated(true)
+        router.replace("/register")
+        return
       }
-    } else if (presetPhone) {
-      setData({ ...emptySignupData(), phone: presetPhone })
+
+      const draft = loadSignupDraft()
+      if (draft?.data.submittedAt || isHomeHandoffPending()) {
+        if (draft?.data.submittedAt) {
+          markHomeHandoffPending()
+          clearSignupDraft()
+        }
+        beginHomeHandoff(true)
+        return
+      }
+      if (draft) {
+        const draftPhone = String(draft.data.phone ?? "").replace(/\D/g, "").slice(0, 10)
+        if (fromLogin && presetPhone && draftPhone && draftPhone !== presetPhone) {
+          setData({ ...emptySignupData(), phone: presetPhone })
+          setStep(1)
+        } else {
+          const restored: SignupData = {
+            ...draft.data,
+            phone: presetPhone || draft.data.phone,
+            photos: (draft.data.photoS3Keys?.length
+              ? draft.data.photoS3Keys
+              : draft.data.photos
+            )
+              .filter(Boolean)
+              .map((path) => getMediaUrl(path)),
+            selfiePhoto: directPreview(draft.data.selfiePhoto),
+            govtIdPhoto: directPreview(draft.data.govtIdPhoto),
+          }
+          setData({ ...restored, ...seedPreferenceDefaults(restored) })
+          // OTP verified iff auth flag is present. Without it, never skip past
+          // Create account / OTP into Identity or later steps.
+          if (apiClient.getToken()) {
+            setStep(Math.max(draft.step, 3))
+          } else {
+            setStep(Math.min(Math.max(draft.step, 1), 2))
+          }
+        }
+      } else if (presetPhone) {
+        setData({ ...emptySignupData(), phone: presetPhone })
+      }
+      setHydrated(true)
     }
-    setHydrated(true)
-  }, [router, presetPhone, fromLogin, beginHomeHandoff])
+
+    void hydrate()
+    return () => {
+      cancelled = true
+    }
+  }, [router, presetPhone, fromLogin, freshStart, beginHomeHandoff])
+
+  // Hard stop: Identity (3+) requires a completed OTP session.
+  React.useEffect(() => {
+    if (!hydrated || submitted) return
+    if (step >= 3 && !apiClient.getToken()) {
+      setStep(1)
+    }
+  }, [hydrated, submitted, step])
 
   // Heal: already-enrolled users (or missing has_profile cookie) shouldn't stay on onboarding.
   React.useEffect(() => {
@@ -197,6 +246,11 @@ function SignupPageInner() {
 
   const nextStep = () => {
     const target = Math.min(step + 1, TOTAL_STEPS)
+    // Identity and later steps require OTP. Never advance past OTP without auth.
+    if (target >= 3 && !apiClient.getToken()) {
+      setStep(2)
+      return
+    }
     // Entering the preferences step: seed the "same as me" pre-fills from the
     // community answers in the same update, so the step renders pre-filled.
     if (target === 5) {

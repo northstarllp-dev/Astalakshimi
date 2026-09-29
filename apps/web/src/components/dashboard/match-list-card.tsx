@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ProfileContactUnlockDialog } from "@/components/profile/profile-contact-unlock-dialog"
 import { ProfileMutualUnlockDialog, useMutualUnlockDialog } from "@/components/profile/profile-mutual-unlock-dialog"
+import { EXTRA_CONTACT_FEE } from "@/lib/plans"
 
 function formatHeight(height?: string, heightCm?: number): string {
   if (heightCm && heightCm > 0) {
@@ -141,9 +142,14 @@ export function MatchListCard({
   const isConnected = connectStatus === "mutual" || connectStatus === "sent" || justConnected
   const isConnecting = sendInterestMutation.isPending
 
-  const isContactUnlocked = unlockedContacts.some(
+  const unlockedEntry = unlockedContacts.find(
     (u: any) => (typeof u === "string" ? u === match.id : u.id === match.id || u.profileId === match.id)
   )
+  const isContactUnlocked = Boolean(unlockedEntry)
+  const unlockedPhone =
+    typeof unlockedEntry === "object" && unlockedEntry
+      ? (unlockedEntry.phone as string | null | undefined) ?? null
+      : null
 
   const handleToggleShortlist = (e?: React.MouseEvent) => {
     e?.preventDefault()
@@ -337,19 +343,25 @@ export function MatchListCard({
           </div>
         </div>
 
-        {/* Tap areas for photo gallery navigation if multiple photos */}
+        {/* Side photo slide buttons */}
         {photos.length > 1 && (
           <>
-            <div
-              className="absolute left-0 top-14 bottom-48 w-1/4 z-10"
+            <button
+              type="button"
               onClick={prevPhoto}
               aria-label="Previous photo"
-            />
-            <div
-              className="absolute right-0 top-14 bottom-48 w-1/4 z-10"
+              className="absolute left-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md border border-white/20 shadow-sm transition hover:bg-black/65 active:scale-95"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
               onClick={nextPhoto}
               aria-label="Next photo"
-            />
+              className="absolute right-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md border border-white/20 shadow-sm transition hover:bg-black/65 active:scale-95"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
           </>
         )}
 
@@ -642,10 +654,11 @@ export function MatchListCard({
         open={contactDialogOpen}
         onOpenChange={setContactDialogOpen}
         profileId={match.id}
+        phone={unlockedPhone}
         access={
           contactUsage
             ? {
-                canView: false,
+                canView: isContactUnlocked,
                 isUnlocked: isContactUnlocked,
                 isMutualBenefit: true,
                 limit: contactUsage.limit,
@@ -659,7 +672,20 @@ export function MatchListCard({
                 extraContactFeePaise: contactUsage.extraContactFeePaise,
                 planSlug: contactUsage.planSlug,
               }
-            : null
+            : isContactUnlocked
+              ? {
+                  canView: true,
+                  isUnlocked: true,
+                  isMutualBenefit: true,
+                  limit: null,
+                  usedThisMonth: 0,
+                  remaining: null,
+                  canUnlockWithQuota: false,
+                  canPayExtra: false,
+                  extraContactFeePaise: EXTRA_CONTACT_FEE * 100,
+                  planSlug: "free",
+                }
+              : null
         }
       />
       <ProfileMutualUnlockDialog

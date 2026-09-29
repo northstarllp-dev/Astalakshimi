@@ -160,10 +160,9 @@ function BackToTop() {
       type="button"
       aria-label="Back to top"
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      className="fixed bottom-24 left-4 z-40 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2.5 text-sm font-semibold text-primary shadow-lg transition hover:bg-primary hover:text-primary-foreground md:bottom-6 md:left-auto md:right-6"
+      className="fixed bottom-24 left-3 z-40 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-primary shadow-md transition hover:bg-primary hover:text-primary-foreground active:scale-95 md:bottom-6 md:left-auto md:right-6"
     >
       <ArrowUp className="h-4 w-4" />
-      Top
     </button>
   )
 }
